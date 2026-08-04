@@ -7,8 +7,9 @@ import os
 import time
 from typing import List, Optional, Union
 from dotenv import load_dotenv
+from app.config import settings
 from openai import OpenAI
-from rich.console import Console
+from app.utils.logger import get_logger
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.panel import Panel
 from rich.table import Table
@@ -24,7 +25,7 @@ except ImportError:
 
 # 加载环境变量
 load_dotenv()
-console = Console()
+# Logger will be initialized per instance
 
 
 class UniversalEmbeddingClient:
@@ -104,10 +105,10 @@ class UniversalEmbeddingClient:
         else:
             self._initialize_api_client()
 
-        console.print(f"[green]✓ 已初始化嵌入客户端: {provider}[/green]")
-        console.print(f"  类型: {'本地Ollama' if self.type == 'local' else '云端API'}")
-        console.print(f"  模型: {self.config['model']}")
-        console.print(f"  向量维度: {self.config['dimensions']}")
+        get_logger(__name__).info(f"✓ 已初始化嵌入客户端: {provider}")
+        get_logger(__name__).info(f"  类型: {'本地Ollama' if self.type == 'local' else '云端API'}")
+        get_logger(__name__).info(f"  模型: {self.config['model']}")
+        get_logger(__name__).info(f"  向量维度: {self.config['dimensions']}")
 
     def _initialize_ollama(self):
         """初始化 Ollama 本地客户端"""
@@ -130,7 +131,7 @@ class UniversalEmbeddingClient:
             try:
                 test_vector = self.ollama_client.embed_query("test")
                 self.config['dimensions'] = len(test_vector)
-                console.print(f"[dim]  实际向量维度: {len(test_vector)}[/dim]")
+                get_logger(__name__).info(f"[dim]  实际向量维度: {len(test_vector)}[/dim]")
             except:
                 pass  # 使用默认维度
 
@@ -188,7 +189,7 @@ class UniversalEmbeddingClient:
             try:
                 return self.ollama_client.embed_query(text)
             except Exception as e:
-                console.print(f"[red]✗ 向量化失败: {str(e)}[/red]")
+                get_logger(__name__).info(f"✗ 向量化失败: {str(e)}")
                 raise
 
         # 云端 API
@@ -199,7 +200,7 @@ class UniversalEmbeddingClient:
             )
             return response.data[0].embedding
         except Exception as e:
-            console.print(f"[red]✗ 向量化失败: {str(e)}[/red]")
+            get_logger(__name__).info(f"✗ 向量化失败: {str(e)}")
             raise
 
     def embed_texts_batch(
@@ -229,7 +230,7 @@ class UniversalEmbeddingClient:
         texts = [t.strip() for t in texts if t.strip()]
 
         if not texts:
-            console.print("[yellow]⚠ 所有文本为空，跳过向量化[/yellow]")
+            get_logger(__name__).info("⚠ 所有文本为空，跳过向量化")
             return []
 
         # 设置批处理大小
@@ -240,11 +241,11 @@ class UniversalEmbeddingClient:
         all_embeddings = []
 
         # 显示开始信息
-        console.print(f"\n[cyan]开始批量向量化...[/cyan]")
-        console.print(f"  总文本数: {len(texts)}")
-        console.print(f"  批次大小: {batch_size}")
-        console.print(f"  总批次数: {total_batches}")
-        console.print(f"  模式: {'本地' if self.type == 'local' else '云端'}\n")
+        get_logger(__name__).info(f"\n开始批量向量化...")
+        get_logger(__name__).info(f"  总文本数: {len(texts)}")
+        get_logger(__name__).info(f"  批次大小: {batch_size}")
+        get_logger(__name__).info(f"  总批次数: {total_batches}")
+        get_logger(__name__).info(f"  模式: {'本地' if self.type == 'local' else '云端'}\n")
 
         # 创建进度条
         with Progress(
@@ -256,7 +257,7 @@ class UniversalEmbeddingClient:
         ) as progress:
 
             task = progress.add_task(
-                "[cyan]向量化进度...",
+                "向量化进度...",
                 total=len(texts),
                 visible=show_progress
             )
@@ -278,7 +279,7 @@ class UniversalEmbeddingClient:
                         progress.update(task, advance=len(batch_texts))
 
                     except Exception as e:
-                        console.print(f"[red]✗ 批次 {batch_num} 失败: {str(e)}[/red]")
+                        get_logger(__name__).info(f"✗ 批次 {batch_num} 失败: {str(e)}")
                         raise
 
                 else:
@@ -304,14 +305,14 @@ class UniversalEmbeddingClient:
                         except Exception as e:
                             if attempt < max_retries - 1:
                                 wait_time = 2 ** attempt  # 指数退避
-                                console.print(
-                                    f"[yellow]批次 {batch_num} 失败，{wait_time}秒后重试... "
-                                    f"({attempt + 1}/{max_retries})[/yellow]"
+                                get_logger(__name__).info(
+                                    f"批次 {batch_num} 失败，{wait_time}秒后重试... "
+                                    f"({attempt + 1}/{max_retries})"
                                 )
                                 time.sleep(wait_time)
                             else:
-                                console.print(
-                                    f"[red]✗ 批次 {batch_num} 失败，已达最大重试次数[/red]"
+                                get_logger(__name__).info(
+                                    f"✗ 批次 {batch_num} 失败，已达最大重试次数"
                                 )
                                 raise
 
@@ -319,7 +320,7 @@ class UniversalEmbeddingClient:
                 if i + batch_size < len(texts):
                     time.sleep(0.1 if self.type == 'api' else 0.05)
 
-        console.print(f"\n[green]✓ 批量向量化完成！总共 {len(all_embeddings)} 个向量[/green]")
+        get_logger(__name__).info(f"\n✓ 批量向量化完成！总共 {len(all_embeddings)} 个向量")
 
         return all_embeddings
 
@@ -331,7 +332,7 @@ class UniversalEmbeddingClient:
         """
         测试嵌入功能
         """
-        console.print(Panel.fit(
+        get_logger(__name__).info(Panel.fit(
             f"[bold cyan]测试 {self.provider} 嵌入模型[/bold cyan]",
             border_style="cyan"
         ))
@@ -342,17 +343,17 @@ class UniversalEmbeddingClient:
             "今天天气真好",
         ]
 
-        console.print("\n[bold]测试文本:[/bold]")
+        get_logger(__name__).info("\n[bold]测试文本:[/bold]")
         for i, text in enumerate(test_texts, 1):
-            console.print(f"  {i}. {text}")
+            get_logger(__name__).info(f"  {i}. {text}")
 
-        console.print("\n[cyan]正在向量化...[/cyan]")
+        get_logger(__name__).info("\n正在向量化...")
 
         # 批量向量化
         embeddings = self.embed_texts_batch(test_texts, show_progress=True)
 
         # 分析结果
-        console.print("\n[bold]向量信息:[/bold]")
+        get_logger(__name__).info("\n[bold]向量信息:[/bold]")
 
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("文本", width=30)
@@ -367,20 +368,20 @@ class UniversalEmbeddingClient:
                 preview
             )
 
-        console.print(table)
+        get_logger(__name__).info(table)
 
         # 计算相似度
-        console.print("\n[bold]语义相似度分析:[/bold]")
+        get_logger(__name__).info("\n[bold]语义相似度分析:[/bold]")
         sim_1_2 = self._cosine_similarity(embeddings[0], embeddings[1])
         sim_1_3 = self._cosine_similarity(embeddings[0], embeddings[2])
 
-        console.print(f"  「AI」 vs 「机器学习」: {sim_1_2:.4f} (应该较高)")
-        console.print(f"  「AI」 vs 「天气」:     {sim_1_3:.4f} (应该较低)")
+        get_logger(__name__).info(f"  「AI」 vs 「机器学习」: {sim_1_2:.4f} (应该较高)")
+        get_logger(__name__).info(f"  「AI」 vs 「天气」:     {sim_1_3:.4f} (应该较低)")
 
         if sim_1_2 > sim_1_3:
-            console.print("\n[green]✓ 嵌入模型工作正常！语义相似的文本向量距离更近。[/green]")
+            get_logger(__name__).info("\n✓ 嵌入模型工作正常！语义相似的文本向量距离更近。")
         else:
-            console.print("\n[yellow]⚠ 结果异常，请检查API配置[/yellow]")
+            get_logger(__name__).info("\n⚠ 结果异常，请检查API配置")
 
     @staticmethod
     def _cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
@@ -410,14 +411,14 @@ def demo_compare_providers():
     """
     演示：对比不同提供商的嵌入效果
     """
-    console.print(Panel.fit(
+    get_logger(__name__).info(Panel.fit(
         "[bold cyan]对比不同API提供商的嵌入模型[/bold cyan]",
         border_style="cyan"
     ))
 
     test_text = "检索增强生成技术结合了信息检索和文本生成"
 
-    console.print(f"\n[bold]测试文本:[/bold] {test_text}\n")
+    get_logger(__name__).info(f"\n[bold]测试文本:[/bold] {test_text}\n")
 
     # 检测可用的提供商
     available_providers = []
@@ -428,21 +429,21 @@ def demo_compare_providers():
         try:
             client = UniversalEmbeddingClient(provider)
             available_providers.append((provider, client))
-            console.print(f"[green]✓ {provider} 可用[/green]")
+            get_logger(__name__).info(f"✓ {provider} 可用")
         except Exception as e:
-            console.print(f"[yellow]⚠ {provider} 不可用: {str(e)[:50]}[/yellow]")
+            get_logger(__name__).info(f"⚠ {provider} 不可用: {str(e)[:50]}")
 
     if not available_providers:
-        console.print("\n[red]✗ 没有可用的提供商，请检查配置[/red]")
+        get_logger(__name__).info("\n✗ 没有可用的提供商，请检查配置")
         return
 
-    console.print("\n" + "="*60)
+    get_logger(__name__).info("\n" + "="*60)
 
     # 对比测试
     results = []
 
     for provider, client in available_providers:
-        console.print(f"\n[bold cyan]测试 {provider}...[/bold cyan]")
+        get_logger(__name__).info(f"\n[bold cyan]测试 {provider}...[/bold cyan]")
 
         start_time = time.time()
         try:
@@ -457,11 +458,11 @@ def demo_compare_providers():
                 'preview': embedding[:5]
             })
         except Exception as e:
-            console.print(f"[red]✗ 测试失败: {str(e)}[/red]")
+            get_logger(__name__).info(f"✗ 测试失败: {str(e)}")
 
     # 展示对比表格
-    console.print("\n" + "="*60)
-    console.print("\n[bold]性能对比:[/bold]\n")
+    get_logger(__name__).info("\n" + "="*60)
+    get_logger(__name__).info("\n[bold]性能对比:[/bold]\n")
 
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("提供商", width=15)
@@ -480,24 +481,24 @@ def demo_compare_providers():
             preview
         )
 
-    console.print(table)
+    get_logger(__name__).info(table)
 
 
 if __name__ == "__main__":
-    console.print("\n[bold cyan]RAG系统 - 向量化与嵌入模块测试[/bold cyan]\n")
+    get_logger(__name__).info("\n[bold cyan]RAG系统 - 向量化与嵌入模块测试[/bold cyan]\n")
 
-    console.print("选择测试模式:")
-    console.print("1. 测试单个API提供商")
-    console.print("2. 对比所有可用提供商")
+    get_logger(__name__).info("选择测试模式:")
+    get_logger(__name__).info("1. 测试单个API提供商")
+    get_logger(__name__).info("2. 对比所有可用提供商")
 
     choice = input("\n请输入选项 (1/2): ").strip()
 
     if choice == "1":
-        console.print("\n选择提供商:")
-        console.print("1. Ollama (本地免费 - 推荐)")
-        console.print("2. OpenAI (云端)")
-        console.print("3. DeepSeek (云端)")
-        console.print("4. 智谱GLM (云端)")
+        get_logger(__name__).info("\n选择提供商:")
+        get_logger(__name__).info("1. Ollama (本地免费 - 推荐)")
+        get_logger(__name__).info("2. OpenAI (云端)")
+        get_logger(__name__).info("3. DeepSeek (云端)")
+        get_logger(__name__).info("4. 智谱GLM (云端)")
 
         provider_choice = input("\n请输入选项 (1/2/3/4): ").strip()
 
@@ -514,13 +515,13 @@ if __name__ == "__main__":
             client = UniversalEmbeddingClient(provider)
             client.test_embedding()
         except Exception as e:
-            console.print(f"\n[red]✗ 测试失败: {str(e)}[/red]")
+            get_logger(__name__).info(f"\n✗ 测试失败: {str(e)}")
             if provider == 'ollama':
-                console.print("[yellow]提示: 请确保 Ollama 正在运行并已下载模型[/yellow]")
-                console.print("  1. 启动: ollama serve")
-                console.print("  2. 下载模型: ollama pull qwen3-embedding")
+                get_logger(__name__).info("提示: 请确保 Ollama 正在运行并已下载模型")
+                get_logger(__name__).info("  1. 启动: ollama serve")
+                get_logger(__name__).info("  2. 下载模型: ollama pull qwen3-embedding")
             else:
-                console.print("[yellow]请检查.env文件中的API配置[/yellow]")
+                get_logger(__name__).info("请检查.env文件中的API配置")
 
     else:
         demo_compare_providers()

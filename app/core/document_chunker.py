@@ -9,12 +9,12 @@ from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,  # 递归分割（推荐）
     CharacterTextSplitter,            # 固定大小分割
 )
-from rich.console import Console
+from app.utils.logger import get_logger
 from rich.table import Table
 from rich.panel import Panel
 import tiktoken
 
-console = Console()
+# Logger will be initialized per instance
 
 
 class DocumentChunker:
@@ -55,8 +55,8 @@ class DocumentChunker:
         Returns:
             分块后的Document列表
         """
-        console.print(f"\n[cyan]使用递归分块策略...[/cyan]")
-        console.print(f"参数: chunk_size={self.chunk_size}, overlap={self.chunk_overlap}")
+        get_logger(__name__).info(f"\n使用递归分块策略...")
+        get_logger(__name__).info(f"参数: chunk_size={self.chunk_size}, overlap={self.chunk_overlap}")
 
         # 创建递归分割器
         text_splitter = RecursiveCharacterTextSplitter(
@@ -80,7 +80,7 @@ class DocumentChunker:
         # 执行分块
         chunks = text_splitter.split_documents(documents)
 
-        console.print(f"[green]✓ 原始文档数: {len(documents)} → 分块后: {len(chunks)}[/green]")
+        get_logger(__name__).info(f"✓ 原始文档数: {len(documents)} → 分块后: {len(chunks)}")
 
         return chunks
 
@@ -98,8 +98,8 @@ class DocumentChunker:
         Returns:
             分块后的Document列表
         """
-        console.print(f"\n[cyan]使用固定大小分块策略...[/cyan]")
-        console.print(f"参数: chunk_size={self.chunk_size}, overlap={self.chunk_overlap}")
+        get_logger(__name__).info(f"\n使用固定大小分块策略...")
+        get_logger(__name__).info(f"参数: chunk_size={self.chunk_size}, overlap={self.chunk_overlap}")
 
         text_splitter = CharacterTextSplitter(
             chunk_size=self.chunk_size,
@@ -110,7 +110,7 @@ class DocumentChunker:
 
         chunks = text_splitter.split_documents(documents)
 
-        console.print(f"[green]✓ 原始文档数: {len(documents)} → 分块后: {len(chunks)}[/green]")
+        get_logger(__name__).info(f"✓ 原始文档数: {len(documents)} → 分块后: {len(chunks)}")
 
         return chunks
 
@@ -124,7 +124,7 @@ class DocumentChunker:
             chunks: 分块后的Document列表
         """
         if not chunks:
-            console.print("[yellow]没有可分析的分块[/yellow]")
+            get_logger(__name__).info("没有可分析的分块")
             return
 
         # 初始化tokenizer（用于计算token数）
@@ -132,7 +132,7 @@ class DocumentChunker:
             tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
         except:
             tokenizer = None
-            console.print("[yellow]未安装tiktoken，跳过token统计[/yellow]")
+            get_logger(__name__).info("未安装tiktoken，跳过token统计")
 
         # 统计信息
         chunk_lengths = [len(chunk.page_content) for chunk in chunks]
@@ -165,11 +165,11 @@ class DocumentChunker:
             table.add_row("平均Token数", f"{avg_tokens:.0f}")
             table.add_row("总Token数", f"{total_tokens:,}")
 
-        console.print("\n")
-        console.print(table)
+        get_logger(__name__).info("\n")
+        get_logger(__name__).info(table)
 
         # 长度分布
-        console.print("\n[bold]字符数分布:[/bold]")
+        get_logger(__name__).info("\n[bold]字符数分布:[/bold]")
         distribution = {
             "0-200": 0,
             "201-400": 0,
@@ -195,7 +195,7 @@ class DocumentChunker:
 
         for range_name, count in distribution.items():
             bar = "█" * (count * 2) if count > 0 else ""
-            console.print(f"{range_name:>12}: {bar} ({count})")
+            get_logger(__name__).info(f"{range_name:>12}: {bar} ({count})")
 
     @staticmethod
     def preview_chunks(chunks: List[Document], num_preview: int = 5):
@@ -206,7 +206,7 @@ class DocumentChunker:
             chunks: 分块列表
             num_preview: 预览数量
         """
-        console.print(f"\n[bold]前 {num_preview} 个分块预览:[/bold]\n")
+        get_logger(__name__).info(f"\n[bold]前 {num_preview} 个分块预览:[/bold]\n")
 
         for i, chunk in enumerate(chunks[:num_preview], 1):
             # 获取元数据
@@ -221,9 +221,9 @@ class DocumentChunker:
                 preview += "..."
 
             # 打印
-            console.print(f"[cyan]分块 {i}[/cyan] (来源: {source}, 页码: {page})")
-            console.print(f"  字符数: {len(content)}")
-            console.print(f"  内容: {preview}\n")
+            get_logger(__name__).info(f"分块 {i} (来源: {source}, 页码: {page})")
+            get_logger(__name__).info(f"  字符数: {len(content)}")
+            get_logger(__name__).info(f"  内容: {preview}\n")
 
 
 def demo_chunking():
@@ -232,13 +232,13 @@ def demo_chunking():
     """
     from document_loader import UniversalDocumentLoader
 
-    console.print(Panel.fit(
+    get_logger(__name__).info(Panel.fit(
         "[bold cyan]RAG系统 - 文档分块演示[/bold cyan]",
         border_style="cyan"
     ))
 
     # 步骤1：创建测试文档
-    console.print("\n[bold]步骤1: 准备测试文档[/bold]")
+    get_logger(__name__).info("\n[bold]步骤1: 准备测试文档[/bold]")
 
     test_content = """
 人工智能技术发展报告
@@ -288,45 +288,45 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
     with open(test_file, 'w', encoding='utf-8') as f:
         f.write(test_content)
 
-    console.print(f"[green]✓ 已创建测试文档: {test_file}[/green]")
-    console.print(f"  字符数: {len(test_content)}")
+    get_logger(__name__).info(f"✓ 已创建测试文档: {test_file}")
+    get_logger(__name__).info(f"  字符数: {len(test_content)}")
 
     # 步骤2：加载文档
-    console.print("\n[bold]步骤2: 加载文档[/bold]")
+    get_logger(__name__).info("\n[bold]步骤2: 加载文档[/bold]")
     loader = UniversalDocumentLoader()
     documents = loader.load_document(test_file)
 
     # 步骤3：测试不同的分块策略
-    console.print("\n" + "="*60)
-    console.print("[bold]步骤3: 测试不同分块策略[/bold]")
-    console.print("="*60)
+    get_logger(__name__).info("\n" + "="*60)
+    get_logger(__name__).info("[bold]步骤3: 测试不同分块策略[/bold]")
+    get_logger(__name__).info("="*60)
 
     # 策略1：小块分割（chunk_size=300）
-    console.print("\n[bold yellow]方案A: 小块分割 (size=300, overlap=50)[/bold yellow]")
+    get_logger(__name__).info("\n[bold yellow]方案A: 小块分割 (size=300, overlap=50)[/bold yellow]")
     chunker_small = DocumentChunker(chunk_size=300, chunk_overlap=50)
     chunks_small = chunker_small.chunk_documents_recursive(documents)
     DocumentChunker.analyze_chunks(chunks_small)
     DocumentChunker.preview_chunks(chunks_small, num_preview=3)
 
     # 策略2：推荐分割（chunk_size=600）
-    console.print("\n" + "="*60)
-    console.print("\n[bold green]方案B: 推荐分割 (size=600, overlap=100)[/bold green]")
+    get_logger(__name__).info("\n" + "="*60)
+    get_logger(__name__).info("\n[bold green]方案B: 推荐分割 (size=600, overlap=100)[/bold green]")
     chunker_recommended = DocumentChunker(chunk_size=600, chunk_overlap=100)
     chunks_recommended = chunker_recommended.chunk_documents_recursive(documents)
     DocumentChunker.analyze_chunks(chunks_recommended)
     DocumentChunker.preview_chunks(chunks_recommended, num_preview=3)
 
     # 策略3：大块分割（chunk_size=1000）
-    console.print("\n" + "="*60)
-    console.print("\n[bold magenta]方案C: 大块分割 (size=1000, overlap=150)[/bold magenta]")
+    get_logger(__name__).info("\n" + "="*60)
+    get_logger(__name__).info("\n[bold magenta]方案C: 大块分割 (size=1000, overlap=150)[/bold magenta]")
     chunker_large = DocumentChunker(chunk_size=1000, chunk_overlap=150)
     chunks_large = chunker_large.chunk_documents_recursive(documents)
     DocumentChunker.analyze_chunks(chunks_large)
     DocumentChunker.preview_chunks(chunks_large, num_preview=3)
 
     # 总结
-    console.print("\n" + "="*60)
-    console.print(Panel.fit(
+    get_logger(__name__).info("\n" + "="*60)
+    get_logger(__name__).info(Panel.fit(
         "[bold cyan]分块策略对比总结[/bold cyan]\n\n"
         f"小块分割: {len(chunks_small)} 个块 - 检索精度高，但上下文可能不足\n"
         f"推荐分割: {len(chunks_recommended)} 个块 - 平衡精度和上下文 ✓\n"

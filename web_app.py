@@ -7,19 +7,20 @@ import os
 import gradio as gr
 from typing import List, Tuple
 from dotenv import load_dotenv
-from rich.console import Console
 
-# 导入前面课程的模块
-from document_loader import UniversalDocumentLoader
-from document_chunker import DocumentChunker
-from embedding_client import UniversalEmbeddingClient
-from vector_store import VectorStore
-from retriever import Retriever
-from generator import RAGGenerator, UniversalLLMClient, GenerationConfig
+# 导入新的模块路径
+from app.core.document_loader import UniversalDocumentLoader
+from app.core.document_chunker import DocumentChunker
+from app.core.embedding_client import UniversalEmbeddingClient
+from app.core.vector_store import VectorStore
+from app.core.retriever import Retriever
+from app.core.generator import RAGGenerator, UniversalLLMClient, GenerationConfig
+from app.config import settings
+from app.utils.logger import get_logger
 
 # 加载环境变量
 load_dotenv()
-console = Console()
+logger = get_logger(__name__)
 
 
 class RAGWebApp:
@@ -30,21 +31,21 @@ class RAGWebApp:
 
     def __init__(self):
         """初始化RAG系统"""
-        console.print("[cyan]正在初始化RAG系统...[/cyan]")
+        logger.info("正在初始化RAG系统...")
 
-        # 获取配置
-        self.embedding_provider = os.getenv('DEFAULT_EMBEDDING_PROVIDER', 'openai')
-        self.llm_provider = os.getenv('DEFAULT_LLM_PROVIDER', 'openai')
+        # 从配置获取设置
+        self.embedding_provider = settings.default_embedding_provider
+        self.llm_provider = settings.default_llm_provider
 
         # 初始化组件
         try:
             # Embedding客户端
             self.embedding_client = UniversalEmbeddingClient(self.embedding_provider)
 
-            # 向量存储
+            # 向量存储（使用统一的数据目录）
             self.vector_store = VectorStore(
-                collection_name="rag_web_app",
-                persist_directory="./rag_web_chroma_db"
+                collection_name=settings.collection_name,
+                persist_directory=settings.chroma_persist_dir
             )
 
             # 检索器
@@ -56,15 +57,18 @@ class RAGWebApp:
             # RAG生成器
             self.rag_generator = RAGGenerator(self.llm_client)
 
-            # 文档加载和分块器
+            # 文档加载和分块器（使用配置的参数）
             self.doc_loader = UniversalDocumentLoader()
-            self.chunker = DocumentChunker(chunk_size=500, chunk_overlap=100)
+            self.chunker = DocumentChunker(
+                chunk_size=settings.chunk_size,
+                chunk_overlap=settings.chunk_overlap
+            )
 
-            console.print("[green]✓ RAG系统初始化完成[/green]")
+            logger.info("RAG系统初始化完成")
             self.initialized = True
 
         except Exception as e:
-            console.print(f"[red]✗ 初始化失败: {str(e)}[/red]")
+            logger.error(f"初始化失败: {str(e)}")
             self.initialized = False
 
     def upload_and_index_document(self, file) -> str:
@@ -85,7 +89,7 @@ class RAGWebApp:
 
         try:
             file_path = file.name
-            console.print(f"[cyan]处理文件: {file_path}[/cyan]")
+            logger.info(f"处理文件: {file_path}")
 
             # 1. 加载文档
             documents = self.doc_loader.load_document(file_path)
@@ -111,12 +115,12 @@ class RAGWebApp:
                 f"现在你可以开始提问了！"
             )
 
-            console.print("[green]✓ 文档索引完成[/green]")
+            logger.info("文档索引完成")
             return result_msg
 
         except Exception as e:
             error_msg = f"❌ 文档处理失败: {str(e)}"
-            console.print(f"[red]{error_msg}[/red]")
+            logger.error(error_msg)
             return error_msg
 
     def answer_question(
@@ -192,7 +196,7 @@ class RAGWebApp:
 
         except Exception as e:
             error_msg = f"❌ 生成答案时出错: {str(e)}"
-            console.print(f"[red]{error_msg}[/red]")
+            logger.error(error_msg)
             history.append({"role": "user", "content": message})
             history.append({"role": "assistant", "content": error_msg})
             yield "", history, ""
@@ -362,20 +366,20 @@ def create_web_interface():
 
 
 if __name__ == "__main__":
-    console.print("\n[bold cyan]启动RAG Web服务...[/bold cyan]\n")
+    logger.info("启动RAG Web服务...")
 
     # 创建界面
     demo, custom_css = create_web_interface()
 
     # 启动服务
-    console.print("[green]✓ Web服务已启动[/green]")
-    console.print("[yellow]访问地址: http://localhost:7860[/yellow]")
-    console.print("[yellow]按 Ctrl+C 停止服务[/yellow]\n")
+    logger.info("Web服务已启动")
+    logger.info(f"访问地址: http://localhost:{settings.server_port}")
+    logger.info("按 Ctrl+C 停止服务")
 
     demo.launch(
-        server_name="0.0.0.0",  # 允许外网访问
-        server_port=7860,
-        share=False,  # 设为True可生成公网链接（临时）
+        server_name=settings.server_host,
+        server_port=settings.server_port,
+        share=settings.share_gradio,
         show_error=True,
         theme=gr.themes.Soft(),
         css=custom_css

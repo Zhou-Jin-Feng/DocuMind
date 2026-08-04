@@ -6,7 +6,7 @@ RAG系统 - 文档加载模块
 import os
 from typing import List
 from pathlib import Path
-from rich.console import Console
+from app.utils.logger import get_logger
 from rich.panel import Panel
 
 # LangChain文档加载器
@@ -17,7 +17,7 @@ from langchain_community.document_loaders import (
 )
 from langchain_core.documents import Document
 
-console = Console()
+# Logger will be initialized per instance
 
 
 class UniversalDocumentLoader:
@@ -35,7 +35,7 @@ class UniversalDocumentLoader:
     }
 
     def __init__(self):
-        self.console = Console()
+        self.# Logger will be initialized per instance
 
     def load_document(self, file_path: str) -> List[Document]:
         """
@@ -65,7 +65,7 @@ class UniversalDocumentLoader:
         loader_class = self.LOADERS[file_ext]
 
         try:
-            console.print(f"[cyan]正在加载 {file_ext} 文件...[/cyan]")
+            self.logger.info(f"正在加载 {file_ext} 文件...")
 
             # 实例化加载器
             if file_ext == '.txt':
@@ -82,13 +82,13 @@ class UniversalDocumentLoader:
                 doc.metadata['source_file'] = Path(file_path).name
                 doc.metadata['file_type'] = file_ext
 
-            console.print(f"[green]✓ 成功加载 {len(documents)} 个文档片段[/green]")
+            self.logger.info(f"✓ 成功加载 {len(documents)} 个文档片段")
 
             return documents
 
         except UnicodeDecodeError:
             # TXT文件编码错误，尝试GBK
-            console.print("[yellow]UTF-8解码失败，尝试GBK编码...[/yellow]")
+            self.logger.info("UTF-8解码失败，尝试GBK编码...")
             loader = TextLoader(file_path, encoding='gbk')
             documents = loader.load()
 
@@ -96,11 +96,11 @@ class UniversalDocumentLoader:
                 doc.metadata['source_file'] = Path(file_path).name
                 doc.metadata['file_type'] = file_ext
 
-            console.print(f"[green]✓ 成功加载 {len(documents)} 个文档片段[/green]")
+            self.logger.info(f"✓ 成功加载 {len(documents)} 个文档片段")
             return documents
 
         except Exception as e:
-            console.print(f"[red]✗ 加载失败: {str(e)}[/red]")
+            self.logger.info(f"✗ 加载失败: {str(e)}")
             raise
 
     def load_directory(self, dir_path: str) -> List[Document]:
@@ -128,10 +128,10 @@ class UniversalDocumentLoader:
                 supported_files.append(file_path)
 
         if not supported_files:
-            console.print(f"[yellow]⚠ 目录中没有找到支持的文档[/yellow]")
+            self.logger.info(f"⚠ 目录中没有找到支持的文档")
             return []
 
-        console.print(f"\n[cyan]找到 {len(supported_files)} 个文档，开始加载...[/cyan]\n")
+        self.logger.info(f"\n找到 {len(supported_files)} 个文档，开始加载...\n")
 
         # 逐个加载
         for file_path in supported_files:
@@ -139,9 +139,9 @@ class UniversalDocumentLoader:
                 docs = self.load_document(file_path)
                 all_documents.extend(docs)
             except Exception as e:
-                console.print(f"[red]跳过文件 {Path(file_path).name}: {str(e)}[/red]")
+                self.logger.info(f"[red]跳过文件 {Path(file_path).name}: {str(e)}")
 
-        console.print(f"\n[green]✓ 总共加载 {len(all_documents)} 个文档片段[/green]")
+        self.logger.info(f"\n✓ 总共加载 {len(all_documents)} 个文档片段")
 
         return all_documents
 
@@ -153,10 +153,10 @@ class UniversalDocumentLoader:
         Args:
             documents: Document对象列表
         """
-        console = Console()
+        # Logger will be initialized per instance
 
         if not documents:
-            console.print("[yellow]没有文档可显示[/yellow]")
+            self.logger.info("没有文档可显示")
             return
 
         # 统计信息
@@ -164,7 +164,7 @@ class UniversalDocumentLoader:
         sources = set(doc.metadata.get('source_file', 'Unknown') for doc in documents)
 
         # 打印摘要
-        console.print(Panel.fit(
+        self.logger.info(Panel.fit(
             f"[bold cyan]文档加载摘要[/bold cyan]\n\n"
             f"文档片段数: {len(documents)}\n"
             f"总字符数: {total_chars:,}\n"
@@ -174,22 +174,22 @@ class UniversalDocumentLoader:
         ))
 
         # 打印前3个片段的预览
-        console.print("\n[bold]前3个片段预览:[/bold]\n")
+        self.logger.info("\n[bold]前3个片段预览:[/bold]\n")
 
         for i, doc in enumerate(documents[:3], 1):
             preview = doc.page_content[:200].replace('\n', ' ')
             source = doc.metadata.get('source_file', 'Unknown')
             page = doc.metadata.get('page', 'N/A')
 
-            console.print(f"[cyan]片段 {i}[/cyan] (来源: {source}, 页码: {page})")
-            console.print(f"  {preview}...\n")
+            self.logger.info(f"片段 {i} (来源: {source}, 页码: {page})")
+            self.logger.info(f"  {preview}...\n")
 
 
 def demo_load_single_file():
     """
     演示：加载单个文档
     """
-    console.print(Panel.fit(
+    self.logger.info(Panel.fit(
         "[bold cyan]演示1：加载单个文档[/bold cyan]",
         border_style="cyan"
     ))
@@ -197,8 +197,8 @@ def demo_load_single_file():
     loader = UniversalDocumentLoader()
 
     # 提示用户输入文件路径
-    console.print("\n请输入文档路径（支持 .pdf / .docx / .txt）:")
-    console.print("[dim]示例: C:\\Users\\test\\Desktop\\sample.pdf[/dim]")
+    self.logger.info("\n请输入文档路径（支持 .pdf / .docx / .txt）:")
+    self.logger.info("[dim]示例: C:\\Users\\test\\Desktop\\sample.pdf[/dim]")
 
     file_path = input("\n文件路径: ").strip()
 
@@ -212,7 +212,7 @@ def demo_load_single_file():
         return documents
 
     except Exception as e:
-        console.print(f"\n[red]✗ 加载失败: {str(e)}[/red]")
+        self.logger.info(f"\n✗ 加载失败: {str(e)}")
         return []
 
 
@@ -220,7 +220,7 @@ def demo_create_test_file():
     """
     演示：创建测试文件（如果你没有现成的文档）
     """
-    console.print(Panel.fit(
+    self.logger.info(Panel.fit(
         "[bold cyan]创建测试TXT文件[/bold cyan]",
         border_style="cyan"
     ))
@@ -250,7 +250,7 @@ RAG（Retrieval-Augmented Generation）是检索增强生成技术。
     with open(test_file, 'w', encoding='utf-8') as f:
         f.write(test_content)
 
-    console.print(f"\n[green]✓ 已创建测试文件: {test_file}[/green]")
+    self.logger.info(f"\n✓ 已创建测试文件: {test_file}")
 
     # 加载测试文件
     loader = UniversalDocumentLoader()
@@ -263,11 +263,11 @@ RAG（Retrieval-Augmented Generation）是检索增强生成技术。
 
 
 if __name__ == "__main__":
-    console.print("\n[bold cyan]RAG系统 - 文档加载模块测试[/bold cyan]\n")
+    self.logger.info("\n[bold cyan]RAG系统 - 文档加载模块测试[/bold cyan]\n")
 
-    console.print("选择测试模式:")
-    console.print("1. 加载你自己的文档")
-    console.print("2. 使用系统创建的测试文档")
+    self.logger.info("选择测试模式:")
+    self.logger.info("1. 加载你自己的文档")
+    self.logger.info("2. 使用系统创建的测试文档")
 
     choice = input("\n请输入选项 (1/2): ").strip()
 
