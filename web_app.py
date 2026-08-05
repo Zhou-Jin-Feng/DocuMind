@@ -1,257 +1,235 @@
 """
-RAG系统 - Web界面
-使用Gradio搭建对话式问答界面
+RAG系统 - Web界面。
+
+使用 Gradio 提供文档上传、索引和问答入口。
 """
 
-import os
+from pathlib import Path
+from typing import List, Optional, Tuple
+
 import gradio as gr
-from typing import List, Tuple
-from dotenv import load_dotenv
 
-# 导入新的模块路径
-from app.core.document_loader import UniversalDocumentLoader
-from app.core.document_chunker import DocumentChunker
-from app.core.embedding_client import UniversalEmbeddingClient
-from app.core.vector_store import VectorStore
-from app.core.retriever import Retriever
-from app.core.generator import RAGGenerator, UniversalLLMClient, GenerationConfig
 from app.config import settings
-from app.utils.logger import get_logger
+from app.core.document_chunker import DocumentChunker
+from app.core.document_loader import UniversalDocumentLoader
+from app.core.embedding_client import UniversalEmbeddingClient
+from app.core.generator import GenerationConfig, RAGGenerator, UniversalLLMClient
+from app.core.retriever import Retriever
+from app.core.vector_store import VectorStore
+from app.utils.logger import get_logger, setup_logger
 
-# 加载环境变量
-load_dotenv()
 logger = get_logger(__name__)
 
 
 class RAGWebApp:
-    """
-    RAG Web应用
-    封装所有组件，提供统一接口
-    """
+    """封装 RAG 组件并提供 Gradio 回调。"""
 
     def __init__(self):
-        """初始化RAG系统"""
         logger.info("正在初始化RAG系统...")
-
-        # 从配置获取设置
         self.embedding_provider = settings.default_embedding_provider
         self.llm_provider = settings.default_llm_provider
+        self.initialized = False
 
-        # 初始化组件
         try:
-            # Embedding客户端
             self.embedding_client = UniversalEmbeddingClient(self.embedding_provider)
-
-            # 向量存储（使用统一的数据目录）
             self.vector_store = VectorStore(
                 collection_name=settings.collection_name,
-                persist_directory=settings.chroma_persist_dir
+                persist_directory=settings.chroma_persist_dir,
             )
-
-            # 检索器
             self.retriever = Retriever(self.vector_store, self.embedding_client)
-
-            # LLM客户端
             self.llm_client = UniversalLLMClient(provider=self.llm_provider)
-
-            # RAG生成器
             self.rag_generator = RAGGenerator(self.llm_client)
-
-            # 文档加载和分块器（使用配置的参数）
             self.doc_loader = UniversalDocumentLoader()
             self.chunker = DocumentChunker(
                 chunk_size=settings.chunk_size,
-                chunk_overlap=settings.chunk_overlap
+                chunk_overlap=settings.chunk_overlap,
             )
-
-            logger.info("RAG系统初始化完成")
             self.initialized = True
+            logger.info("RAG系统初始化完成")
+        except Exception:
+            logger.exception("RAG系统初始化失败")
 
-        except Exception as e:
-            logger.error(f"初始化失败: {str(e)}")
-            self.initialized = False
+    @staticmethod
+    def _resolve_upload_path(file) -> Path:
+        """兼容 Gradio 文件对象和直接传入的路径。"""
+        if isinstance(file, (str, Path)):
+            raw_path = str(file)
+        else:
+            raw_path = str(getattr(file, "name", ""))
+        if not raw_path.strip():
+            raise ValueError("未获取到上传文件路径")
+        return Path(raw_path)
 
     def upload_and_index_document(self, file) -> str:
-        """
-        上传并索引文档
-
-        Args:
-            file: Gradio上传的文件对象
-
-        Returns:
-            处理结果消息
-        """
+        """校验、加载、分块、向量化并幂等写入文档。"""
         if not self.initialized:
-            return "❌ 系统未正确初始化，请检查API配置"
-
+            return "❌ 系统未正确初始化，请查看服务日志"
         if file is None:
             return "⚠️ 请先上传文件"
 
         try:
-            file_path = file.name
-            logger.info(f"处理文件: {file_path}")
+            file_path = self._resolve_upload_path(file)
+            if not file_path.exists() or not file_path.is_file():
+                return "❌ 上传文件不存在或不可读取"
 
-            # 1. 加载文档
-            documents = self.doc_loader.load_document(file_path)
+            extension = file_path.suffix.lower()
+            if extension not in settings.allowed_extensions:
+                allowed = "、".join(settings.allowed_extensions)
+                return f"❌ 不支持的文件格式，仅允许: {allowed}"
 
-            # 2. 分块
+            max_bytes = settings.max_upload_size_mb * 1024 * 1024
+            file_size = file_path.stat().st_size
+            if file_size > max_bytes:
+                return f"❌ 文件过大，最大允许 {settings.max_upload_size_mb} MB"
+
+            logger.info(
+                f"开始处理上传文件: name={file_path.name}, size_bytes={file_size}"
+            )
+            documents = self.doc_loader.load_document(str(file_path))
+            if not documents:
+                return "❌ 文档中没有可加载的内容"
+
             chunks = self.chunker.chunk_documents_recursive(documents)
+            if not chunks:
+                return "❌ 文档分块后没有有效内容"
 
-            # 3. 向量化
             texts = [chunk.page_content for chunk in chunks]
             embeddings = self.embedding_client.embed_texts_batch(
                 texts,
-                show_progress=False
+                show_progress=False,
             )
+            if len(embeddings) != len(chunks):
+                raise RuntimeError(
+                    f"向量数量与分块数量不一致: {len(embeddings)} != {len(chunks)}"
+                )
 
-            # 4. 存储
             self.vector_store.add_documents(chunks, embeddings)
-
-            result_msg = (
-                f"✅ 文档处理完成！\n\n"
-                f"📄 文件名: {os.path.basename(file_path)}\n"
-                f"📊 分块数: {len(chunks)}\n"
-                f"💾 已索引: {self.vector_store.collection.count()} 个文档块\n\n"
-                f"现在你可以开始提问了！"
+            collection_count = self.vector_store.collection.count()
+            logger.info(
+                f"文档索引完成: name={file_path.name}, chunks={len(chunks)}, "
+                f"collection_count={collection_count}"
             )
-
-            logger.info("文档索引完成")
-            return result_msg
-
-        except Exception as e:
-            error_msg = f"❌ 文档处理失败: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
+            return (
+                "✅ 文档处理完成！\n\n"
+                f"📄 文件名: {file_path.name}\n"
+                f"📊 本次分块数: {len(chunks)}\n"
+                f"💾 集合文档块总数: {collection_count}\n\n"
+                "现在你可以开始提问了！"
+            )
+        except Exception:
+            logger.exception("文档处理失败")
+            return "❌ 文档处理失败，请查看服务日志后重试"
 
     def answer_question(
         self,
         message: str,
-        history: List[dict]
+        history: Optional[List[dict]],
     ):
-        """
-        回答用户问题
-
-        Args:
-            message: 用户问题
-            history: 对话历史（Gradio messages 格式，元素为
-                     {"role": "user"/"assistant", "content": str}）
-
-        Yields:
-            (清空的输入框, 更新的对话历史, 来源信息)
-        """
+        """检索相关文档并流式生成回答。"""
         history = list(history or [])
+        normalized_message = (message or "").strip()
+        if not normalized_message:
+            yield "", history, ""
+            return
 
+        history.append({"role": "user", "content": normalized_message})
         if not self.initialized:
-            history.append({"role": "user", "content": message})
-            history.append({
-                "role": "assistant",
-                "content": "❌ 系统未正确初始化，请检查API配置"
-            })
-            yield "", history, ""
-            return
-
-        if not message.strip():
-            yield "", history, ""
-            return
-
-        try:
-            # 1. 检索相关文档
-            retrieval_results = self.retriever.retrieve_semantic(
-                message,
-                top_k=3
+            history.append(
+                {
+                    "role": "assistant",
+                    "content": "❌ 系统未正确初始化，请查看服务日志",
+                }
             )
+            yield "", history, ""
+            return
 
+        assistant_index: Optional[int] = None
+        try:
+            retrieval_results = self.retriever.retrieve_semantic(
+                normalized_message,
+                top_k=settings.retrieval_top_k,
+                score_threshold=settings.retrieval_score_threshold,
+            )
             if not retrieval_results:
-                answer = "⚠️ 未找到相关文档，请先上传文档或检查知识库。"
-                history.append({"role": "user", "content": message})
-                history.append({"role": "assistant", "content": answer})
+                history.append(
+                    {
+                        "role": "assistant",
+                        "content": "⚠️ 未找到达到相关性阈值的文档内容，请先上传文档或换一种问法。",
+                    }
+                )
                 yield "", history, ""
                 return
 
-            # 2. 生成答案（流式）
-            answer_parts = []
-
-            # 先添加用户问题，再追加一条空的助手消息用于流式填充
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": ""})
-
-            # 流式生成答案
-            for chunk in self.rag_generator.generate_answer_stream(
-                message,
-                retrieval_results,
-                config=GenerationConfig(temperature=0.3)
-            ):
-                answer_parts.append(chunk)
-                # 更新对话历史中的答案
-                history[-1] = {
-                    "role": "assistant",
-                    "content": ''.join(answer_parts)
-                }
-                yield "", history, self._format_sources(retrieval_results)
-
-            # 3. 格式化来源信息
             sources = self._format_sources(retrieval_results)
+            history.append({"role": "assistant", "content": ""})
+            assistant_index = len(history) - 1
+            answer_parts: List[str] = []
 
+            for chunk in self.rag_generator.generate_answer_stream(
+                normalized_message,
+                retrieval_results,
+                config=GenerationConfig(
+                    temperature=settings.llm_temperature,
+                    max_tokens=settings.llm_max_tokens,
+                    stream=True,
+                ),
+            ):
+                if not chunk:
+                    continue
+                answer_parts.append(chunk)
+                history[assistant_index] = {
+                    "role": "assistant",
+                    "content": "".join(answer_parts),
+                }
+                yield "", list(history), sources
+
+            if not answer_parts:
+                raise RuntimeError("LLM 流式接口未返回任何文本")
             yield "", history, sources
-
-        except Exception as e:
-            error_msg = f"❌ 生成答案时出错: {str(e)}"
-            logger.error(error_msg)
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": error_msg})
+        except Exception:
+            logger.exception("问答流程执行失败")
+            public_error = "❌ 系统暂时无法完成回答，请稍后重试并查看服务日志"
+            assistant_message = {"role": "assistant", "content": public_error}
+            if assistant_index is not None:
+                history[assistant_index] = assistant_message
+            else:
+                history.append(assistant_message)
             yield "", history, ""
 
     def _format_sources(self, retrieval_results) -> str:
-        """
-        格式化来源信息
-
-        Args:
-            retrieval_results: 检索结果列表
-
-        Returns:
-            Markdown格式的来源信息
-        """
+        """将来源、页码、检索距离和重排分数格式化为 Markdown。"""
         if not retrieval_results:
             return "未找到相关来源"
 
-        sources_md = "### 📚 引用来源\n\n"
-
-        for i, result in enumerate(retrieval_results, 1):
+        sections = ["### 📚 引用来源", ""]
+        for index, result in enumerate(retrieval_results, 1):
             source = result.source or "未知来源"
-            page = f"第{result.page}页" if result.page else ""
-            score = f"{result.score:.4f}"
-
-            # 截取内容预览
-            content_preview = result.content[:150].replace('\n', ' ')
+            page = f" 第{result.page_number}页" if result.page_number else ""
+            metrics = [f"距离: {result.distance:.4f}"]
+            if result.rerank_score is not None:
+                metrics.append(f"重排分数: {result.rerank_score:.4f}")
+            content_preview = result.content[:150].replace("\n", " ")
             if len(result.content) > 150:
                 content_preview += "..."
-
-            sources_md += (
-                f"**[{i}] {source}** {page} (相似度: {score})\n\n"
-                f"> {content_preview}\n\n"
-                f"---\n\n"
+            sections.extend(
+                [
+                    f"**[{index}] {source}**{page} ({', '.join(metrics)})",
+                    "",
+                    f"> {content_preview}",
+                    "",
+                    "---",
+                    "",
+                ]
             )
-
-        return sources_md
+        return "\n".join(sections)
 
     def clear_conversation(self) -> Tuple[List, str]:
-        """
-        清空对话历史
-
-        Returns:
-            (空的对话历史, 空的来源信息)
-        """
         return [], ""
 
 
 def create_web_interface():
-    """
-    创建Gradio Web界面
-    """
-    # 初始化RAG系统
+    """创建 Gradio Web 界面。"""
     rag_app = RAGWebApp()
-
-    # 自定义CSS样式
     custom_css = """
     .gradio-container {
         max-width: 1200px !important;
@@ -261,126 +239,107 @@ def create_web_interface():
     }
     """
 
-    # 创建界面
-    # 注意: Gradio 6 起 theme / css 需要传给 launch()，不再放在 Blocks 构造函数里
     with gr.Blocks(title="RAG知识库问答系统") as demo:
-
-        # 标题和说明
         gr.Markdown(
             """
             # 🤖 RAG知识库问答系统
 
-            上传文档后，就可以向AI提问文档相关问题。系统会从文档中检索相关内容并生成准确答案。
+            上传文档后，可以向 AI 提问文档相关问题。系统会检索相关内容并生成答案。
 
             **支持格式**: PDF、Word (.docx)、TXT
             """
         )
 
         with gr.Row():
-            # 左侧：对话区域
             with gr.Column(scale=2):
                 chatbot = gr.Chatbot(
                     label="对话历史",
                     height=500,
                     elem_id="chatbot",
-                    render_markdown=True
+                    render_markdown=True,
                 )
-
                 with gr.Row():
                     msg = gr.Textbox(
                         label="输入问题",
                         placeholder="请输入你的问题...",
                         scale=4,
-                        lines=2
+                        lines=2,
                     )
                     submit_btn = gr.Button("发送", variant="primary", scale=1)
+                clear_btn = gr.Button("🗑️ 清空对话")
 
-                with gr.Row():
-                    clear_btn = gr.Button("🗑️ 清空对话")
-
-            # 右侧：文档上传和来源显示
             with gr.Column(scale=1):
                 with gr.Accordion("📤 上传文档", open=True):
                     file_upload = gr.File(
                         label="选择文件",
-                        file_types=[".pdf", ".docx", ".txt"]
+                        file_types=settings.allowed_extensions,
                     )
                     upload_btn = gr.Button("📥 上传并索引", variant="secondary")
                     upload_status = gr.Textbox(
                         label="处理状态",
                         lines=8,
-                        interactive=False
+                        interactive=False,
                     )
-
                 with gr.Accordion("📚 引用来源", open=True):
                     sources_display = gr.Markdown(
                         value="上传文档并提问后，这里会显示答案的引用来源。"
                     )
 
-        # 底部信息
         gr.Markdown(
-            """
+            f"""
             ---
 
             💡 **使用提示**:
-            - 上传文档后稍等几秒，等待索引完成
+            - 上传文档后等待索引完成
             - 提问时尽量具体明确
-            - 可以连续对话，系统会记住上下文
-            - 查看右侧"引用来源"了解答案依据
+            - 当前对话历史仅用于页面展示，尚未参与上下文检索
+            - 查看右侧“引用来源”了解答案依据
 
             ⚙️ **当前配置**:
-            - Embedding: """ + rag_app.embedding_provider + """
-            - LLM: """ + rag_app.llm_provider + """
+            - Embedding: {rag_app.embedding_provider}
+            - LLM: {rag_app.llm_provider}
             """
         )
 
-        # 事件绑定
-        # 文档上传
         upload_btn.click(
             fn=rag_app.upload_and_index_document,
             inputs=[file_upload],
-            outputs=[upload_status]
+            outputs=[upload_status],
         )
-
-        # 发送消息（支持流式输出）
-        submit_event = submit_btn.click(
+        submit_btn.click(
             fn=rag_app.answer_question,
             inputs=[msg, chatbot],
-            outputs=[msg, chatbot, sources_display]
+            outputs=[msg, chatbot, sources_display],
         )
-
-        # 回车发送
         msg.submit(
             fn=rag_app.answer_question,
             inputs=[msg, chatbot],
-            outputs=[msg, chatbot, sources_display]
+            outputs=[msg, chatbot, sources_display],
         )
-
-        # 清空对话
         clear_btn.click(
             fn=rag_app.clear_conversation,
-            outputs=[chatbot, sources_display]
+            outputs=[chatbot, sources_display],
         )
 
     return demo, custom_css
 
 
 if __name__ == "__main__":
+    setup_logger(
+        log_level=settings.log_level,
+        log_file_path=settings.log_file_path,
+        rotation=settings.log_rotation,
+        retention=settings.log_retention,
+    )
     logger.info("启动RAG Web服务...")
-
-    # 创建界面
     demo, custom_css = create_web_interface()
-
-    # 启动服务
-    logger.info("Web服务已启动")
     logger.info(f"访问地址: http://localhost:{settings.server_port}")
     logger.info("按 Ctrl+C 停止服务")
-
     demo.launch(
         server_name=settings.server_host,
         server_port=settings.server_port,
         share=settings.share_gradio,
-        show_error=True,
+        show_error=False,
         theme=gr.themes.Soft(),
-        css=custom_css
+        css=custom_css,
     )

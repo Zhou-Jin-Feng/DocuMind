@@ -1,5 +1,5 @@
 ﻿# ============================================
-# RAG 知识库问答系统 - 核心依赖（最新版）
+# RAG 知识库问答系统 - 核心直接依赖
 # ============================================
 
 # --- 核心框架 ---
@@ -8,6 +8,7 @@ langchain-core
 langchain-community
 langchain-text-splitters
 langchain-openai
+langchain-ollama
 
 # --- 向量数据库 ---
 chromadb
@@ -19,6 +20,7 @@ anthropic
 # --- 文档加载器 ---
 pypdf
 python-docx
+docx2txt
 
 # --- 嵌入模型支持 ---
 tiktoken

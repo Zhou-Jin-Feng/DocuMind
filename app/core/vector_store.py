@@ -1,210 +1,208 @@
-﻿"""
-RAG系统 - 向量数据库存储模块
-基于ChromaDB实现向量的增删改查
+"""
+RAG 系统向量存储模块。
+
+封装 ChromaDB 的持久化、幂等写入、检索和删除操作。
 """
 
+import hashlib
 import os
-import uuid
-from typing import List, Dict, Optional
-from langchain_core.documents import Document
+from typing import Dict, List, Optional
+
 import chromadb
 from chromadb.config import Settings
-from app.utils.logger import get_logger
+from langchain_core.documents import Document
 from rich.table import Table
-from rich.panel import Panel
+
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class VectorStore:
-    """
-    向量存储管理器
-    封装ChromaDB的基本操作
-    """
+    """ChromaDB 向量存储封装。"""
 
     def __init__(
         self,
         collection_name: str = "rag_documents",
-        persist_directory: str = "./chroma_db"
+        persist_directory: str = "./data/chroma_db",
     ):
-        """
-        初始化向量存储
+        if not collection_name.strip():
+            raise ValueError("collection_name 不能为空")
 
-        Args:
-            collection_name: 集合名称（类似数据库表名）
-            persist_directory: 数据持久化目录
-        """
         self.collection_name = collection_name
         self.persist_directory = persist_directory
-
-        # 创建存储目录
         os.makedirs(persist_directory, exist_ok=True)
-
-        # 初始化ChromaDB客户端
-        logger.info(f"正在初始化向量数据库...")
 
         self.client = chromadb.PersistentClient(
             path=persist_directory,
-            settings=Settings(
-                anonymized_telemetry=False,  # 关闭匿名遥测
-            )
+            settings=Settings(anonymized_telemetry=False),
+        )
+        self.collection = self.client.get_or_create_collection(
+            name=collection_name,
+            metadata={"description": "RAG系统文档向量存储"},
+        )
+        logger.info(
+            f"向量数据库已就绪: collection={collection_name}, "
+            f"count={self.collection.count()}, path={persist_directory}"
         )
 
-        # 创建或获取集合
-        try:
-            self.collection = self.client.get_collection(name=collection_name)
-            logger.info(f"已连接到现有集合: {collection_name}")
-            logger.info(f"  当前文档数: {self.collection.count()}")
-        except:
-            self.collection = self.client.create_collection(
-                name=collection_name,
-                metadata={"description": "RAG系统文档向量存储"}
-            )
-            logger.info(f"已创建新集合: {collection_name}")
+    @staticmethod
+    def _sanitize_metadata(metadata: Dict) -> Dict:
+        """将元数据转换为 Chroma 支持的标量类型并移除空值。"""
+        sanitized: Dict = {}
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            if isinstance(value, (str, int, float, bool)):
+                sanitized[str(key)] = value
+            else:
+                sanitized[str(key)] = str(value)
+        return sanitized
 
-        logger.info(f"  存储路径: {persist_directory}\n")
+    @staticmethod
+    def _fallback_chunk_id(document: Document, index: int) -> str:
+        """兼容没有 chunk_id 的调用方，生成确定性 ID。"""
+        source = document.metadata.get("source_file") or document.metadata.get("source") or "unknown"
+        page = document.metadata.get("page_number") or document.metadata.get("page") or ""
+        chunk_index = document.metadata.get("chunk_index", index)
+        payload = f"{source}\0{page}\0{chunk_index}\0{document.page_content}".encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _validate_embeddings(embeddings: List[List[float]]) -> None:
+        if not embeddings:
+            return
+        dimension = len(embeddings[0])
+        if dimension == 0:
+            raise ValueError("Embedding 向量不能为空")
+        if any(len(embedding) != dimension for embedding in embeddings):
+            raise ValueError("同一批次的 Embedding 维度不一致")
 
     def add_documents(
         self,
         documents: List[Document],
         embeddings: List[List[float]],
-        ids: Optional[List[str]] = None
+        ids: Optional[List[str]] = None,
     ) -> List[str]:
-        """
-        添加文档到向量数据库
-
-        Args:
-            documents: LangChain Document对象列表
-            embeddings: 对应的向量列表
-            ids: 可选的文档ID列表（不提供则自动生成）
-
-        Returns:
-            文档ID列表
-        """
+        """幂等写入文档；相同 Chunk ID 会被更新而不是重复插入。"""
         if len(documents) != len(embeddings):
             raise ValueError(
                 f"文档数量({len(documents)})与向量数量({len(embeddings)})不匹配"
             )
+        if not documents:
+            return []
+        self._validate_embeddings(embeddings)
 
-        # 生成ID（如果未提供）
         if ids is None:
-            ids = [str(uuid.uuid4()) for _ in range(len(documents))]
+            ids = [
+                str(document.metadata.get("chunk_id") or self._fallback_chunk_id(document, index))
+                for index, document in enumerate(documents)
+            ]
+        if len(ids) != len(documents):
+            raise ValueError("ID 数量必须与文档数量一致")
+        if len(set(ids)) != len(ids):
+            raise ValueError("同一批次中存在重复 Chunk ID")
 
-        # 提取文本和元数据
-        texts = [doc.page_content for doc in documents]
-        metadatas = [doc.metadata for doc in documents]
-
-        # 添加到数据库
-        logger.info(f"正在添加 {len(documents)} 个文档到向量库...")
+        texts = [document.page_content for document in documents]
+        if any(not text.strip() for text in texts):
+            raise ValueError("不能写入空文档块")
+        metadatas = [self._sanitize_metadata(document.metadata) for document in documents]
 
         try:
-            self.collection.add(
+            self.collection.upsert(
                 ids=ids,
                 embeddings=embeddings,
                 documents=texts,
-                metadatas=metadatas
+                metadatas=metadatas,
             )
-
-            logger.info(f"成功添加 {len(documents)} 个文档")
-            logger.info(f"  当前总文档数: {self.collection.count()}")
-
+            logger.info(
+                f"向量写入完成: upserted={len(documents)}, total={self.collection.count()}"
+            )
             return ids
-
-        except Exception as e:
-            logger.info(f"添加失败: {str(e)}")
+        except Exception:
+            logger.exception("向量写入失败")
             raise
 
     def search(
         self,
         query_embedding: List[float],
         n_results: int = 5,
-        where: Optional[Dict] = None
+        where: Optional[Dict] = None,
     ) -> Dict:
-        """
-        向量相似度搜索
+        """执行向量距离检索，返回展开后的 Chroma 结果。"""
+        if not query_embedding:
+            raise ValueError("查询向量不能为空")
+        if n_results <= 0:
+            raise ValueError("n_results 必须大于 0")
 
-        Args:
-            query_embedding: 查询向量
-            n_results: 返回的结果数量
-            where: 元数据过滤条件（例如 {"source_file": "报告.pdf"}）
+        collection_count = self.collection.count()
+        if collection_count == 0:
+            return {"ids": [], "documents": [], "metadatas": [], "distances": []}
 
-        Returns:
-            检索结果字典，包含ids、documents、metadatas、distances
-        """
         try:
             results = self.collection.query(
                 query_embeddings=[query_embedding],
-                n_results=n_results,
-                where=where
+                n_results=min(n_results, collection_count),
+                where=where,
             )
-
-            # 展平结果（query返回的是嵌套列表）
             return {
-                'ids': results['ids'][0] if results['ids'] else [],
-                'documents': results['documents'][0] if results['documents'] else [],
-                'metadatas': results['metadatas'][0] if results['metadatas'] else [],
-                'distances': results['distances'][0] if results['distances'] else []
+                "ids": results["ids"][0] if results.get("ids") else [],
+                "documents": results["documents"][0] if results.get("documents") else [],
+                "metadatas": results["metadatas"][0] if results.get("metadatas") else [],
+                "distances": results["distances"][0] if results.get("distances") else [],
             }
-
-        except Exception as e:
-            logger.info(f"搜索失败: {str(e)}")
+        except Exception:
+            logger.exception("向量搜索失败")
             raise
 
     def delete_by_ids(self, ids: List[str]) -> None:
-        """
-        根据ID删除文档
-
-        Args:
-            ids: 要删除的文档ID列表
-        """
+        """根据 Chunk ID 删除向量。"""
+        if not ids:
+            return
         try:
             self.collection.delete(ids=ids)
-            logger.info(f"已删除 {len(ids)} 个文档")
-        except Exception as e:
-            logger.info(f"删除失败: {str(e)}")
+            logger.info(f"已删除 {len(ids)} 个文档块")
+        except Exception:
+            logger.exception("按 ID 删除文档块失败")
+            raise
+
+    def delete_by_document_id(self, document_id: str) -> None:
+        """删除某个文档对应的全部 Chunk。"""
+        if not document_id.strip():
+            raise ValueError("document_id 不能为空")
+        try:
+            self.collection.delete(where={"document_id": document_id})
+            logger.info(f"已删除文档: document_id={document_id}")
+        except Exception:
+            logger.exception("按 document_id 删除文档失败")
             raise
 
     def delete_collection(self) -> None:
-        """
-        删除整个集合（慎用！）
-        """
+        """删除整个集合。"""
         try:
             self.client.delete_collection(name=self.collection_name)
             logger.info(f"已删除集合: {self.collection_name}")
-        except Exception as e:
-            logger.info(f"删除集合失败: {str(e)}")
+        except Exception:
+            logger.exception("删除集合失败")
             raise
 
     def get_collection_info(self) -> Dict:
-        """
-        获取集合信息
-        """
-        count = self.collection.count()
-        metadata = self.collection.metadata
-
+        """获取集合基本信息。"""
         return {
-            'name': self.collection_name,
-            'count': count,
-            'metadata': metadata
+            "name": self.collection_name,
+            "count": self.collection.count(),
+            "metadata": self.collection.metadata or {},
         }
 
     def peek_documents(self, limit: int = 5) -> Dict:
-        """
-        查看前N个文档（用于调试）
-
-        Args:
-            limit: 查看数量
-
-        Returns:
-            文档字典
-        """
+        """查看前 N 个文档块。"""
+        if limit <= 0:
+            raise ValueError("limit 必须大于 0")
         try:
-            results = self.collection.peek(limit=limit)
-            return results
-        except Exception as e:
-            logger.info(f"查看失败: {str(e)}")
+            return self.collection.peek(limit=limit)
+        except Exception:
+            logger.exception("预览向量库内容失败")
             raise
-
 
 def demo_basic_operations():
     """
@@ -330,9 +328,9 @@ def demo_integration_with_real_embeddings():
 
     # 导入前面的模块
     try:
-        from document_loader import UniversalDocumentLoader
-        from document_chunker import DocumentChunker
-        from embedding_client import UniversalEmbeddingClient
+        from app.core.document_loader import UniversalDocumentLoader
+        from app.core.document_chunker import DocumentChunker
+        from app.core.embedding_client import UniversalEmbeddingClient
     except ImportError as e:
         logger.info(f"导入失败: {str(e)}")
         logger.info("请确保前面课程的脚本都在同一目录")
@@ -446,5 +444,3 @@ if __name__ == "__main__":
         demo_basic_operations()
     else:
         demo_integration_with_real_embeddings()
-
-

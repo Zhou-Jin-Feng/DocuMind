@@ -1,184 +1,151 @@
-﻿"""
-RAG系统 - 文档加载模块
-支持PDF、Word、TXT三种格式的统一加载
+"""
+RAG 系统文档加载模块。
+
+支持 PDF、DOCX、TXT，并统一补充可追踪的文档元数据。
 """
 
-import os
-from typing import List
+import hashlib
 from pathlib import Path
-from app.utils.logger import get_logger
-from rich.panel import Panel  # 保留给测试代码
+from typing import List
 
-# 模块级 logger（用于独立函数）
-logger = get_logger(__name__)
-
-# LangChain文档加载器
-from langchain_community.document_loaders import (
-    PyPDFLoader,        # PDF加载器
-    Docx2txtLoader,     # Word加载器
-    TextLoader,         # TXT加载器
-)
+from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
+
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class UniversalDocumentLoader:
-    """
-    通用文档加载器
-    自动识别文件类型并选择合适的加载器
-    """
+    """根据扩展名选择加载器，并统一规范文档元数据。"""
 
-    # 支持的文件格式及对应的加载器
     LOADERS = {
-        '.pdf': PyPDFLoader,
-        '.docx': Docx2txtLoader,
-        '.doc': Docx2txtLoader,  # 老版Word格式
-        '.txt': TextLoader,
+        ".pdf": PyPDFLoader,
+        ".docx": Docx2txtLoader,
+        ".txt": TextLoader,
     }
 
     def __init__(self):
         self.logger = get_logger(__name__)
 
+    @staticmethod
+    def _build_document_id(file_path: str) -> str:
+        """基于文件名和文件内容生成稳定文档 ID。"""
+        path = Path(file_path)
+        digest = hashlib.sha256()
+        digest.update(path.name.lower().encode("utf-8"))
+        digest.update(b"\0")
+        with path.open("rb") as file_obj:
+            for block in iter(lambda: file_obj.read(1024 * 1024), b""):
+                digest.update(block)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _normalize_metadata(
+        documents: List[Document], file_path: str, file_ext: str, document_id: str
+    ) -> None:
+        """补充稳定 ID、文件名和从 1 开始的 PDF 页码。"""
+        file_name = Path(file_path).name
+        for document in documents:
+            raw_page = document.metadata.get("page")
+            page_number = raw_page + 1 if file_ext == ".pdf" and isinstance(raw_page, int) else None
+
+            # 不将 Gradio 临时文件的绝对路径写入向量库。
+            document.metadata["source"] = file_name
+            document.metadata["source_file"] = file_name
+            document.metadata["file_type"] = file_ext
+            document.metadata["document_id"] = document_id
+            if page_number is not None:
+                document.metadata["page_number"] = page_number
+
+    def _load_text(self, file_path: str) -> List[Document]:
+        """依次尝试常见中文文本编码。"""
+        last_error: UnicodeDecodeError | None = None
+        path = Path(file_path)
+        for encoding in ("utf-8-sig", "gb18030"):
+            try:
+                content = path.read_text(encoding=encoding)
+                return [Document(page_content=content, metadata={"source": str(path)})]
+            except UnicodeDecodeError as exc:
+                last_error = exc
+                self.logger.warning(f"使用 {encoding} 解码失败，尝试下一种编码")
+        if last_error is not None:
+            raise last_error
+        return []
+
     def load_document(self, file_path: str) -> List[Document]:
-        """
-        加载单个文档
+        """加载单个文档。"""
+        path = Path(file_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"文件不存在或不是普通文件: {file_path}")
 
-        Args:
-            file_path: 文档路径
-
-        Returns:
-            Document对象列表（每个对象包含文本+元数据）
-        """
-        # 检查文件是否存在
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"文件不存在: {file_path}")
-
-        # 获取文件扩展名
-        file_ext = Path(file_path).suffix.lower()
-
-        # 检查是否支持该格式
+        file_ext = path.suffix.lower()
         if file_ext not in self.LOADERS:
             raise ValueError(
-                f"不支持的文件格式: {file_ext}\n"
+                f"不支持的文件格式: {file_ext or '无扩展名'}；"
                 f"目前支持: {', '.join(self.LOADERS.keys())}"
             )
 
-        # 选择对应的加载器
-        loader_class = self.LOADERS[file_ext]
-
+        self.logger.info(f"正在加载文档: {path.name}")
         try:
-            self.logger.info(f"正在加载 {file_ext} 文件...")
-
-            # 实例化加载器
-            if file_ext == '.txt':
-                # TXT需要指定编码（中文通常是UTF-8或GBK）
-                loader = loader_class(file_path, encoding='utf-8')
+            if file_ext == ".txt":
+                documents = self._load_text(str(path))
             else:
-                loader = loader_class(file_path)
+                documents = self.LOADERS[file_ext](str(path)).load()
 
-            # 加载文档
-            documents = loader.load()
+            if not documents:
+                raise ValueError(f"文档没有可读取的内容: {path.name}")
 
-            # 添加文件名到元数据
-            for doc in documents:
-                doc.metadata['source_file'] = Path(file_path).name
-                doc.metadata['file_type'] = file_ext
-
-            self.logger.info(f"成功加载 {len(documents)} 个文档片段")
-
+            document_id = self._build_document_id(str(path))
+            self._normalize_metadata(documents, str(path), file_ext, document_id)
+            self.logger.info(f"成功加载 {len(documents)} 个文档片段: {path.name}")
             return documents
-
-        except UnicodeDecodeError:
-            # TXT文件编码错误，尝试GBK
-            self.logger.info("UTF-8解码失败，尝试GBK编码...")
-            loader = TextLoader(file_path, encoding='gbk')
-            documents = loader.load()
-
-            for doc in documents:
-                doc.metadata['source_file'] = Path(file_path).name
-                doc.metadata['file_type'] = file_ext
-
-            self.logger.info(f"成功加载 {len(documents)} 个文档片段")
-            return documents
-
-        except Exception as e:
-            self.logger.error(f"加载失败: {str(e)}")
+        except Exception:
+            self.logger.exception(f"文档加载失败: {path.name}")
             raise
 
     def load_directory(self, dir_path: str) -> List[Document]:
-        """
-        批量加载目录下的所有文档
-
-        Args:
-            dir_path: 目录路径
-
-        Returns:
-            所有文档的Document对象列表
-        """
-        if not os.path.isdir(dir_path):
+        """按文件名排序，加载目录下所有支持的文档。"""
+        directory = Path(dir_path)
+        if not directory.is_dir():
             raise NotADirectoryError(f"不是有效的目录: {dir_path}")
 
-        all_documents = []
-        supported_files = []
-
-        # 扫描目录
-        for file_name in os.listdir(dir_path):
-            file_path = os.path.join(dir_path, file_name)
-            file_ext = Path(file_path).suffix.lower()
-
-            if file_ext in self.LOADERS and os.path.isfile(file_path):
-                supported_files.append(file_path)
-
+        supported_files = sorted(
+            path for path in directory.iterdir()
+            if path.is_file() and path.suffix.lower() in self.LOADERS
+        )
         if not supported_files:
-            self.logger.warning(f"目录中没有找到支持的文档")
+            self.logger.warning("目录中没有找到支持的文档")
             return []
 
-        self.logger.info(f"找到 {len(supported_files)} 个文档，开始加载...")
-
-        # 逐个加载
+        all_documents: List[Document] = []
         for file_path in supported_files:
             try:
-                docs = self.load_document(file_path)
-                all_documents.extend(docs)
-            except Exception as e:
-                self.logger.warning(f"跳过文件 {Path(file_path).name}: {str(e)}")
+                all_documents.extend(self.load_document(str(file_path)))
+            except Exception as exc:
+                self.logger.warning(f"跳过文件 {file_path.name}: {exc}")
 
-        self.logger.info(f"总共加载 {len(all_documents)} 个文档片段")
-
+        self.logger.info(f"目录加载完成，共 {len(all_documents)} 个文档片段")
         return all_documents
 
-    def print_document_info(self, documents: List[Document]):
-        """
-        打印文档信息（用于验证）
-
-        Args:
-            documents: Document对象列表
-        """
+    def print_document_info(self, documents: List[Document]) -> None:
+        """输出文档摘要，供手动验证使用。"""
         if not documents:
             self.logger.info("没有文档可显示")
             return
 
-        # 统计信息
-        total_chars = sum(len(doc.page_content) for doc in documents)
-        sources = set(doc.metadata.get('source_file', 'Unknown') for doc in documents)
+        total_chars = sum(len(document.page_content) for document in documents)
+        sources = sorted({document.metadata.get("source_file", "Unknown") for document in documents})
+        self.logger.info(
+            f"文档加载摘要: 片段={len(documents)}, 字符={total_chars}, "
+            f"来源={len(sources)} ({', '.join(sources)})"
+        )
 
-        # 打印摘要
-        self.logger.info(f"\n文档加载摘要\n")
-        self.logger.info(f"文档片段数: {len(documents)}")
-        self.logger.info(f"总字符数: {total_chars:,}")
-        self.logger.info(f"来源文件数: {len(sources)}")
-        self.logger.info(f"文件列表: {', '.join(sources)}")
-
-        # 打印前3个片段的预览
-        self.logger.info("\n前3个片段预览:\n")
-
-        for i, doc in enumerate(documents[:3], 1):
-            preview = doc.page_content[:200].replace('\n', ' ')
-            source = doc.metadata.get('source_file', 'Unknown')
-            page = doc.metadata.get('page', 'N/A')
-
-            self.logger.info(f"片段 {i} (来源: {source}, 页码: {page})")
-            self.logger.info(f"  {preview}...\n")
-
+        for index, document in enumerate(documents[:3], 1):
+            preview = document.page_content[:200].replace("\n", " ")
+            source = document.metadata.get("source_file", "Unknown")
+            page = document.metadata.get("page_number", "N/A")
+            self.logger.info(f"片段 {index} (来源: {source}, 页码: {page}): {preview}...")
 
 def demo_load_single_file():
     """

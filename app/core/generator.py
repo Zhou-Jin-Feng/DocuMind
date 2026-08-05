@@ -1,215 +1,233 @@
-﻿"""
-RAG系统 - 生成模块
-支持多个LLM API的统一调用，流式输出，引用溯源
+"""
+RAG系统 - 生成模块。
+
+支持多个 LLM API 的统一调用、流式输出和引用溯源。
 """
 
 import os
-from typing import List, Dict, Optional, Generator
 from dataclasses import dataclass
-from dotenv import load_dotenv
-from openai import OpenAI
-from anthropic import Anthropic
-from app.utils.logger import get_logger
-from rich.panel import Panel
-from rich.markdown import Markdown
+from typing import Dict, Generator, List, Optional, Tuple
 
-# 加载环境变量
-load_dotenv()
+from anthropic import Anthropic
+from openai import OpenAI
+from rich.panel import Panel
+
+from app.config import settings
+from app.utils.logger import get_logger
+
 logger = get_logger(__name__)
 
 
 @dataclass
 class GenerationConfig:
-    """生成配置"""
-    temperature: float = 0.7      # 创造性（0=确定性，1=随机性）
-    max_tokens: int = 1000        # 最大生成长度
-    stream: bool = True           # 是否流式输出
+    """生成配置。"""
+
+    temperature: float = 0.7
+    max_tokens: int = 1000
+    stream: bool = True
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.temperature <= 2:
+            raise ValueError("temperature 必须在 0 到 2 之间")
+        if self.max_tokens <= 0:
+            raise ValueError("max_tokens 必须大于 0")
 
 
 class UniversalLLMClient:
-    """
-    统一LLM客户端
-    支持OpenAI、Claude、DeepSeek、GLM的统一调用
-    """
+    """OpenAI、Claude、DeepSeek 和 GLM 的统一客户端。"""
 
-    # 模型配置
     MODELS = {
-        'openai': {
-            'default_model': 'gpt-3.5-turbo',
-            'models': ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo']
+        "openai": {
+            "default_model": "gpt-3.5-turbo",
+            "models": ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"],
         },
-        'claude': {
-            'default_model': 'claude-3-haiku-20240307',
-            'models': ['claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-opus-20240229']
+        "claude": {
+            "default_model": "claude-3-haiku-20240307",
+            "models": [
+                "claude-3-haiku-20240307",
+                "claude-3-sonnet-20240229",
+                "claude-3-opus-20240229",
+            ],
         },
-        'deepseek': {
-            'default_model': 'deepseek-chat',
-            'models': ['deepseek-chat']
+        "deepseek": {
+            "default_model": "deepseek-chat",
+            "models": ["deepseek-chat"],
         },
-        'glm': {
-            'default_model': 'glm-4-flash',
-            'models': ['glm-4-flash', 'glm-4']
-        }
+        "glm": {
+            "default_model": "glm-4-flash",
+            "models": ["glm-4-flash", "glm-4"],
+        },
     }
 
-    def __init__(self, provider: str = 'openai', model: Optional[str] = None):
-        """
-        初始化LLM客户端
-
-        Args:
-            provider: API提供商 (openai/claude/deepseek/glm)
-            model: 模型名称（可选，默认使用推荐模型）
-        """
-        self.provider = provider
-
-        if provider not in self.MODELS:
+    def __init__(self, provider: str = "openai", model: Optional[str] = None):
+        self.provider = provider.strip().lower()
+        if self.provider not in self.MODELS:
             raise ValueError(
                 f"不支持的提供商: {provider}\n"
                 f"支持的选项: {', '.join(self.MODELS.keys())}"
             )
 
-        self.model = model or self.MODELS[provider]['default_model']
+        self.model = model or self.MODELS[self.provider]["default_model"]
         self.client = self._initialize_client()
-
-        logger.info(f"已初始化LLM客户端: {provider}")
+        logger.info(f"已初始化LLM客户端: {self.provider}")
         logger.info(f"  模型: {self.model}")
 
     def _initialize_client(self):
-        """根据提供商初始化API客户端"""
-        if self.provider == 'openai':
-            api_key = os.getenv('OPENAI_API_KEY')
-            base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
-
-            if not api_key:
+        """根据提供商初始化 API 客户端。"""
+        if self.provider == "openai":
+            if not settings.openai_api_key:
                 raise ValueError("未配置OPENAI_API_KEY")
+            return OpenAI(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_base_url,
+            )
 
-            return OpenAI(api_key=api_key, base_url=base_url)
-
-        elif self.provider == 'claude':
-            api_key = os.getenv('ANTHROPIC_API_KEY')
-
-            if not api_key:
+        if self.provider == "claude":
+            if not settings.anthropic_api_key:
                 raise ValueError("未配置ANTHROPIC_API_KEY")
+            return Anthropic(api_key=settings.anthropic_api_key)
 
-            return Anthropic(api_key=api_key)
-
-        elif self.provider == 'deepseek':
-            api_key = os.getenv('DEEPSEEK_API_KEY')
-            base_url = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
-
-            if not api_key:
+        if self.provider == "deepseek":
+            if not settings.deepseek_api_key:
                 raise ValueError("未配置DEEPSEEK_API_KEY")
+            return OpenAI(
+                api_key=settings.deepseek_api_key,
+                base_url=settings.deepseek_base_url,
+            )
 
-            return OpenAI(api_key=api_key, base_url=base_url)
-
-        elif self.provider == 'glm':
-            api_key = os.getenv('GLM_API_KEY')
-            base_url = os.getenv('GLM_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
-
-            if not api_key:
+        if self.provider == "glm":
+            if not settings.glm_api_key:
                 raise ValueError("未配置GLM_API_KEY")
+            return OpenAI(
+                api_key=settings.glm_api_key,
+                base_url=settings.glm_base_url,
+            )
 
-            return OpenAI(api_key=api_key, base_url=base_url)
+        raise RuntimeError(f"未实现的LLM提供商: {self.provider}")
+
+    @staticmethod
+    def _validate_messages(messages: List[Dict[str, str]]) -> None:
+        if not messages:
+            raise ValueError("messages 不能为空")
+        for index, message in enumerate(messages):
+            if not isinstance(message, dict):
+                raise ValueError(f"第 {index} 条消息必须是字典")
+            role = message.get("role")
+            content = message.get("content")
+            if role not in {"system", "user", "assistant"}:
+                raise ValueError(f"第 {index} 条消息的 role 不受支持: {role}")
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError(f"第 {index} 条消息内容不能为空")
+
+    @classmethod
+    def _prepare_claude_messages(
+        cls,
+        messages: List[Dict[str, str]],
+    ) -> Tuple[Optional[str], List[Dict[str, str]]]:
+        """将 system 消息拆分为 Anthropic API 的独立 system 参数。"""
+        cls._validate_messages(messages)
+        system_parts: List[str] = []
+        claude_messages: List[Dict[str, str]] = []
+        for message in messages:
+            if message["role"] == "system":
+                system_parts.append(message["content"].strip())
+            else:
+                claude_messages.append(
+                    {
+                        "role": message["role"],
+                        "content": message["content"],
+                    }
+                )
+        if not claude_messages:
+            raise ValueError("Claude 请求至少需要一条 user 或 assistant 消息")
+        system_prompt = "\n\n".join(system_parts) or None
+        return system_prompt, claude_messages
 
     def generate(
         self,
         messages: List[Dict[str, str]],
-        config: Optional[GenerationConfig] = None
+        config: Optional[GenerationConfig] = None,
     ) -> str:
-        """
-        生成回答（一次性输出）
-
-        Args:
-            messages: 消息列表 [{"role": "user", "content": "..."}]
-            config: 生成配置
-
-        Returns:
-            生成的文本
-        """
-        if config is None:
-            config = GenerationConfig(stream=False)
+        """生成回答（一次性输出）。"""
+        config = config or GenerationConfig(stream=False)
+        self._validate_messages(messages)
 
         try:
-            if self.provider == 'claude':
-                # Claude使用不同的API格式
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=config.max_tokens,
-                    temperature=config.temperature,
-                    messages=messages
-                )
-                return response.content[0].text
-
+            if self.provider == "claude":
+                system_prompt, claude_messages = self._prepare_claude_messages(messages)
+                request = {
+                    "model": self.model,
+                    "max_tokens": config.max_tokens,
+                    "temperature": config.temperature,
+                    "messages": claude_messages,
+                }
+                if system_prompt:
+                    request["system"] = system_prompt
+                response = self.client.messages.create(**request)
+                if not response.content:
+                    raise RuntimeError("Claude 未返回文本内容")
+                answer = response.content[0].text
             else:
-                # OpenAI兼容格式（OpenAI/DeepSeek/GLM）
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     temperature=config.temperature,
-                    max_tokens=config.max_tokens
+                    max_tokens=config.max_tokens,
                 )
-                return response.choices[0].message.content
+                answer = response.choices[0].message.content
 
-        except Exception as e:
-            logger.info(f"生成失败: {str(e)}")
+            if not answer:
+                raise RuntimeError("模型未返回文本内容")
+            return answer
+        except Exception:
+            logger.exception(f"LLM 生成失败: provider={self.provider}")
             raise
 
     def generate_stream(
         self,
         messages: List[Dict[str, str]],
-        config: Optional[GenerationConfig] = None
+        config: Optional[GenerationConfig] = None,
     ) -> Generator[str, None, None]:
-        """
-        生成回答（流式输出）
-
-        Args:
-            messages: 消息列表
-            config: 生成配置
-
-        Yields:
-            文本片段
-        """
-        if config is None:
-            config = GenerationConfig(stream=True)
+        """生成回答（流式输出）。"""
+        config = config or GenerationConfig(stream=True)
+        self._validate_messages(messages)
 
         try:
-            if self.provider == 'claude':
-                # Claude流式输出
-                with self.client.messages.stream(
-                    model=self.model,
-                    max_tokens=config.max_tokens,
-                    temperature=config.temperature,
-                    messages=messages
-                ) as stream:
+            if self.provider == "claude":
+                system_prompt, claude_messages = self._prepare_claude_messages(messages)
+                request = {
+                    "model": self.model,
+                    "max_tokens": config.max_tokens,
+                    "temperature": config.temperature,
+                    "messages": claude_messages,
+                }
+                if system_prompt:
+                    request["system"] = system_prompt
+                with self.client.messages.stream(**request) as stream:
                     for text in stream.text_stream:
-                        yield text
+                        if text:
+                            yield text
+                return
 
-            else:
-                # OpenAI兼容格式流式输出
-                stream = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=config.temperature,
-                    max_tokens=config.max_tokens,
-                    stream=True
-                )
-
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-
-        except Exception as e:
-            logger.info(f"流式生成失败: {str(e)}")
+            stream = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                stream=True,
+            )
+            for chunk in stream:
+                content = chunk.choices[0].delta.content
+                if content:
+                    yield content
+        except Exception:
+            logger.exception(f"LLM 流式生成失败: provider={self.provider}")
             raise
 
 
 class RAGGenerator:
-    """
-    RAG生成器
-    结合检索结果和LLM生成答案
-    """
+    """结合检索结果和 LLM 生成答案。"""
 
-    # RAG系统提示词模板
     SYSTEM_PROMPT = """你是一个专业的AI知识助手。你的任务是基于提供的文档内容回答用户问题。
 
 重要规则：
@@ -226,134 +244,62 @@ class RAGGenerator:
 """
 
     def __init__(self, llm_client: UniversalLLMClient):
-        """
-        初始化RAG生成器
-
-        Args:
-            llm_client: UniversalLLMClient实例
-        """
         self.llm_client = llm_client
         logger.info("RAG生成器初始化完成")
 
     def _build_context_from_retrieval(self, retrieval_results) -> str:
-        """
-        从检索结果构建上下文
-
-        Args:
-            retrieval_results: 检索结果列表（RetrievalResult对象）
-
-        Returns:
-            格式化的上下文字符串
-        """
+        """从检索结果构建上下文。"""
         if not retrieval_results:
             return "未找到相关文档。"
 
         context_parts = ["以下是相关文档内容：\n"]
-
-        for i, result in enumerate(retrieval_results, 1):
-            source_info = f"{result.source}" if result.source else "未知来源"
-            if result.page:
-                source_info += f" 第{result.page}页"
-
+        for index, result in enumerate(retrieval_results, 1):
+            source_info = result.source or "未知来源"
+            if result.page_number:
+                source_info += f" 第{result.page_number}页"
             context_parts.append(
-                f"[文档{i}] 来源: {source_info}\n"
+                f"[文档{index}] 来源: {source_info}\n"
                 f"{result.content}\n"
             )
-
         return "\n".join(context_parts)
 
     def _build_prompt(self, query: str, context: str) -> List[Dict[str, str]]:
-        """
-        构建完整的对话消息
-
-        Args:
-            query: 用户问题
-            context: 文档上下文
-
-        Returns:
-            消息列表
-        """
-        user_message = f"{context}\n\n用户问题：{query}\n\n请基于上述文档回答："
-
-        messages = [
+        normalized_query = (query or "").strip()
+        if not normalized_query:
+            raise ValueError("query 不能为空")
+        user_message = f"{context}\n\n用户问题：{normalized_query}\n\n请基于上述文档回答："
+        return [
             {"role": "system", "content": self.SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
+            {"role": "user", "content": user_message},
         ]
-
-        return messages
 
     def generate_answer(
         self,
         query: str,
         retrieval_results,
         config: Optional[GenerationConfig] = None,
-        show_prompt: bool = False
+        show_prompt: bool = False,
     ) -> str:
-        """
-        生成答案（一次性输出）
-
-        Args:
-            query: 用户问题
-            retrieval_results: 检索结果列表
-            config: 生成配置
-            show_prompt: 是否显示构造的prompt（调试用）
-
-        Returns:
-            生成的答案
-        """
-        logger.info(f"\n正在生成答案...")
-
-        # 1. 构建上下文
+        """生成答案（一次性输出）；失败时向上抛出异常。"""
+        logger.info("正在生成答案...")
         context = self._build_context_from_retrieval(retrieval_results)
-
-        # 2. 构建prompt
         messages = self._build_prompt(query, context)
-
         if show_prompt:
-            logger.info("\n--- 构造的Prompt ---")
-            logger.info(messages[1]['content'][:500] + "...")
-            logger.info("--- End ---\n")
-
-        # 3. 调用LLM生成
-        try:
-            answer = self.llm_client.generate(messages, config)
-            logger.info(f"答案生成完成")
-            return answer
-
-        except Exception as e:
-            logger.info(f"生成失败: {str(e)}")
-            return "抱歉，生成答案时发生错误。"
+            logger.debug(f"构造的Prompt预览: {messages[1]['content'][:500]}")
+        answer = self.llm_client.generate(messages, config)
+        logger.info("答案生成完成")
+        return answer
 
     def generate_answer_stream(
         self,
         query: str,
         retrieval_results,
-        config: Optional[GenerationConfig] = None
+        config: Optional[GenerationConfig] = None,
     ) -> Generator[str, None, None]:
-        """
-        生成答案（流式输出）
-
-        Args:
-            query: 用户问题
-            retrieval_results: 检索结果列表
-            config: 生成配置
-
-        Yields:
-            答案文本片段
-        """
-        # 构建上下文和prompt
+        """生成答案（流式输出）；失败时向上抛出异常。"""
         context = self._build_context_from_retrieval(retrieval_results)
         messages = self._build_prompt(query, context)
-
-        # 流式生成
-        try:
-            for chunk in self.llm_client.generate_stream(messages, config):
-                yield chunk
-
-        except Exception as e:
-            logger.info(f"流式生成失败: {str(e)}")
-            yield "抱歉，生成答案时发生错误。"
-
+        yield from self.llm_client.generate_stream(messages, config)
 
 def demo_rag_generation():
     """
@@ -363,13 +309,11 @@ def demo_rag_generation():
 
     # 导入依赖模块
     try:
-        from retriever import Retriever
-        from vector_store import VectorStore
-        from embedding_client import UniversalEmbeddingClient
-        from document_loader import UniversalDocumentLoader
-        from document_chunker import DocumentChunker
+        from app.core.retriever import Retriever
+        from app.core.vector_store import VectorStore
+        from app.core.embedding_client import UniversalEmbeddingClient
     except ImportError as e:
-        logger.info(f"导入失败: {str(e)}")
+        logger.error(f"导入失败: {str(e)}")
         logger.info("请确保前面课程的脚本都在同一目录")
         return
 
@@ -384,7 +328,7 @@ def demo_rag_generation():
         logger.info("发现已有知识库，直接加载")
 
         # 初始化embedding和vector store
-        provider = os.getenv('DEFAULT_EMBEDDING_PROVIDER', 'openai')
+        provider = settings.default_embedding_provider
         embedding_client = UniversalEmbeddingClient(provider)
 
         vector_store = VectorStore(
@@ -396,7 +340,6 @@ def demo_rag_generation():
         logger.info("未找到知识库，正在创建...")
 
         # 创建知识库（复用第6课的代码）
-        from retriever import demo_retrieval
         logger.info("请先运行 retriever.py 创建知识库")
         return
 
@@ -407,14 +350,14 @@ def demo_rag_generation():
     # 步骤3：初始化LLM生成器
     logger.info("\n步骤3: 初始化LLM生成器")
 
-    llm_provider = os.getenv('DEFAULT_LLM_PROVIDER', 'openai')
+    llm_provider = settings.default_llm_provider
     logger.info(f"使用LLM: {llm_provider}")
 
     try:
         llm_client = UniversalLLMClient(provider=llm_provider)
         rag_generator = RAGGenerator(llm_client)
     except Exception as e:
-        logger.info(f"LLM初始化失败: {str(e)}")
+        logger.exception("LLM初始化失败")
         logger.info("请检查.env中的LLM API配置")
         return
 
@@ -515,5 +458,3 @@ def demo_rag_generation():
 
 if __name__ == "__main__":
     demo_rag_generation()
-
-

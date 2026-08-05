@@ -1,16 +1,15 @@
-﻿"""
+"""
 RAG系统 - 向量化与嵌入模块
 支持多个API提供商的统一嵌入接口（含本地Ollama）
 """
 
-import os
 import time
-from typing import List, Optional, Union
-from dotenv import load_dotenv
+from copy import deepcopy
+from typing import List, Optional
 from openai import OpenAI
+from app.config import settings
 from app.utils.logger import get_logger
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
-from rich.panel import Panel
 from rich.table import Table
 
 # 尝试导入 Ollama（如果可用）
@@ -19,11 +18,7 @@ try:
     OLLAMA_AVAILABLE = True
 except ImportError:
     OLLAMA_AVAILABLE = False
-    print("⚠️ langchain-ollama 未安装，Ollama支持将不可用")
-    print("   安装: pip install langchain-ollama")
 
-# 加载环境变量
-load_dotenv()
 logger = get_logger(__name__)
 
 
@@ -61,7 +56,7 @@ class UniversalEmbeddingClient:
         },
         # ===== 新增 Ollama 支持 =====
         'ollama': {
-            'model': os.getenv('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding'),
+            'model': 'qwen3-embedding',
             'dimensions': 1024,  # 实际维度由模型决定，这里给默认值
             'max_batch_size': 50,  # Ollama 批处理能力有限
             'type': 'local'
@@ -95,7 +90,9 @@ class UniversalEmbeddingClient:
                 f"支持的选项: {', '.join(self.MODELS.keys())}"
             )
 
-        self.config = self.MODELS[provider]
+        self.config = deepcopy(self.MODELS[provider])
+        if provider == 'ollama':
+            self.config['model'] = settings.ollama_embedding_model
         self.type = self.config.get('type', 'api')
 
         # 根据类型初始化客户端
@@ -117,7 +114,7 @@ class UniversalEmbeddingClient:
                 "运行: pip install langchain-ollama"
             )
 
-        base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+        base_url = settings.ollama_base_url
         model_name = self.config['model']
 
         try:
@@ -131,8 +128,8 @@ class UniversalEmbeddingClient:
                 test_vector = self.ollama_client.embed_query("test")
                 self.config['dimensions'] = len(test_vector)
                 logger.info(f"  实际向量维度: {len(test_vector)}")
-            except:
-                pass  # 使用默认维度
+            except Exception:
+                logger.warning("无法探测 Ollama 向量维度，将使用配置中的默认值")
 
         except Exception as e:
             raise ConnectionError(
@@ -144,8 +141,8 @@ class UniversalEmbeddingClient:
     def _initialize_api_client(self) -> OpenAI:
         """初始化云端API客户端"""
         if self.provider.startswith('openai'):
-            api_key = os.getenv('OPENAI_API_KEY')
-            base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+            api_key = settings.openai_api_key
+            base_url = settings.openai_base_url
 
             if not api_key:
                 raise ValueError("未配置OPENAI_API_KEY，请检查.env文件")
@@ -153,8 +150,8 @@ class UniversalEmbeddingClient:
             self.client = OpenAI(api_key=api_key, base_url=base_url)
 
         elif self.provider == 'deepseek':
-            api_key = os.getenv('DEEPSEEK_API_KEY')
-            base_url = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
+            api_key = settings.deepseek_api_key
+            base_url = settings.deepseek_base_url
 
             if not api_key:
                 raise ValueError("未配置DEEPSEEK_API_KEY，请检查.env文件")
@@ -162,8 +159,8 @@ class UniversalEmbeddingClient:
             self.client = OpenAI(api_key=api_key, base_url=base_url)
 
         elif self.provider == 'glm':
-            api_key = os.getenv('GLM_API_KEY')
-            base_url = os.getenv('GLM_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4')
+            api_key = settings.glm_api_key
+            base_url = settings.glm_base_url
 
             if not api_key:
                 raise ValueError("未配置GLM_API_KEY，请检查.env文件")
@@ -187,8 +184,8 @@ class UniversalEmbeddingClient:
         if self.type == 'local':
             try:
                 return self.ollama_client.embed_query(text)
-            except Exception as e:
-                logger.info(f"向量化失败: {str(e)}")
+            except Exception:
+                logger.exception("Ollama 单文本向量化失败")
                 raise
 
         # 云端 API
@@ -198,8 +195,8 @@ class UniversalEmbeddingClient:
                 input=text
             )
             return response.data[0].embedding
-        except Exception as e:
-            logger.info(f"向量化失败: {str(e)}")
+        except Exception:
+            logger.exception("API 单文本向量化失败")
             raise
 
     def embed_texts_batch(
@@ -224,17 +221,23 @@ class UniversalEmbeddingClient:
         """
         if not texts:
             return []
+        if max_retries <= 0:
+            raise ValueError("max_retries 必须大于 0")
 
-        # 过滤空文本
-        texts = [t.strip() for t in texts if t.strip()]
-
-        if not texts:
-            logger.info("所有文本为空，跳过向量化")
-            return []
+        empty_indexes = [
+            index
+            for index, text in enumerate(texts)
+            if not isinstance(text, str) or not text.strip()
+        ]
+        if empty_indexes:
+            raise ValueError(f"存在空文本，索引位置: {empty_indexes[:10]}")
+        texts = [text.strip() for text in texts]
 
         # 设置批处理大小
         if batch_size is None:
             batch_size = self.config['max_batch_size']
+        if batch_size <= 0:
+            raise ValueError("batch_size 必须大于 0")
 
         total_batches = (len(texts) + batch_size - 1) // batch_size
         all_embeddings = []
@@ -276,8 +279,8 @@ class UniversalEmbeddingClient:
                         all_embeddings.extend(batch_embeddings)
                         progress.update(task, advance=len(batch_texts))
 
-                    except Exception as e:
-                        logger.info(f"批次 {batch_num} 失败: {str(e)}")
+                    except Exception:
+                        logger.exception(f"Ollama 批次 {batch_num} 向量化失败")
                         raise
 
                 else:
@@ -309,8 +312,8 @@ class UniversalEmbeddingClient:
                                 )
                                 time.sleep(wait_time)
                             else:
-                                logger.info(
-                                    f"批次 {batch_num} 失败，已达最大重试次数"
+                                logger.exception(
+                                    f"API 批次 {batch_num} 失败，已达最大重试次数"
                                 )
                                 raise
 
@@ -450,7 +453,7 @@ def demo_compare_providers():
                 'preview': embedding[:5]
             })
         except Exception as e:
-            logger.info(f"测试失败: {str(e)}")
+            logger.error(f"测试失败: {str(e)}")
 
     # 展示对比表格
     logger.info("\n" + "="*60)
@@ -507,7 +510,7 @@ if __name__ == "__main__":
             client = UniversalEmbeddingClient(provider)
             client.test_embedding()
         except Exception as e:
-            logger.info(f"\n测试失败: {str(e)}")
+            logger.exception("测试失败")
             if provider == 'ollama':
                 logger.info("提示: 请确保 Ollama 正在运行并已下载模型")
                 logger.info("  1. 启动: ollama serve")
@@ -517,5 +520,3 @@ if __name__ == "__main__":
 
     else:
         demo_compare_providers()
-
-

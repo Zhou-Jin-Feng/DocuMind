@@ -1,117 +1,119 @@
-﻿"""
-RAG系统 - 文档分块模块
-支持多种分块策略，并可视化分块结果
+"""
+RAG 系统文档分块模块。
+
+支持递归分块和固定分块，并为每个 Chunk 补充稳定元数据。
 """
 
+import hashlib
+from collections import defaultdict
 from typing import List
-from langchain_core.documents import Document
-from langchain_text_splitters import (
-    RecursiveCharacterTextSplitter,  # 递归分割（推荐）
-    CharacterTextSplitter,            # 固定大小分割
-)
-from app.utils.logger import get_logger
-from rich.table import Table
-from rich.panel import Panel
+
 import tiktoken
+from langchain_core.documents import Document
+from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
+from rich.panel import Panel
+from rich.table import Table
+
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class DocumentChunker:
-    """
-    文档分块器
-    支持多种分块策略
-    """
+    """文档分块器。"""
 
     def __init__(
         self,
         chunk_size: int = 800,
         chunk_overlap: int = 100,
-        separator: str = "\n\n"
+        separator: str = "\n\n",
     ):
-        """
-        初始化分块器
+        if chunk_size <= 0:
+            raise ValueError("chunk_size 必须大于 0")
+        if chunk_overlap < 0:
+            raise ValueError("chunk_overlap 不能小于 0")
+        if chunk_overlap >= chunk_size:
+            raise ValueError("chunk_overlap 必须小于 chunk_size")
 
-        Args:
-            chunk_size: 每个块的字符数（中文推荐500-800）
-            chunk_overlap: 相邻块重叠的字符数（推荐chunk_size的10-20%）
-            separator: 分割符（默认按段落分）
-        """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.separator = separator
 
-    def chunk_documents_recursive(
-        self,
-        documents: List[Document]
-    ) -> List[Document]:
-        """
-        递归分块（推荐方法）
-        先尝试按段落分，不行再按句子，最后按字符
+    @staticmethod
+    def _ensure_document_ids(documents: List[Document]) -> None:
+        """为手工构造的 Document 补充稳定 document_id。"""
+        for document in documents:
+            if document.metadata.get("document_id"):
+                continue
+            source = str(document.metadata.get("source_file") or document.metadata.get("source") or "unknown")
+            page = str(document.metadata.get("page_number") or document.metadata.get("page") or "")
+            payload = f"{source}\0{page}\0{document.page_content}".encode("utf-8")
+            document.metadata["document_id"] = hashlib.sha256(payload).hexdigest()
 
-        Args:
-            documents: 待分块的Document列表
+    @staticmethod
+    def _decorate_chunks(chunks: List[Document]) -> List[Document]:
+        """去除空 Chunk，并增加 chunk_index、chunk_id 和字符数。"""
+        counters: defaultdict[str, int] = defaultdict(int)
+        decorated: List[Document] = []
 
-        Returns:
-            分块后的Document列表
-        """
-        logger.info(f"\n使用递归分块策略...")
-        logger.info(f"参数: chunk_size={self.chunk_size}, overlap={self.chunk_overlap}")
+        for chunk in chunks:
+            content = chunk.page_content.strip()
+            if not content:
+                continue
+            chunk.page_content = content
 
-        # 创建递归分割器
+            document_id = str(chunk.metadata["document_id"])
+            chunk_index = counters[document_id]
+            counters[document_id] += 1
+            page_number = chunk.metadata.get("page_number", "")
+            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            chunk_id = hashlib.sha256(
+                f"{document_id}:{page_number}:{chunk_index}:{content_hash}".encode("utf-8")
+            ).hexdigest()
+
+            chunk.metadata["chunk_index"] = chunk_index
+            chunk.metadata["chunk_id"] = chunk_id
+            chunk.metadata["chunk_char_count"] = len(content)
+            decorated.append(chunk)
+
+        return decorated
+
+    def chunk_documents_recursive(self, documents: List[Document]) -> List[Document]:
+        """优先按段落和句子边界进行递归分块。"""
+        if not documents:
+            return []
+
+        self._ensure_document_ids(documents)
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
-            length_function=len,  # 使用字符数计算长度
-            separators=[
-                "\n\n",  # 优先按段落分（双换行）
-                "\n",    # 其次按行分
-                "。",    # 中文句号
-                "！",    # 中文感叹号
-                "？",    # 中文问号
-                ".",     # 英文句号
-                "!",
-                "?",
-                " ",     # 空格
-                ""       # 最后按字符切
-            ]
+            length_function=len,
+            separators=["\n\n", "\n", "。", "！", "？", ".", "!", "?", " ", ""],
         )
-
-        # 执行分块
-        chunks = text_splitter.split_documents(documents)
-
-        logger.info(f"原始文档数: {len(documents)} → 分块后: {len(chunks)}")
-
+        chunks = self._decorate_chunks(text_splitter.split_documents(documents))
+        logger.info(
+            f"递归分块完成: 原始文档={len(documents)}, chunks={len(chunks)}, "
+            f"chunk_size={self.chunk_size}, overlap={self.chunk_overlap}"
+        )
         return chunks
 
-    def chunk_documents_fixed(
-        self,
-        documents: List[Document]
-    ) -> List[Document]:
-        """
-        固定大小分块
-        简单粗暴，每N个字符切一刀
+    def chunk_documents_fixed(self, documents: List[Document]) -> List[Document]:
+        """按固定大小进行分块。"""
+        if not documents:
+            return []
 
-        Args:
-            documents: 待分块的Document列表
-
-        Returns:
-            分块后的Document列表
-        """
-        logger.info(f"\n使用固定大小分块策略...")
-        logger.info(f"参数: chunk_size={self.chunk_size}, overlap={self.chunk_overlap}")
-
+        self._ensure_document_ids(documents)
         text_splitter = CharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
             separator=self.separator,
-            length_function=len
+            length_function=len,
         )
-
-        chunks = text_splitter.split_documents(documents)
-
-        logger.info(f"原始文档数: {len(documents)} → 分块后: {len(chunks)}")
-
+        chunks = self._decorate_chunks(text_splitter.split_documents(documents))
+        logger.info(
+            f"固定分块完成: 原始文档={len(documents)}, chunks={len(chunks)}, "
+            f"chunk_size={self.chunk_size}, overlap={self.chunk_overlap}"
+        )
         return chunks
 
     @staticmethod
@@ -230,7 +232,7 @@ def demo_chunking():
     """
     完整演示：从文档加载到分块
     """
-    from document_loader import UniversalDocumentLoader
+    from app.core.document_loader import UniversalDocumentLoader
 
     logger.info("="*60)
 

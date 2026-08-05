@@ -1,53 +1,53 @@
-﻿"""
-RAG系统 - 检索模块
-支持多种检索策略：语义检索、混合检索、重排序
+"""
+RAG 系统检索模块。
+
+明确区分 Chroma 距离和重排分数，并保留检索异常语义。
 """
 
-from typing import List, Dict, Optional, Tuple
+import re
 from dataclasses import dataclass
-from app.utils.logger import get_logger
-from rich.table import Table
+from typing import Dict, List, Optional
+
 from rich.panel import Panel
+
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 @dataclass
 class RetrievalResult:
-    """
-    检索结果数据类
-    """
-    content: str              # 文档内容
-    metadata: Dict            # 元数据
-    score: float              # 相似度分数（越小越相似，对于距离；或越大越相似，对于相关性）
-    rank: int                 # 排名
-    source: str = ""          # 来源文件
-    page: int = 0             # 页码
+    """单条检索结果。distance 越小越相关，rerank_score 越大越相关。"""
 
-    def __post_init__(self):
-        """初始化后处理"""
-        if self.metadata:
-            self.source = self.metadata.get('source_file', self.metadata.get('source', ''))
-            self.page = self.metadata.get('page', 0)
+    content: str
+    metadata: Dict
+    distance: float
+    rank: int
+    source: str = ""
+    page_number: Optional[int] = None
+    rerank_score: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        self.metadata = self.metadata or {}
+        self.source = str(
+            self.metadata.get("source_file") or self.metadata.get("source") or self.source
+        )
+        page = self.metadata.get("page_number")
+        if isinstance(page, int) and page > 0:
+            self.page_number = page
+
+    @property
+    def page(self) -> int:
+        """兼容旧调用；无页码时返回 0。"""
+        return self.page_number or 0
 
 
 class Retriever:
-    """
-    检索器
-    封装多种检索策略
-    """
+    """封装语义检索和轻量重排。"""
 
     def __init__(self, vector_store, embedding_client):
-        """
-        初始化检索器
-
-        Args:
-            vector_store: VectorStore实例
-            embedding_client: UniversalEmbeddingClient实例
-        """
         self.vector_store = vector_store
         self.embedding_client = embedding_client
-
         logger.info("检索器初始化完成")
 
     def retrieve_semantic(
@@ -55,197 +55,136 @@ class Retriever:
         query: str,
         top_k: int = 5,
         score_threshold: Optional[float] = None,
-        metadata_filter: Optional[Dict] = None
+        metadata_filter: Optional[Dict] = None,
     ) -> List[RetrievalResult]:
-        """
-        语义检索（基于向量相似度）
+        """执行语义检索；score_threshold 表示允许的最大距离。"""
+        normalized_query = (query or "").strip()
+        if not normalized_query:
+            raise ValueError("查询内容不能为空")
+        if top_k <= 0:
+            raise ValueError("top_k 必须大于 0")
+        if score_threshold is not None and score_threshold < 0:
+            raise ValueError("score_threshold 不能小于 0")
 
-        Args:
-            query: 查询问题
-            top_k: 返回结果数量
-            score_threshold: 距离阈值，大于此值的结果会被过滤（可选）
-            metadata_filter: 元数据过滤条件（可选）
-
-        Returns:
-            检索结果列表
-        """
-        logger.info(f"\n执行语义检索...")
-        logger.info(f"  查询: {query}")
-        logger.info(f"  Top-K: {top_k}")
-
-        # 1. 将问题向量化
+        logger.info(
+            f"执行语义检索: query_length={len(normalized_query)}, top_k={top_k}, "
+            f"distance_threshold={score_threshold}"
+        )
         try:
-            query_embedding = self.embedding_client.embed_text(query)
-        except Exception as e:
-            logger.info(f"向量化失败: {str(e)}")
-            return []
-
-        # 2. 在向量库中搜索
-        try:
+            query_embedding = self.embedding_client.embed_text(normalized_query)
             search_results = self.vector_store.search(
                 query_embedding=query_embedding,
                 n_results=top_k,
-                where=metadata_filter
+                where=metadata_filter,
             )
-        except Exception as e:
-            logger.info(f"搜索失败: {str(e)}")
-            return []
+        except Exception:
+            # 系统故障必须继续向上传播，不能伪装成“无结果”。
+            logger.exception("语义检索失败")
+            raise
 
-        # 3. 构造结果对象
-        results = []
-
-        for i, (doc, meta, dist) in enumerate(
-            zip(
-                search_results['documents'],
-                search_results['metadatas'],
-                search_results['distances']
-            )
+        results: List[RetrievalResult] = []
+        for document, metadata, distance in zip(
+            search_results["documents"],
+            search_results["metadatas"],
+            search_results["distances"],
         ):
-            # 应用距离阈值过滤
-            if score_threshold is not None and dist > score_threshold:
+            numeric_distance = float(distance)
+            if score_threshold is not None and numeric_distance > score_threshold:
                 continue
-
-            result = RetrievalResult(
-                content=doc,
-                metadata=meta,
-                score=dist,  # ChromaDB返回的是距离（越小越好）
-                rank=i + 1
+            results.append(
+                RetrievalResult(
+                    content=document,
+                    metadata=metadata or {},
+                    distance=numeric_distance,
+                    rank=len(results) + 1,
+                )
             )
-            results.append(result)
 
-        logger.info(f"检索到 {len(results)} 个结果")
-
+        logger.info(f"语义检索完成: result_count={len(results)}")
         return results
 
     def retrieve_with_context(
         self,
         query: str,
         top_k: int = 5,
-        expand_context: bool = False
+        expand_context: bool = False,
     ) -> List[RetrievalResult]:
-        """
-        带上下文扩展的检索
-        检索到相关块后，可选地包含其前后块（提供更完整的上下文）
-
-        Args:
-            query: 查询问题
-            top_k: 返回结果数量
-            expand_context: 是否扩展上下文（包含相邻块）
-
-        Returns:
-            检索结果列表
-        """
-        # 先执行标准检索
+        """执行标准检索；相邻 Chunk 扩展留待文档生命周期版本实现。"""
         results = self.retrieve_semantic(query, top_k)
-
-        if not expand_context:
-            return results
-
-        # TODO: 实现上下文扩展逻辑
-        # 需要在存储时记录chunk_index，然后检索相邻块
-        logger.info("上下文扩展功能待实现（需要存储时添加chunk_index）")
-
+        if expand_context:
+            logger.warning("上下文扩展尚未启用，当前返回标准检索结果")
         return results
+
+    @staticmethod
+    def _keyword_terms(text: str) -> set[str]:
+        """提取英文词、中文单字和中文二元组，避免依赖空格分词。"""
+        normalized = (text or "").lower()
+        terms = set(re.findall(r"[a-z0-9_]+", normalized))
+        for sequence in re.findall(r"[\u4e00-\u9fff]+", normalized):
+            terms.update(sequence)
+            terms.update(sequence[index : index + 2] for index in range(len(sequence) - 1))
+        return terms
 
     @staticmethod
     def rerank_results(
         results: List[RetrievalResult],
         query: str,
-        top_k: int = 3
+        top_k: int = 3,
     ) -> List[RetrievalResult]:
-        """
-        重排序（简化版）
-        使用启发式规则对结果重新排序
-
-        Args:
-            results: 初步检索结果
-            query: 查询问题
-            top_k: 重排序后保留的数量
-
-        Returns:
-            重排序后的结果
-        """
-        logger.info(f"\n执行重排序...")
-        logger.info(f"  初始结果数: {len(results)}")
-
+        """结合向量距离和轻量关键词覆盖率进行重排。"""
+        if top_k <= 0:
+            raise ValueError("top_k 必须大于 0")
         if not results:
             return []
 
-        # 简化版重排序：结合距离和关键词匹配
-        query_terms = set(query.lower().split())
-
+        query_terms = Retriever._keyword_terms(query)
         for result in results:
-            # 计算关键词匹配度
-            content_terms = set(result.content.lower().split())
-            keyword_overlap = len(query_terms & content_terms) / len(query_terms)
+            content_terms = Retriever._keyword_terms(result.content)
+            keyword_overlap = (
+                len(query_terms & content_terms) / len(query_terms) if query_terms else 0.0
+            )
+            distance_similarity = 1 / (1 + max(result.distance, 0.0))
+            result.rerank_score = 0.7 * distance_similarity + 0.3 * keyword_overlap
 
-            # 综合得分（距离越小越好，重叠越大越好）
-            # 归一化到0-1，越大越好
-            distance_score = 1 / (1 + result.score)  # 将距离转为相似度
-            combined_score = 0.7 * distance_score + 0.3 * keyword_overlap
+        reranked = sorted(
+            results,
+            key=lambda result: result.rerank_score if result.rerank_score is not None else -1.0,
+            reverse=True,
+        )[:top_k]
+        for rank, result in enumerate(reranked, 1):
+            result.rank = rank
 
-            result.score = combined_score
-
-        # 按综合得分降序排序
-        reranked = sorted(results, key=lambda x: x.score, reverse=True)
-
-        # 更新排名
-        for i, result in enumerate(reranked[:top_k], 1):
-            result.rank = i
-
-        logger.info(f"重排序完成，保留前 {top_k} 个结果")
-
-        return reranked[:top_k]
+        logger.info(f"重排序完成: input={len(results)}, output={len(reranked)}")
+        return reranked
 
     @staticmethod
     def format_results_for_llm(results: List[RetrievalResult]) -> str:
-        """
-        将检索结果格式化为LLM的上下文
-
-        Args:
-            results: 检索结果列表
-
-        Returns:
-            格式化的上下文字符串
-        """
+        """将结果格式化成包含来源和页码的 LLM 上下文。"""
         if not results:
             return "未找到相关信息。"
 
         context_parts = []
-
-        for i, result in enumerate(results, 1):
+        for index, result in enumerate(results, 1):
+            page = f"，第 {result.page_number} 页" if result.page_number else ""
             context_parts.append(
-                f"[文档{i}] 来源: {result.source or '未知'}\n"
-                f"{result.content}\n"
+                f"[文档{index}] 来源: {result.source or '未知'}{page}\n{result.content}\n"
             )
-
         return "\n".join(context_parts)
 
     @staticmethod
-    def display_results(results: List[RetrievalResult], title: str = "检索结果"):
-        """
-        美化显示检索结果
-
-        Args:
-            results: 检索结果列表
-            title: 显示标题
-        """
-        if not results:
-            logger.info("没有检索到相关结果")
-            return
-
-        logger.info(f"\n{title} (共 {len(results)} 个)\n")
-
+    def display_results(results: List[RetrievalResult], title: str = "检索结果") -> None:
+        """以普通日志输出检索结果摘要。"""
+        logger.info(f"{title}: {len(results)} 条")
         for result in results:
-            # 限制显示长度
-            content_preview = result.content[:150].replace('\n', ' ')
-            if len(result.content) > 150:
-                content_preview += "..."
-
-            logger.info(f"排名 {result.rank} (得分: {result.score:.4f})")
-            logger.info(f"  来源: {result.source or '未知'} | 页码: {result.page or 'N/A'}")
-            logger.info(f"  内容: {content_preview}\n")
-
+            rerank = (
+                f", rerank={result.rerank_score:.4f}"
+                if result.rerank_score is not None
+                else ""
+            )
+            logger.info(
+                f"排名 {result.rank}: distance={result.distance:.4f}{rerank}, "
+                f"source={result.source or '未知'}"
+            )
 
 def demo_retrieval():
     """
@@ -255,10 +194,10 @@ def demo_retrieval():
 
     # 导入依赖模块
     try:
-        from vector_store import VectorStore
-        from embedding_client import UniversalEmbeddingClient
-        from document_loader import UniversalDocumentLoader
-        from document_chunker import DocumentChunker
+        from app.core.vector_store import VectorStore
+        from app.core.embedding_client import UniversalEmbeddingClient
+        from app.core.document_loader import UniversalDocumentLoader
+        from app.core.document_chunker import DocumentChunker
     except ImportError as e:
         logger.info(f"导入失败: {str(e)}")
         logger.info("请确保前面课程的脚本都在同一目录")
@@ -421,5 +360,3 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
 
 if __name__ == "__main__":
     demo_retrieval()
-
-
