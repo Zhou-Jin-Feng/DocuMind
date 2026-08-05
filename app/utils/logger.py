@@ -1,4 +1,4 @@
-"""
+﻿"""
 统一日志管理
 使用 loguru 替代标准 logging 和 rich.console
 """
@@ -19,7 +19,7 @@ def setup_logger(
     
     Args:
         log_level: 日志级别
-        log_file_path: 日志文件路径
+        log_file_path: 日志文件路径（支持 loguru 时间格式占位符）
         rotation: 日志轮转大小
         retention: 日志保留时间
     """
@@ -34,11 +34,12 @@ def setup_logger(
         colorize=True
     )
     
-    # 确保日志目录存在
-    log_path = Path(log_file_path.format(time=""))
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    # 确保日志目录存在（使用固定路径，不包含时间占位符）
+    log_dir = Path("./logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
     
     # 文件输出（结构化，适合生产）
+    # loguru 会自动处理 {time:YYYY-MM-DD} 占位符
     logger.add(
         log_file_path,
         rotation=rotation,
