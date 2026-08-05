@@ -251,8 +251,7 @@ class UniversalEmbeddingClient:
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=console
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%")
         ) as progress:
 
             task = progress.add_task(
