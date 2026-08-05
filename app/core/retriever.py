@@ -1,4 +1,4 @@
-"""
+﻿"""
 RAG系统 - 检索模块
 支持多种检索策略：语义检索、混合检索、重排序
 """
@@ -9,7 +9,7 @@ from app.utils.logger import get_logger
 from rich.table import Table
 from rich.panel import Panel
 
-# Logger will be initialized per instance
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -48,7 +48,7 @@ class Retriever:
         self.vector_store = vector_store
         self.embedding_client = embedding_client
 
-        get_logger(__name__).info("✓ 检索器初始化完成")
+        logger.info("检索器初始化完成")
 
     def retrieve_semantic(
         self,
@@ -69,15 +69,15 @@ class Retriever:
         Returns:
             检索结果列表
         """
-        get_logger(__name__).info(f"\n执行语义检索...")
-        get_logger(__name__).info(f"  查询: {query}")
-        get_logger(__name__).info(f"  Top-K: {top_k}")
+        logger.info(f"\n执行语义检索...")
+        logger.info(f"  查询: {query}")
+        logger.info(f"  Top-K: {top_k}")
 
         # 1. 将问题向量化
         try:
             query_embedding = self.embedding_client.embed_text(query)
         except Exception as e:
-            get_logger(__name__).info(f"✗ 向量化失败: {str(e)}")
+            logger.info(f"向量化失败: {str(e)}")
             return []
 
         # 2. 在向量库中搜索
@@ -88,7 +88,7 @@ class Retriever:
                 where=metadata_filter
             )
         except Exception as e:
-            get_logger(__name__).info(f"✗ 搜索失败: {str(e)}")
+            logger.info(f"搜索失败: {str(e)}")
             return []
 
         # 3. 构造结果对象
@@ -113,7 +113,7 @@ class Retriever:
             )
             results.append(result)
 
-        get_logger(__name__).info(f"✓ 检索到 {len(results)} 个结果")
+        logger.info(f"检索到 {len(results)} 个结果")
 
         return results
 
@@ -143,7 +143,7 @@ class Retriever:
 
         # TODO: 实现上下文扩展逻辑
         # 需要在存储时记录chunk_index，然后检索相邻块
-        get_logger(__name__).info("上下文扩展功能待实现（需要存储时添加chunk_index）")
+        logger.info("上下文扩展功能待实现（需要存储时添加chunk_index）")
 
         return results
 
@@ -165,8 +165,8 @@ class Retriever:
         Returns:
             重排序后的结果
         """
-        get_logger(__name__).info(f"\n执行重排序...")
-        get_logger(__name__).info(f"  初始结果数: {len(results)}")
+        logger.info(f"\n执行重排序...")
+        logger.info(f"  初始结果数: {len(results)}")
 
         if not results:
             return []
@@ -193,7 +193,7 @@ class Retriever:
         for i, result in enumerate(reranked[:top_k], 1):
             result.rank = i
 
-        get_logger(__name__).info(f"✓ 重排序完成，保留前 {top_k} 个结果")
+        logger.info(f"重排序完成，保留前 {top_k} 个结果")
 
         return reranked[:top_k]
 
@@ -231,10 +231,10 @@ class Retriever:
             title: 显示标题
         """
         if not results:
-            get_logger(__name__).info("没有检索到相关结果")
+            logger.info("没有检索到相关结果")
             return
 
-        get_logger(__name__).info(f"\n[bold]{title}[/bold] (共 {len(results)} 个)\n")
+        logger.info(f"\n{title} (共 {len(results)} 个)\n")
 
         for result in results:
             # 限制显示长度
@@ -242,19 +242,16 @@ class Retriever:
             if len(result.content) > 150:
                 content_preview += "..."
 
-            get_logger(__name__).info(f"排名 {result.rank} (得分: {result.score:.4f})")
-            get_logger(__name__).info(f"  来源: {result.source or '未知'} | 页码: {result.page or 'N/A'}")
-            get_logger(__name__).info(f"  内容: {content_preview}\n")
+            logger.info(f"排名 {result.rank} (得分: {result.score:.4f})")
+            logger.info(f"  来源: {result.source or '未知'} | 页码: {result.page or 'N/A'}")
+            logger.info(f"  内容: {content_preview}\n")
 
 
 def demo_retrieval():
     """
     演示：完整的检索流程
     """
-    get_logger(__name__).info(Panel.fit(
-        "[bold cyan]RAG检索模块演示[/bold cyan]",
-        border_style="cyan"
-    ))
+    logger.info("="*60)
 
     # 导入依赖模块
     try:
@@ -263,14 +260,14 @@ def demo_retrieval():
         from document_loader import UniversalDocumentLoader
         from document_chunker import DocumentChunker
     except ImportError as e:
-        get_logger(__name__).info(f"✗ 导入失败: {str(e)}")
-        get_logger(__name__).info("请确保前面课程的脚本都在同一目录")
+        logger.info(f"导入失败: {str(e)}")
+        logger.info("请确保前面课程的脚本都在同一目录")
         return
 
     import os
 
     # 步骤1：准备知识库
-    get_logger(__name__).info("\n[bold]步骤1: 准备知识库文档[/bold]")
+    logger.info("\n步骤1: 准备知识库文档")
 
     knowledge_content = """
 机器学习算法详解
@@ -327,11 +324,11 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     with open(kb_file, 'w', encoding='utf-8') as f:
         f.write(knowledge_content)
 
-    get_logger(__name__).info(f"✓ 已创建知识库: {kb_file}")
-    get_logger(__name__).info(f"  字符数: {len(knowledge_content):,}")
+    logger.info(f"已创建知识库: {kb_file}")
+    logger.info(f"  字符数: {len(knowledge_content):,}")
 
     # 步骤2：加载和分块
-    get_logger(__name__).info("\n[bold]步骤2: 加载并分块文档[/bold]")
+    logger.info("\n步骤2: 加载并分块文档")
 
     loader = UniversalDocumentLoader()
     documents = loader.load_document(kb_file)
@@ -339,10 +336,10 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     chunker = DocumentChunker(chunk_size=300, chunk_overlap=50)
     chunks = chunker.chunk_documents_recursive(documents)
 
-    get_logger(__name__).info(f"分块结果: {len(chunks)} 个块")
+    logger.info(f"分块结果: {len(chunks)} 个块")
 
     # 步骤3：向量化并存储
-    get_logger(__name__).info("\n[bold]步骤3: 向量化并存储到向量库[/bold]")
+    logger.info("\n步骤3: 向量化并存储到向量库")
 
     try:
         provider = os.getenv('DEFAULT_EMBEDDING_PROVIDER', 'openai')
@@ -352,8 +349,8 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
         embeddings = embedding_client.embed_texts_batch(texts, show_progress=True)
 
     except Exception as e:
-        get_logger(__name__).info(f"⚠ 使用真实向量失败: {str(e)}")
-        get_logger(__name__).info("使用模拟向量继续演示...")
+        logger.info(f"使用真实向量失败: {str(e)}")
+        logger.info("使用模拟向量继续演示...")
 
         import random
         embeddings = [[random.random() for _ in range(1536)] for _ in chunks]
@@ -368,17 +365,17 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     vector_store.add_documents(chunks, embeddings)
 
     # 步骤4：初始化检索器
-    get_logger(__name__).info("\n[bold]步骤4: 初始化检索器[/bold]")
+    logger.info("\n步骤4: 初始化检索器")
 
     if embedding_client is None:
-        get_logger(__name__).info("⚠ 模拟模式，无法测试真实检索")
+        logger.info("模拟模式，无法测试真实检索")
         return
 
     retriever = Retriever(vector_store, embedding_client)
 
     # 步骤5：测试不同的查询
-    get_logger(__name__).info("\n" + "="*70)
-    get_logger(__name__).info("\n[bold]步骤5: 测试检索功能[/bold]")
+    logger.info("\n" + "="*70)
+    logger.info("\n步骤5: 测试检索功能")
 
     test_queries = [
         "监督学习有哪些常见算法？",
@@ -387,8 +384,8 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     ]
 
     for i, query in enumerate(test_queries, 1):
-        get_logger(__name__).info("\n" + "="*70)
-        get_logger(__name__).info(f"\n[bold yellow]查询 {i}: {query}[/bold yellow]")
+        logger.info("\n" + "="*70)
+        logger.info(f"\n查询 {i}: {query}")
 
         # 执行检索
         results = retriever.retrieve_semantic(query, top_k=3)
@@ -398,16 +395,16 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
 
         # 格式化为LLM上下文
         if i == 1:  # 只在第一个查询展示上下文格式
-            get_logger(__name__).info("\n[bold]格式化为LLM上下文:[/bold]")
+            logger.info("\n格式化为LLM上下文:")
             llm_context = Retriever.format_results_for_llm(results[:2])
-            get_logger(__name__).info(Panel(llm_context, border_style="green", title="供LLM使用的上下文"))
+            logger.info(Panel(llm_context, border_style="green", title="供LLM使用的上下文"))
 
     # 步骤6：测试重排序
-    get_logger(__name__).info("\n" + "="*70)
-    get_logger(__name__).info("\n[bold]步骤6: 测试重排序功能[/bold]")
+    logger.info("\n" + "="*70)
+    logger.info("\n步骤6: 测试重排序功能")
 
     query = test_queries[0]
-    get_logger(__name__).info(f"\n查询: {query}")
+    logger.info(f"\n查询: {query}")
 
     # 先检索更多结果
     initial_results = retriever.retrieve_semantic(query, top_k=5)
@@ -418,17 +415,11 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     Retriever.display_results(reranked_results, title="重排序后 (Top-3)")
 
     # 完成
-    get_logger(__name__).info("\n" + "="*70)
-    get_logger(__name__).info(Panel.fit(
-        "[bold green]✓ 检索模块演示完成！[/bold green]\n\n"
-        "你已经掌握了RAG检索的核心技术：\n"
-        "✓ 语义检索（向量相似度）\n"
-        "✓ 结果重排序（提升精度）\n"
-        "✓ 格式化上下文（供LLM使用）\n\n"
-        "下一步：学习如何用LLM生成答案",
-        border_style="green"
-    ))
+    logger.info("\n" + "="*70)
+    logger.info("="*60)
 
 
 if __name__ == "__main__":
     demo_retrieval()
+
+

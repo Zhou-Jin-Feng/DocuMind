@@ -1,4 +1,4 @@
-"""
+﻿"""
 RAG系统 - 生成模块
 支持多个LLM API的统一调用，流式输出，引用溯源
 """
@@ -15,7 +15,7 @@ from rich.markdown import Markdown
 
 # 加载环境变量
 load_dotenv()
-# Logger will be initialized per instance
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -71,8 +71,8 @@ class UniversalLLMClient:
         self.model = model or self.MODELS[provider]['default_model']
         self.client = self._initialize_client()
 
-        get_logger(__name__).info(f"✓ 已初始化LLM客户端: {provider}")
-        get_logger(__name__).info(f"  模型: {self.model}")
+        logger.info(f"已初始化LLM客户端: {provider}")
+        logger.info(f"  模型: {self.model}")
 
     def _initialize_client(self):
         """根据提供商初始化API客户端"""
@@ -151,7 +151,7 @@ class UniversalLLMClient:
                 return response.choices[0].message.content
 
         except Exception as e:
-            get_logger(__name__).info(f"✗ 生成失败: {str(e)}")
+            logger.info(f"生成失败: {str(e)}")
             raise
 
     def generate_stream(
@@ -199,7 +199,7 @@ class UniversalLLMClient:
                         yield chunk.choices[0].delta.content
 
         except Exception as e:
-            get_logger(__name__).info(f"✗ 流式生成失败: {str(e)}")
+            logger.info(f"流式生成失败: {str(e)}")
             raise
 
 
@@ -233,7 +233,7 @@ class RAGGenerator:
             llm_client: UniversalLLMClient实例
         """
         self.llm_client = llm_client
-        get_logger(__name__).info("✓ RAG生成器初始化完成")
+        logger.info("RAG生成器初始化完成")
 
     def _build_context_from_retrieval(self, retrieval_results) -> str:
         """
@@ -301,7 +301,7 @@ class RAGGenerator:
         Returns:
             生成的答案
         """
-        get_logger(__name__).info(f"\n正在生成答案...")
+        logger.info(f"\n正在生成答案...")
 
         # 1. 构建上下文
         context = self._build_context_from_retrieval(retrieval_results)
@@ -310,18 +310,18 @@ class RAGGenerator:
         messages = self._build_prompt(query, context)
 
         if show_prompt:
-            get_logger(__name__).info("\n--- 构造的Prompt ---")
-            get_logger(__name__).info(messages[1]['content'][:500] + "...")
-            get_logger(__name__).info("--- End ---\n")
+            logger.info("\n--- 构造的Prompt ---")
+            logger.info(messages[1]['content'][:500] + "...")
+            logger.info("--- End ---\n")
 
         # 3. 调用LLM生成
         try:
             answer = self.llm_client.generate(messages, config)
-            get_logger(__name__).info(f"✓ 答案生成完成")
+            logger.info(f"答案生成完成")
             return answer
 
         except Exception as e:
-            get_logger(__name__).info(f"✗ 生成失败: {str(e)}")
+            logger.info(f"生成失败: {str(e)}")
             return "抱歉，生成答案时发生错误。"
 
     def generate_answer_stream(
@@ -351,7 +351,7 @@ class RAGGenerator:
                 yield chunk
 
         except Exception as e:
-            get_logger(__name__).info(f"✗ 流式生成失败: {str(e)}")
+            logger.info(f"流式生成失败: {str(e)}")
             yield "抱歉，生成答案时发生错误。"
 
 
@@ -359,10 +359,7 @@ def demo_rag_generation():
     """
     演示：完整的RAG问答流程
     """
-    get_logger(__name__).info(Panel.fit(
-        "[bold cyan]RAG完整问答演示：检索 + 生成[/bold cyan]",
-        border_style="cyan"
-    ))
+    logger.info("="*60)
 
     # 导入依赖模块
     try:
@@ -372,19 +369,19 @@ def demo_rag_generation():
         from document_loader import UniversalDocumentLoader
         from document_chunker import DocumentChunker
     except ImportError as e:
-        get_logger(__name__).info(f"✗ 导入失败: {str(e)}")
-        get_logger(__name__).info("请确保前面课程的脚本都在同一目录")
+        logger.info(f"导入失败: {str(e)}")
+        logger.info("请确保前面课程的脚本都在同一目录")
         return
 
     import os
 
     # 步骤1：检查是否有已存在的知识库
-    get_logger(__name__).info("\n[bold]步骤1: 加载知识库[/bold]")
+    logger.info("\n步骤1: 加载知识库")
 
     kb_exists = os.path.exists("./retrieval_chroma_db")
 
     if kb_exists:
-        get_logger(__name__).info("✓ 发现已有知识库，直接加载")
+        logger.info("发现已有知识库，直接加载")
 
         # 初始化embedding和vector store
         provider = os.getenv('DEFAULT_EMBEDDING_PROVIDER', 'openai')
@@ -396,34 +393,34 @@ def demo_rag_generation():
         )
 
     else:
-        get_logger(__name__).info("未找到知识库，正在创建...")
+        logger.info("未找到知识库，正在创建...")
 
         # 创建知识库（复用第6课的代码）
         from retriever import demo_retrieval
-        get_logger(__name__).info("请先运行 retriever.py 创建知识库")
+        logger.info("请先运行 retriever.py 创建知识库")
         return
 
     # 步骤2：初始化检索器
-    get_logger(__name__).info("\n[bold]步骤2: 初始化检索器[/bold]")
+    logger.info("\n步骤2: 初始化检索器")
     retriever = Retriever(vector_store, embedding_client)
 
     # 步骤3：初始化LLM生成器
-    get_logger(__name__).info("\n[bold]步骤3: 初始化LLM生成器[/bold]")
+    logger.info("\n步骤3: 初始化LLM生成器")
 
     llm_provider = os.getenv('DEFAULT_LLM_PROVIDER', 'openai')
-    get_logger(__name__).info(f"使用LLM: {llm_provider}")
+    logger.info(f"使用LLM: {llm_provider}")
 
     try:
         llm_client = UniversalLLMClient(provider=llm_provider)
         rag_generator = RAGGenerator(llm_client)
     except Exception as e:
-        get_logger(__name__).info(f"✗ LLM初始化失败: {str(e)}")
-        get_logger(__name__).info("请检查.env中的LLM API配置")
+        logger.info(f"LLM初始化失败: {str(e)}")
+        logger.info("请检查.env中的LLM API配置")
         return
 
     # 步骤4：测试问答
-    get_logger(__name__).info("\n" + "="*70)
-    get_logger(__name__).info("\n[bold]步骤4: 测试RAG问答[/bold]")
+    logger.info("\n" + "="*70)
+    logger.info("\n步骤4: 测试RAG问答")
 
     test_queries = [
         "监督学习有哪些常见算法？请列举并简单说明。",
@@ -431,24 +428,24 @@ def demo_rag_generation():
     ]
 
     for i, query in enumerate(test_queries, 1):
-        get_logger(__name__).info("\n" + "="*70)
-        get_logger(__name__).info(f"\n[bold yellow]问题 {i}: {query}[/bold yellow]")
+        logger.info("\n" + "="*70)
+        logger.info(f"\n问题 {i}: {query}")
 
         # 执行检索
-        get_logger(__name__).info("\n1️⃣ 检索相关文档...")
+        logger.info("\n1️⃣ 检索相关文档...")
         retrieval_results = retriever.retrieve_semantic(query, top_k=3)
 
-        get_logger(__name__).info(f"检索到 {len(retrieval_results)} 个相关片段")
+        logger.info(f"检索到 {len(retrieval_results)} 个相关片段")
         for j, result in enumerate(retrieval_results, 1):
             preview = result.content[:80].replace('\n', ' ')
-            get_logger(__name__).info(f"  [{j}] {preview}...")
+            logger.info(f"  [{j}] {preview}...")
 
         # 生成答案
-        get_logger(__name__).info("\n2️⃣ 生成答案...\n")
+        logger.info("\n2️⃣ 生成答案...\n")
 
         if i == 1:
             # 第一个问题：流式输出
-            get_logger(__name__).info("[bold green]答案（流式输出）:[/bold green]\n")
+            logger.info("答案（流式输出）:\n")
 
             answer_parts = []
             for chunk in rag_generator.generate_answer_stream(
@@ -456,11 +453,11 @@ def demo_rag_generation():
                 retrieval_results,
                 config=GenerationConfig(temperature=0.3, stream=True)
             ):
-                get_logger(__name__).info(chunk, end='')
+                logger.info(chunk, end='')
                 answer_parts.append(chunk)
 
             full_answer = ''.join(answer_parts)
-            get_logger(__name__).info("\n")
+            logger.info("\n")
 
         else:
             # 第二个问题：一次性输出
@@ -471,19 +468,19 @@ def demo_rag_generation():
                 show_prompt=False
             )
 
-            get_logger(__name__).info("\n[bold green]答案:[/bold green]")
-            get_logger(__name__).info(Panel(answer, border_style="green"))
+            logger.info("\n答案:")
+            logger.info(Panel(answer, border_style="green"))
 
     # 步骤5：对比测试（有/无RAG）
-    get_logger(__name__).info("\n" + "="*70)
-    get_logger(__name__).info("\n[bold]步骤5: 对比测试（RAG vs 直接问）[/bold]")
+    logger.info("\n" + "="*70)
+    logger.info("\n步骤5: 对比测试（RAG vs 直接问）")
 
     comparison_query = "K-means聚类的具体步骤是什么？"
 
-    get_logger(__name__).info(f"\n[bold yellow]测试问题: {comparison_query}[/bold yellow]")
+    logger.info(f"\n测试问题: {comparison_query}")
 
     # 5.1 不使用RAG（直接问）
-    get_logger(__name__).info("\n方式1: 不使用RAG（直接问LLM）")
+    logger.info("\n方式1: 不使用RAG（直接问LLM）")
 
     direct_messages = [
         {"role": "user", "content": comparison_query}
@@ -494,11 +491,11 @@ def demo_rag_generation():
         config=GenerationConfig(temperature=0.3, stream=False)
     )
 
-    get_logger(__name__).info("\n[bold]直接回答（可能不准确或编造）:[/bold]")
-    get_logger(__name__).info(Panel(direct_answer, border_style="yellow", title="无RAG"))
+    logger.info("\n直接回答（可能不准确或编造）:")
+    logger.info(Panel(direct_answer, border_style="yellow", title="无RAG"))
 
     # 5.2 使用RAG
-    get_logger(__name__).info("\n方式2: 使用RAG（检索+生成）")
+    logger.info("\n方式2: 使用RAG（检索+生成）")
 
     retrieval_results = retriever.retrieve_semantic(comparison_query, top_k=2)
 
@@ -508,24 +505,15 @@ def demo_rag_generation():
         config=GenerationConfig(temperature=0.3, stream=False)
     )
 
-    get_logger(__name__).info("\n[bold]RAG回答（基于文档）:[/bold]")
-    get_logger(__name__).info(Panel(rag_answer, border_style="green", title="使用RAG"))
+    logger.info("\nRAG回答（基于文档）:")
+    logger.info(Panel(rag_answer, border_style="green", title="使用RAG"))
 
     # 完成
-    get_logger(__name__).info("\n" + "="*70)
-    get_logger(__name__).info(Panel.fit(
-        "[bold green]✓ RAG生成模块演示完成！[/bold green]\n\n"
-        "你已经掌握了RAG的完整流程：\n"
-        "✓ 文档加载与分块\n"
-        "✓ 向量化与存储\n"
-        "✓ 语义检索\n"
-        "✓ 上下文构建\n"
-        "✓ LLM生成答案\n"
-        "✓ 引用溯源\n\n"
-        "下一步：封装成Web服务，提供友好界面！",
-        border_style="green"
-    ))
+    logger.info("\n" + "="*70)
+    logger.info("="*60)
 
 
 if __name__ == "__main__":
     demo_rag_generation()
+
+

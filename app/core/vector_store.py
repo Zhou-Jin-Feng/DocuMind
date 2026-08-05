@@ -1,4 +1,4 @@
-"""
+﻿"""
 RAG系统 - 向量数据库存储模块
 基于ChromaDB实现向量的增删改查
 """
@@ -13,7 +13,7 @@ from app.utils.logger import get_logger
 from rich.table import Table
 from rich.panel import Panel
 
-# Logger will be initialized per instance
+logger = get_logger(__name__)
 
 
 class VectorStore:
@@ -41,7 +41,7 @@ class VectorStore:
         os.makedirs(persist_directory, exist_ok=True)
 
         # 初始化ChromaDB客户端
-        get_logger(__name__).info(f"正在初始化向量数据库...")
+        logger.info(f"正在初始化向量数据库...")
 
         self.client = chromadb.PersistentClient(
             path=persist_directory,
@@ -53,16 +53,16 @@ class VectorStore:
         # 创建或获取集合
         try:
             self.collection = self.client.get_collection(name=collection_name)
-            get_logger(__name__).info(f"✓ 已连接到现有集合: {collection_name}")
-            get_logger(__name__).info(f"  当前文档数: {self.collection.count()}")
+            logger.info(f"已连接到现有集合: {collection_name}")
+            logger.info(f"  当前文档数: {self.collection.count()}")
         except:
             self.collection = self.client.create_collection(
                 name=collection_name,
                 metadata={"description": "RAG系统文档向量存储"}
             )
-            get_logger(__name__).info(f"✓ 已创建新集合: {collection_name}")
+            logger.info(f"已创建新集合: {collection_name}")
 
-        get_logger(__name__).info(f"  存储路径: {persist_directory}\n")
+        logger.info(f"  存储路径: {persist_directory}\n")
 
     def add_documents(
         self,
@@ -95,7 +95,7 @@ class VectorStore:
         metadatas = [doc.metadata for doc in documents]
 
         # 添加到数据库
-        get_logger(__name__).info(f"正在添加 {len(documents)} 个文档到向量库...")
+        logger.info(f"正在添加 {len(documents)} 个文档到向量库...")
 
         try:
             self.collection.add(
@@ -105,13 +105,13 @@ class VectorStore:
                 metadatas=metadatas
             )
 
-            get_logger(__name__).info(f"✓ 成功添加 {len(documents)} 个文档")
-            get_logger(__name__).info(f"  当前总文档数: {self.collection.count()}")
+            logger.info(f"成功添加 {len(documents)} 个文档")
+            logger.info(f"  当前总文档数: {self.collection.count()}")
 
             return ids
 
         except Exception as e:
-            get_logger(__name__).info(f"✗ 添加失败: {str(e)}")
+            logger.info(f"添加失败: {str(e)}")
             raise
 
     def search(
@@ -147,7 +147,7 @@ class VectorStore:
             }
 
         except Exception as e:
-            get_logger(__name__).info(f"✗ 搜索失败: {str(e)}")
+            logger.info(f"搜索失败: {str(e)}")
             raise
 
     def delete_by_ids(self, ids: List[str]) -> None:
@@ -159,9 +159,9 @@ class VectorStore:
         """
         try:
             self.collection.delete(ids=ids)
-            get_logger(__name__).info(f"✓ 已删除 {len(ids)} 个文档")
+            logger.info(f"已删除 {len(ids)} 个文档")
         except Exception as e:
-            get_logger(__name__).info(f"✗ 删除失败: {str(e)}")
+            logger.info(f"删除失败: {str(e)}")
             raise
 
     def delete_collection(self) -> None:
@@ -170,9 +170,9 @@ class VectorStore:
         """
         try:
             self.client.delete_collection(name=self.collection_name)
-            get_logger(__name__).info(f"⚠ 已删除集合: {self.collection_name}")
+            logger.info(f"已删除集合: {self.collection_name}")
         except Exception as e:
-            get_logger(__name__).info(f"✗ 删除集合失败: {str(e)}")
+            logger.info(f"删除集合失败: {str(e)}")
             raise
 
     def get_collection_info(self) -> Dict:
@@ -202,7 +202,7 @@ class VectorStore:
             results = self.collection.peek(limit=limit)
             return results
         except Exception as e:
-            get_logger(__name__).info(f"✗ 查看失败: {str(e)}")
+            logger.info(f"查看失败: {str(e)}")
             raise
 
 
@@ -210,20 +210,17 @@ def demo_basic_operations():
     """
     演示：向量数据库基本操作
     """
-    get_logger(__name__).info(Panel.fit(
-        "[bold cyan]ChromaDB 基本操作演示[/bold cyan]",
-        border_style="cyan"
-    ))
+    logger.info("="*60)
 
     # 步骤1：初始化向量存储
-    get_logger(__name__).info("\n[bold]步骤1: 初始化向量存储[/bold]")
+    logger.info("\n步骤1: 初始化向量存储")
     store = VectorStore(
         collection_name="demo_collection",
         persist_directory="./demo_chroma_db"
     )
 
     # 步骤2：准备测试数据
-    get_logger(__name__).info("\n[bold]步骤2: 准备测试数据[/bold]")
+    logger.info("\n步骤2: 准备测试数据")
 
     test_documents = [
         Document(
@@ -242,10 +239,10 @@ def demo_basic_operations():
         ),
     ]
 
-    get_logger(__name__).info(f"准备了 {len(test_documents)} 个测试文档")
+    logger.info(f"准备了 {len(test_documents)} 个测试文档")
 
     # 步骤3：生成向量（这里用模拟向量）
-    get_logger(__name__).info("\n[bold]步骤3: 生成向量（模拟）[/bold]")
+    logger.info("\n步骤3: 生成向量（模拟）")
 
     # 实际应用中应该用embedding_client.py生成真实向量
     # 这里为了演示，生成随机向量
@@ -255,16 +252,16 @@ def demo_basic_operations():
         for _ in range(len(test_documents))
     ]
 
-    get_logger(__name__).info(f"生成了 {len(test_embeddings)} 个向量（每个1536维）")
+    logger.info(f"生成了 {len(test_embeddings)} 个向量（每个1536维）")
 
     # 步骤4：添加到向量库
-    get_logger(__name__).info("\n[bold]步骤4: 添加文档到向量库[/bold]")
+    logger.info("\n步骤4: 添加文档到向量库")
     doc_ids = store.add_documents(test_documents, test_embeddings)
 
-    get_logger(__name__).info(f"\n文档ID: {doc_ids[:2]}... (共{len(doc_ids)}个)")
+    logger.info(f"\n文档ID: {doc_ids[:2]}... (共{len(doc_ids)}个)")
 
     # 步骤5：查看集合信息
-    get_logger(__name__).info("\n[bold]步骤5: 查看集合信息[/bold]")
+    logger.info("\n步骤5: 查看集合信息")
     info = store.get_collection_info()
 
     table = Table(show_header=True, header_style="bold magenta")
@@ -274,70 +271,62 @@ def demo_basic_operations():
     table.add_row("集合名称", info['name'])
     table.add_row("文档数量", str(info['count']))
 
-    get_logger(__name__).info(table)
+    logger.info(table)
 
     # 步骤6：预览文档
-    get_logger(__name__).info("\n[bold]步骤6: 预览前3个文档[/bold]\n")
+    logger.info("\n步骤6: 预览前3个文档\n")
     peek_results = store.peek_documents(limit=3)
 
     for i, (doc, meta) in enumerate(zip(peek_results['documents'], peek_results['metadatas']), 1):
-        get_logger(__name__).info(f"文档 {i}:")
-        get_logger(__name__).info(f"  内容: {doc[:50]}...")
-        get_logger(__name__).info(f"  来源: {meta.get('source', 'N/A')}")
-        get_logger(__name__).info(f"  主题: {meta.get('topic', 'N/A')}\n")
+        logger.info(f"文档 {i}:")
+        logger.info(f"  内容: {doc[:50]}...")
+        logger.info(f"  来源: {meta.get('source', 'N/A')}")
+        logger.info(f"  主题: {meta.get('topic', 'N/A')}\n")
 
     # 步骤7：相似度搜索
-    get_logger(__name__).info("\n[bold]步骤7: 执行相似度搜索[/bold]")
+    logger.info("\n步骤7: 执行相似度搜索")
 
     # 用第一个文档的向量作为查询（实际应该用新问题的向量）
     query_vector = test_embeddings[0]
 
-    get_logger(__name__).info("查询向量: 机器学习相关内容")
+    logger.info("查询向量: 机器学习相关内容")
     results = store.search(query_vector, n_results=3)
 
-    get_logger(__name__).info(f"\n找到 {len(results['documents'])} 个相关文档:\n")
+    logger.info(f"\n找到 {len(results['documents'])} 个相关文档:\n")
 
     for i, (doc, meta, dist) in enumerate(
         zip(results['documents'], results['metadatas'], results['distances']), 1
     ):
-        get_logger(__name__).info(f"结果 {i}: (相似度距离: {dist:.4f})")
-        get_logger(__name__).info(f"  内容: {doc[:60]}...")
-        get_logger(__name__).info(f"  来源: {meta.get('source', 'N/A')}\n")
+        logger.info(f"结果 {i}: (相似度距离: {dist:.4f})")
+        logger.info(f"  内容: {doc[:60]}...")
+        logger.info(f"  来源: {meta.get('source', 'N/A')}\n")
 
     # 步骤8：元数据过滤搜索
-    get_logger(__name__).info("\n[bold]步骤8: 带元数据过滤的搜索[/bold]")
+    logger.info("\n步骤8: 带元数据过滤的搜索")
 
     filtered_results = store.search(
         query_vector,
         n_results=3,
     )
 
-    get_logger(__name__).info(f"\n找到 {len(filtered_results['documents'])} 个匹配文档:\n")
+    logger.info(f"\n找到 {len(filtered_results['documents'])} 个匹配文档:\n")
 
     for i, (doc, meta) in enumerate(
         zip(filtered_results['documents'], filtered_results['metadatas']), 1
     ):
-        get_logger(__name__).info(f"结果 {i}:")
-        get_logger(__name__).info(f"  内容: {doc[:60]}...")
-        get_logger(__name__).info(f"  来源: {meta.get('source', 'N/A')}\n")
+        logger.info(f"结果 {i}:")
+        logger.info(f"  内容: {doc[:60]}...")
+        logger.info(f"  来源: {meta.get('source', 'N/A')}\n")
 
     # 完成
-    get_logger(__name__).info(Panel.fit(
-        "[bold green]✓ 所有基本操作演示完成！[/bold green]\n\n"
-        f"数据已保存在: {store.persist_directory}\n"
-        "下次启动时可以直接加载这些数据",
-        border_style="green"
-    ))
+    logger.info("="*60)
 
 
 def demo_integration_with_real_embeddings():
     """
     演示：与真实嵌入模型集成
     """
-    get_logger(__name__).info(Panel.fit(
-        "[bold cyan]完整流程演示：文档加载 → 分块 → 向量化 → 存储[/bold cyan]",
-        border_style="cyan"
-    ))
+    logger.info("="*60)
 
     # 导入前面的模块
     try:
@@ -345,12 +334,12 @@ def demo_integration_with_real_embeddings():
         from document_chunker import DocumentChunker
         from embedding_client import UniversalEmbeddingClient
     except ImportError as e:
-        get_logger(__name__).info(f"✗ 导入失败: {str(e)}")
-        get_logger(__name__).info("请确保前面课程的脚本都在同一目录")
+        logger.info(f"导入失败: {str(e)}")
+        logger.info("请确保前面课程的脚本都在同一目录")
         return
 
     # 步骤1：创建测试文档
-    get_logger(__name__).info("\n[bold]步骤1: 创建测试文档[/bold]")
+    logger.info("\n步骤1: 创建测试文档")
 
     test_content = """
 向量数据库技术指南
@@ -369,27 +358,27 @@ ChromaDB是一个轻量级的嵌入式向量数据库，支持持久化存储和
     with open(test_file, 'w', encoding='utf-8') as f:
         f.write(test_content)
 
-    get_logger(__name__).info(f"✓ 已创建测试文档: {test_file}")
+    logger.info(f"已创建测试文档: {test_file}")
 
     # 步骤2：加载文档
-    get_logger(__name__).info("\n[bold]步骤2: 加载文档[/bold]")
+    logger.info("\n步骤2: 加载文档")
     loader = UniversalDocumentLoader()
     documents = loader.load_document(test_file)
 
     # 步骤3：分块
-    get_logger(__name__).info("\n[bold]步骤3: 文档分块[/bold]")
+    logger.info("\n步骤3: 文档分块")
     chunker = DocumentChunker(chunk_size=200, chunk_overlap=50)
     chunks = chunker.chunk_documents_recursive(documents)
 
-    get_logger(__name__).info(f"分块结果: {len(chunks)} 个块")
+    logger.info(f"分块结果: {len(chunks)} 个块")
 
     # 步骤4：向量化
-    get_logger(__name__).info("\n[bold]步骤4: 向量化文档块[/bold]")
+    logger.info("\n步骤4: 向量化文档块")
 
     try:
         # 尝试使用配置的嵌入模型
         provider = os.getenv('DEFAULT_EMBEDDING_PROVIDER', 'openai')
-        get_logger(__name__).info(f"使用嵌入模型: {provider}")
+        logger.info(f"使用嵌入模型: {provider}")
 
         embedding_client = UniversalEmbeddingClient(provider)
 
@@ -400,15 +389,15 @@ ChromaDB是一个轻量级的嵌入式向量数据库，支持持久化存储和
         embeddings = embedding_client.embed_texts_batch(texts, show_progress=True)
 
     except Exception as e:
-        get_logger(__name__).info(f"✗ 向量化失败: {str(e)}")
-        get_logger(__name__).info("使用模拟向量继续演示...")
+        logger.info(f"向量化失败: {str(e)}")
+        logger.info("使用模拟向量继续演示...")
 
         # 使用模拟向量
         import random
         embeddings = [[random.random() for _ in range(1536)] for _ in chunks]
 
     # 步骤5：存储到向量库
-    get_logger(__name__).info("\n[bold]步骤5: 存储到向量数据库[/bold]")
+    logger.info("\n步骤5: 存储到向量数据库")
 
     store = VectorStore(
         collection_name="integrated_demo",
@@ -418,10 +407,10 @@ ChromaDB是一个轻量级的嵌入式向量数据库，支持持久化存储和
     doc_ids = store.add_documents(chunks, embeddings)
 
     # 步骤6：测试检索
-    get_logger(__name__).info("\n[bold]步骤6: 测试检索功能[/bold]")
+    logger.info("\n步骤6: 测试检索功能")
 
     test_query = "ChromaDB是什么？"
-    get_logger(__name__).info(f"\n查询问题: {test_query}")
+    logger.info(f"\n查询问题: {test_query}")
 
     try:
         # 向量化查询
@@ -433,28 +422,23 @@ ChromaDB是一个轻量级的嵌入式向量数据库，支持持久化存储和
     # 检索
     results = store.search(query_embedding, n_results=2)
 
-    get_logger(__name__).info(f"\n检索到 {len(results['documents'])} 个相关片段:\n")
+    logger.info(f"\n检索到 {len(results['documents'])} 个相关片段:\n")
 
     for i, (doc, meta, dist) in enumerate(
         zip(results['documents'], results['metadatas'], results['distances']), 1
     ):
-        get_logger(__name__).info(f"片段 {i}: (距离: {dist:.4f})")
-        get_logger(__name__).info(f"  {doc}\n")
+        logger.info(f"片段 {i}: (距离: {dist:.4f})")
+        logger.info(f"  {doc}\n")
 
-    get_logger(__name__).info(Panel.fit(
-        "[bold green]✓ 完整流程演示成功！[/bold green]\n\n"
-        "你已经掌握了RAG系统的核心链路:\n"
-        "文档加载 → 分块 → 向量化 → 存储 → 检索",
-        border_style="green"
-    ))
+    logger.info("="*60)
 
 
 if __name__ == "__main__":
-    get_logger(__name__).info("\n[bold cyan]RAG系统 - 向量数据库存储模块测试[/bold cyan]\n")
+    logger.info("\nRAG系统 - 向量数据库存储模块测试\n")
 
-    get_logger(__name__).info("选择演示模式:")
-    get_logger(__name__).info("1. 基本操作演示（增删改查）")
-    get_logger(__name__).info("2. 完整流程演示（文档→分块→向量化→存储）")
+    logger.info("选择演示模式:")
+    logger.info("1. 基本操作演示（增删改查）")
+    logger.info("2. 完整流程演示（文档→分块→向量化→存储）")
 
     choice = input("\n请输入选项 (1/2): ").strip()
 
@@ -462,3 +446,5 @@ if __name__ == "__main__":
         demo_basic_operations()
     else:
         demo_integration_with_real_embeddings()
+
+
