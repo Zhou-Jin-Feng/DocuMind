@@ -15,12 +15,12 @@ from rich.table import Table
 
 # 尝试导入 Ollama（如果可用）
 try:
-    from langchain_community.embeddings import OllamaEmbeddings
+    from langchain_ollama import OllamaEmbeddings
     OLLAMA_AVAILABLE = True
 except ImportError:
     OLLAMA_AVAILABLE = False
-    print("⚠️ langchain-community 未安装，Ollama支持将不可用")
-    print("   安装: pip install langchain-community")
+    print("⚠️ langchain-ollama 未安装，Ollama支持将不可用")
+    print("   安装: pip install langchain-ollama")
 
 # 加载环境变量
 load_dotenv()
@@ -113,8 +113,8 @@ class UniversalEmbeddingClient:
         """初始化 Ollama 本地客户端"""
         if not OLLAMA_AVAILABLE:
             raise ImportError(
-                "需要安装 langchain-community 来使用 Ollama\n"
-                "运行: pip install langchain-community"
+                "需要安装 langchain-ollama 来使用 Ollama\n"
+                "运行: pip install langchain-ollama"
             )
 
         base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
