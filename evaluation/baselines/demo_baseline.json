@@ -8,10 +8,10 @@
     "embedding_provider": "evaluation-fake",
     "embedding_model": "sha256-token-hash-v1",
     "embedding_dimension": 64,
-    "chunk_size": 500,
-    "chunk_overlap": 100,
     "case_top_k_values": [3],
-    "score_threshold": null
+    "score_threshold": null,
+    "dataset_sha256": "81741dfc4e4a59698b45ba2565558203aa0f7906c077f98749eb88ce512019a6",
+    "documents_sha256": "645e477edbcd6086226621abb76ddfa147b44acf56c632edf39e89e8220298b3"
   },
   "metrics": {
     "recall_at_k": 0.8333333333333334,

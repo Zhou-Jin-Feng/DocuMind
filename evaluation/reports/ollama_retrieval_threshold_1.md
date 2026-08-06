@@ -19,6 +19,8 @@
 | `score_threshold` | `1.0` |
 | `dataset_path` | `"evaluation/datasets/golden_dataset.jsonl"` |
 | `documents_directory` | `"evaluation/datasets/documents"` |
+| `dataset_sha256` | `"81741dfc4e4a59698b45ba2565558203aa0f7906c077f98749eb88ce512019a6"` |
+| `documents_sha256` | `"645e477edbcd6086226621abb76ddfa147b44acf56c632edf39e89e8220298b3"` |
 
 ## Aggregate Metrics
 
@@ -33,17 +35,17 @@
 | `refusal_accuracy` | N/A |
 | `keyword_coverage` | N/A |
 | `successful_case_rate` | 1.0000 |
-| `average_duration_ms` | 319.0208 |
+| `average_duration_ms` | 318.8513 |
 
 ## Cases
 
 | Case | Status | Top-K | Duration (ms) |
 |---|---|---:|---:|
-| `rag-core-components` | success | 3 | 313.384 |
-| `stable-indexing` | success | 3 | 324.298 |
-| `observability-request` | success | 3 | 337.829 |
-| `metrics-listening` | success | 3 | 322.354 |
-| `distance-direction` | success | 3 | 317.894 |
-| `ollama-embedding` | success | 3 | 308.769 |
-| `unrelated-stock` | success | 3 | 313.621 |
-| `unrelated-recipe` | success | 3 | 314.018 |
+| `rag-core-components` | success | 3 | 303.957 |
+| `stable-indexing` | success | 3 | 337.442 |
+| `observability-request` | success | 3 | 310.885 |
+| `metrics-listening` | success | 3 | 332.217 |
+| `distance-direction` | success | 3 | 316.572 |
+| `ollama-embedding` | success | 3 | 316.233 |
+| `unrelated-stock` | success | 3 | 335.427 |
+| `unrelated-recipe` | success | 3 | 298.077 |

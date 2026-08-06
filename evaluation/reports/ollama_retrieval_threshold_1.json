@@ -16,7 +16,9 @@
     ],
     "score_threshold": 1.0,
     "dataset_path": "evaluation/datasets/golden_dataset.jsonl",
-    "documents_directory": "evaluation/datasets/documents"
+    "documents_directory": "evaluation/datasets/documents",
+    "dataset_sha256": "81741dfc4e4a59698b45ba2565558203aa0f7906c077f98749eb88ce512019a6",
+    "documents_sha256": "645e477edbcd6086226621abb76ddfa147b44acf56c632edf39e89e8220298b3"
   },
   "metrics": {
     "recall_at_k": 1.0,
@@ -28,7 +30,7 @@
     "refusal_accuracy": null,
     "keyword_coverage": null,
     "successful_case_rate": 1.0,
-    "average_duration_ms": 319.02081250518677
+    "average_duration_ms": 318.8512999913655
   },
   "cases": [
     {
@@ -51,7 +53,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 313.384,
+      "duration_ms": 303.957,
       "status": "success",
       "answered": null,
       "error_type": null
@@ -76,7 +78,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 324.298,
+      "duration_ms": 337.442,
       "status": "success",
       "answered": null,
       "error_type": null
@@ -101,7 +103,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 337.829,
+      "duration_ms": 310.885,
       "status": "success",
       "answered": null,
       "error_type": null
@@ -128,7 +130,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 322.354,
+      "duration_ms": 332.217,
       "status": "success",
       "answered": null,
       "error_type": null
@@ -153,7 +155,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 317.894,
+      "duration_ms": 316.572,
       "status": "success",
       "answered": null,
       "error_type": null
@@ -178,7 +180,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 308.769,
+      "duration_ms": 316.233,
       "status": "success",
       "answered": null,
       "error_type": null
@@ -199,7 +201,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 313.621,
+      "duration_ms": 335.427,
       "status": "success",
       "answered": null,
       "error_type": null
@@ -220,7 +222,7 @@
         "refusal_accuracy": null,
         "keyword_coverage": null
       },
-      "duration_ms": 314.018,
+      "duration_ms": 298.077,
       "status": "success",
       "answered": null,
       "error_type": null

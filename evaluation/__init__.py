@@ -8,7 +8,13 @@ from evaluation.models import (
     GoldenCase,
     RetrievedDocument,
 )
-from evaluation.regression import RegressionGate, RegressionResult
+from evaluation.regression import (
+    EvaluationSnapshot,
+    RegressionGate,
+    RegressionResult,
+    load_evaluation_snapshot,
+    report_compatibility_issues,
+)
 from evaluation.integration import (
     DeterministicEmbeddingClient,
     InMemoryVectorStore,
@@ -25,6 +31,7 @@ __all__ = [
     "AnswerResult",
     "CaseEvaluation",
     "EvaluationReport",
+    "EvaluationSnapshot",
     "EvaluationRunner",
     "FakeAnswerAdapter",
     "FakeRetrievalAdapter",
@@ -41,6 +48,8 @@ __all__ = [
     "build_indexed_retrieval_adapter",
     "load_text_documents",
     "load_golden_dataset",
+    "load_evaluation_snapshot",
+    "report_compatibility_issues",
 ]
 
 

@@ -96,6 +96,20 @@ result.assert_passed()
 
 The gate uses absolute metric drops. A missing current metric fails when the baseline had a numeric value; a metric that is not applicable in both reports is skipped.
 
+Run the automatic CLI gate against two JSON reports:
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.regression_runner `
+  --baseline evaluation/reports/ollama_retrieval_baseline.json `
+  --current evaluation/reports/current.json
+```
+
+The default policy allows an absolute drop of `0.02` for Recall, Precision, MRR, and Top-K hit rate, allows no drop in no-answer retrieval accuracy, and requires `successful_case_rate=1.0`. Use repeated `--allowed-drop METRIC=VALUE` and `--minimum METRIC=VALUE` arguments to override or add rules. `--no-default-policy` disables the built-in rules.
+
+Exit codes are stable for local scripts and CI: `0` means pass, `1` means a quality regression, and `2` means invalid input or incompatible reports. Before checking metrics, the CLI requires matching dataset name, Top-K, case count, golden-dataset SHA-256, and document-corpus SHA-256. Embedding model, chunk settings, and score threshold may differ because those are the configurations being evaluated.
+
+`correct_document_avg_rank` is intentionally absent from the default policy because lower values are better; the current `allowed-drop` policy is only for metrics where larger values are better.
+
 ## Scope
 
 This version deliberately does not add Docker, Prometheus/Grafana containers, Celery, Redis, authentication, query rewriting, or a production reranker. Those remain later roadmap items.

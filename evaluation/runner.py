@@ -12,6 +12,7 @@ from langchain_core.documents import Document
 
 from evaluation.adapters import AnswerAdapter, FakeAnswerAdapter, FakeRetrievalAdapter, RetrievalAdapter
 from evaluation.integration import build_deterministic_retriever
+from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from evaluation.metrics import (
     first_relevant_rank,
     hit_at_k,
@@ -193,7 +194,19 @@ def _build_demo_runner(cases: Sequence[GoldenCase], dataset_path: Path) -> Evalu
             text=" ".join(case.expected_keywords) if case.should_answer else "",
         )
     documents = _load_demo_documents(dataset_path)
+    metadata: dict[str, Any] = {
+        "baseline_type": "deterministic-smoke",
+        "document_count": len(documents),
+        "embedding_provider": "evaluation-fake",
+        "embedding_model": "sha256-token-hash-v1",
+        "embedding_dimension": 64,
+        "case_count": len(cases),
+        "case_top_k_values": sorted({case.top_k for case in cases}),
+        "score_threshold": None,
+        "dataset_sha256": file_sha256(dataset_path),
+    }
     if documents:
+        metadata["documents_sha256"] = text_corpus_sha256(dataset_path.parent / "documents")
         retrieval_adapter: RetrievalAdapter = RetrieverAdapter(
             build_deterministic_retriever(documents)
         )
@@ -214,6 +227,7 @@ def _build_demo_runner(cases: Sequence[GoldenCase], dataset_path: Path) -> Evalu
         retrieval_adapter,
         FakeAnswerAdapter(answer_mapping),
         dataset_name="demo-golden-dataset",
+        metadata=metadata,
     )
 
 

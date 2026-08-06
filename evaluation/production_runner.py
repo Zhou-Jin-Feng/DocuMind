@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from app.config import settings
+from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from evaluation.production import (
     build_configured_retrieval_adapter,
     load_text_documents,
@@ -95,6 +96,8 @@ def main() -> int:
                 "score_threshold": args.score_threshold,
                 "dataset_path": dataset_path.as_posix(),
                 "documents_directory": Path(args.documents_dir).as_posix(),
+                "dataset_sha256": file_sha256(dataset_path),
+                "documents_sha256": text_corpus_sha256(args.documents_dir),
             },
         ).run(cases)
     finally:

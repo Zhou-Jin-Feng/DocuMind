@@ -1,8 +1,10 @@
 import json
+import io
 import gc
 import shutil
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -12,6 +14,7 @@ from evaluation import EvaluationRunner as PublicEvaluationRunner
 from evaluation.integration import DeterministicEmbeddingClient, build_deterministic_retriever
 from evaluation.production import build_indexed_retrieval_adapter, load_text_documents
 from evaluation.production_runner import _default_report_stem
+from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from app.core.document_chunker import DocumentChunker
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
@@ -23,11 +26,32 @@ from evaluation.metrics import (
     reciprocal_rank_at_k,
 )
 from evaluation.models import AnswerResult, EvaluationReport, GoldenCase, RetrievedDocument
-from evaluation.regression import RegressionGate
+from evaluation.regression import (
+    EvaluationSnapshot,
+    RegressionGate,
+    report_compatibility_issues,
+)
+from evaluation.regression_runner import main as regression_main
 from evaluation.runner import EvaluationRunner, load_golden_dataset
 
 
 class EvaluationTests(unittest.TestCase):
+    @staticmethod
+    def _snapshot_payload(*, recall=1.0, dataset_sha="dataset", documents_sha="documents"):
+        return {
+            "dataset_name": "test-dataset",
+            "top_k": 3,
+            "case_count": 2,
+            "metadata": {
+                "dataset_sha256": dataset_sha,
+                "documents_sha256": documents_sha,
+            },
+            "metrics": {
+                "recall_at_k": recall,
+                "successful_case_rate": 1.0,
+            },
+        }
+
     def test_public_runner_export_is_lazy_and_available(self):
         from evaluation.runner import EvaluationRunner
 
@@ -258,6 +282,52 @@ class EvaluationTests(unittest.TestCase):
             documents = load_text_documents(directory)
         self.assertEqual(documents[0].metadata["document_id"], "knowledge-base")
         self.assertEqual(documents[0].metadata["chunk_id"], "knowledge-base:source")
+
+    def test_evaluation_fingerprints_change_with_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "a.txt"
+            second = root / "b.txt"
+            first.write_text("alpha", encoding="utf-8")
+            second.write_text("beta", encoding="utf-8")
+            initial_file_hash = file_sha256(first)
+            initial_corpus_hash = text_corpus_sha256(root)
+            second.write_text("changed", encoding="utf-8")
+            self.assertEqual(file_sha256(first), initial_file_hash)
+            self.assertNotEqual(text_corpus_sha256(root), initial_corpus_hash)
+
+    def test_report_compatibility_requires_matching_input_fingerprints(self):
+        baseline = EvaluationSnapshot.from_dict(self._snapshot_payload())
+        current = EvaluationSnapshot.from_dict(
+            self._snapshot_payload(documents_sha="changed")
+        )
+        issues = report_compatibility_issues(baseline, current)
+        self.assertIn("metadata.documents_sha256 不一致", issues)
+
+    def test_regression_cli_uses_distinct_exit_codes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline_path = root / "baseline.json"
+            current_path = root / "current.json"
+            baseline_path.write_text(
+                json.dumps(self._snapshot_payload()), encoding="utf-8"
+            )
+
+            def run(current_payload):
+                current_path.write_text(json.dumps(current_payload), encoding="utf-8")
+                with redirect_stdout(io.StringIO()):
+                    return regression_main(
+                        [
+                            "--baseline",
+                            str(baseline_path),
+                            "--current",
+                            str(current_path),
+                        ]
+                    )
+
+            self.assertEqual(run(self._snapshot_payload(recall=0.99)), 0)
+            self.assertEqual(run(self._snapshot_payload(recall=0.8)), 1)
+            self.assertEqual(run(self._snapshot_payload(dataset_sha="changed")), 2)
 
     def test_regression_gate_checks_drop_and_minimum(self):
         baseline = {"recall_at_k": 0.9, "successful_case_rate": 1.0}
