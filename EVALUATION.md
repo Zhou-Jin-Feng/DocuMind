@@ -51,7 +51,9 @@ Run the deterministic demo without Ollama, ChromaDB, network access, or an LLM:
   --output-markdown evaluation/reports/demo.md
 ```
 
-The demo adapter is intentionally perfect. Its purpose is to validate dataset parsing, report generation, and the evaluation pipeline, not to claim production retrieval quality.
+The default demo loads the sample documents and exercises the production `Retriever` through a deterministic hash Embedding and in-memory Vector Store. The answerability adapter remains fake. The demo is intentionally deterministic: its purpose is to validate the real retrieval boundary, dataset parsing, report generation, and the evaluation pipeline, not to claim production retrieval quality.
+
+For a real baseline, replace the deterministic integration components with a real `RetrieverAdapter` backed by the intended Embedding model and vector collection. Keep the same document IDs and golden dataset when comparing changes.
 
 ## Regression Gate
 

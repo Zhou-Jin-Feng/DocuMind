@@ -9,6 +9,11 @@ from evaluation.models import (
     RetrievedDocument,
 )
 from evaluation.regression import RegressionGate, RegressionResult
+from evaluation.integration import (
+    DeterministicEmbeddingClient,
+    InMemoryVectorStore,
+    build_deterministic_retriever,
+)
 
 __all__ = [
     "AnswerResult",
@@ -17,11 +22,14 @@ __all__ = [
     "EvaluationRunner",
     "FakeAnswerAdapter",
     "FakeRetrievalAdapter",
+    "DeterministicEmbeddingClient",
     "GoldenCase",
     "RegressionGate",
     "RegressionResult",
     "RetrievedDocument",
     "RetrieverAdapter",
+    "InMemoryVectorStore",
+    "build_deterministic_retriever",
     "load_golden_dataset",
 ]
 

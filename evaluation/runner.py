@@ -8,7 +8,10 @@ from pathlib import Path
 from time import perf_counter
 from typing import Sequence
 
+from langchain_core.documents import Document
+
 from evaluation.adapters import AnswerAdapter, FakeAnswerAdapter, FakeRetrievalAdapter, RetrievalAdapter
+from evaluation.integration import build_deterministic_retriever
 from evaluation.metrics import (
     first_relevant_rank,
     hit_at_k,
@@ -20,6 +23,7 @@ from evaluation.metrics import (
     refusal_accuracy,
 )
 from evaluation.models import AnswerResult, CaseEvaluation, EvaluationReport, GoldenCase, RetrievedDocument
+from evaluation.adapters import RetrieverAdapter
 
 
 def load_golden_dataset(path: str | Path) -> list[GoldenCase]:
@@ -151,24 +155,53 @@ class EvaluationRunner:
         )
 
 
-def _build_demo_runner(cases: Sequence[GoldenCase]) -> EvaluationRunner:
-    retrieval_mapping = {}
+def _load_demo_documents(dataset_path: Path) -> list[Document]:
+    documents_dir = dataset_path.parent / "documents"
+    documents: list[Document] = []
+    if not documents_dir.is_dir():
+        return documents
+    for path in sorted(documents_dir.glob("*.txt")):
+        document_id = path.stem
+        documents.append(
+            Document(
+                page_content=path.read_text(encoding="utf-8"),
+                metadata={
+                    "document_id": document_id,
+                    "chunk_id": f"{document_id}:0",
+                    "source_file": path.name,
+                },
+            )
+        )
+    return documents
+
+
+def _build_demo_runner(cases: Sequence[GoldenCase], dataset_path: Path) -> EvaluationRunner:
     answer_mapping = {}
     for case in cases:
-        retrieval_mapping[case.question] = tuple(
-            RetrievedDocument(
-                document_id=document_id,
-                content=" ".join(case.expected_keywords),
-                rank=index,
-            )
-            for index, document_id in enumerate(case.expected_document_ids, 1)
-        )
         answer_mapping[case.question] = AnswerResult(
             answered=case.should_answer,
             text=" ".join(case.expected_keywords) if case.should_answer else "",
         )
+    documents = _load_demo_documents(dataset_path)
+    if documents:
+        retrieval_adapter: RetrievalAdapter = RetrieverAdapter(
+            build_deterministic_retriever(documents)
+        )
+    else:
+        retrieval_mapping = {
+            case.question: tuple(
+                RetrievedDocument(
+                    document_id=document_id,
+                    content=" ".join(case.expected_keywords),
+                    rank=index,
+                )
+                for index, document_id in enumerate(case.expected_document_ids, 1)
+            )
+            for case in cases
+        }
+        retrieval_adapter = FakeRetrievalAdapter(retrieval_mapping)
     return EvaluationRunner(
-        FakeRetrievalAdapter(retrieval_mapping),
+        retrieval_adapter,
         FakeAnswerAdapter(answer_mapping),
         dataset_name="demo-golden-dataset",
     )
@@ -187,7 +220,7 @@ def main() -> int:
 
     dataset_path = Path(args.dataset)
     cases = load_golden_dataset(dataset_path)
-    report = _build_demo_runner(cases).run(cases)
+    report = _build_demo_runner(cases, dataset_path).run(cases)
     if args.output_json:
         Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output_json).write_text(report.to_json(), encoding="utf-8")

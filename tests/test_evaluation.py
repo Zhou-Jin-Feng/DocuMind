@@ -1,10 +1,18 @@
 import json
+import gc
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
+from langchain_core.documents import Document
+
 from evaluation.adapters import FakeAnswerAdapter, FakeRetrievalAdapter, RetrieverAdapter
 from evaluation import EvaluationRunner as PublicEvaluationRunner
+from evaluation.integration import DeterministicEmbeddingClient, build_deterministic_retriever
+from app.core.document_chunker import DocumentChunker
+from app.core.retriever import Retriever
+from app.core.vector_store import VectorStore
 from evaluation.metrics import (
     first_relevant_rank,
     hit_at_k,
@@ -114,6 +122,67 @@ class EvaluationTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             RetrieverAdapter(FakeRetriever()).retrieve("q", 1)
+
+    def test_production_retriever_adapter_runs_deterministic_integration(self):
+        retriever = build_deterministic_retriever(
+            [
+                Document(
+                    page_content="RAG 使用向量检索增强生成。",
+                    metadata={"document_id": "knowledge-base", "chunk_id": "chunk-1"},
+                ),
+                Document(
+                    page_content="天气预报与出行建议。",
+                    metadata={"document_id": "weather", "chunk_id": "chunk-2"},
+                ),
+            ]
+        )
+        results = RetrieverAdapter(retriever).retrieve("RAG 向量检索", 1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].document_id, "knowledge-base")
+
+    def test_chroma_pipeline_reaches_runner_metrics_without_network(self):
+        directory = Path(tempfile.mkdtemp(prefix="rag-evaluation-chroma-"))
+        store = None
+        try:
+            documents = [
+                Document(
+                    page_content="RAG 使用向量数据库保存 Embedding，并通过检索增强生成。",
+                    metadata={"document_id": "knowledge-base", "source_file": "knowledge.txt"},
+                ),
+                Document(
+                    page_content="天气预报用于查询温度、降雨和出行建议。",
+                    metadata={"document_id": "weather", "source_file": "weather.txt"},
+                ),
+            ]
+            chunks = DocumentChunker(chunk_size=200, chunk_overlap=0).chunk_documents_recursive(
+                documents
+            )
+            embedder = DeterministicEmbeddingClient()
+            store = VectorStore(
+                collection_name="evaluation_documents",
+                persist_directory=str(directory),
+            )
+            store.add_documents(chunks, [embedder.embed_text(chunk.page_content) for chunk in chunks])
+            report = EvaluationRunner(
+                RetrieverAdapter(Retriever(store, embedder)),
+                FakeAnswerAdapter({"RAG 如何使用向量数据库？": True}),
+            ).run(
+                [
+                    GoldenCase(
+                        id="chroma-rag",
+                        question="RAG 如何使用向量数据库？",
+                        expected_document_ids=("knowledge-base",),
+                        should_answer=True,
+                    )
+                ]
+            )
+            self.assertEqual(report.metrics["recall_at_k"], 1.0)
+            self.assertEqual(report.metrics["top_k_hit_rate"], 1.0)
+            self.assertEqual(report.metrics["successful_case_rate"], 1.0)
+        finally:
+            store = None
+            gc.collect()
+            shutil.rmtree(directory, ignore_errors=True)
 
     def test_regression_gate_checks_drop_and_minimum(self):
         baseline = {"recall_at_k": 0.9, "successful_case_rate": 1.0}
