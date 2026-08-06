@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.2）
+# DocuMind - RAG 知识库问答系统（v1.3）
 
-这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、流式生成和来源展示。
+这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、流式生成、来源展示，以及结构化日志、Prometheus Metrics 和 OpenTelemetry Tracing。
 
-> 当前版本：**v1.2 收尾版**。本版本暂不提供 Docker 启动方式。
+> 当前版本：**v1.3 可观测性版**。Docker/Compose 按计划暂缓到后续阶段，本版本只建设应用内 Logs + Metrics + Traces。
 
 ## 当前能力
 
@@ -12,7 +12,10 @@
 - PDF 页面统一显示为从 1 开始的页码。
 - OpenAI、Anthropic Claude、DeepSeek、GLM 生成接口，以及 Ollama/OpenAI 兼容 Embedding。
 - 上传扩展名、上传大小、分块、检索和 LLM 参数统一从 `app/config.py` 与 `.env` 读取。
-- 默认 Web 服务仅监听 `127.0.0.1`。
+- 默认 Web 服务和 Metrics 服务都只监听 `127.0.0.1`。
+- JSONL 结构化日志内置 `request_id` / `trace_id`、阶段事件、数字毫秒耗时和敏感字段脱敏。
+- Prometheus Metrics 使用低基数标签，默认暴露在 `127.0.0.1:8000/metrics`。
+- OpenTelemetry Tracing 默认关闭，支持应用私有 Provider、OTLP/HTTP 导出和日志 Trace ID 关联。
 
 ## 项目结构
 
@@ -27,15 +30,21 @@ DocuMind/
 │   │   ├── vector_store.py       # Chroma upsert/search/delete
 │   │   ├── retriever.py          # 距离阈值与轻量重排
 │   │   └── generator.py          # 多 Provider 流式生成
+│   ├── observability/
+│   │   ├── context.py            # request_id / trace_id 上下文
+│   │   ├── logging.py            # JSONL 结构化日志与脱敏
+│   │   ├── metrics.py            # Prometheus 指标与显式服务启动
+│   │   └── tracing.py            # OpenTelemetry Span 与 OTLP 导出
 │   └── utils/
-│       ├── logger.py
-│       └── monitoring.py
+│       ├── logger.py             # 日志兼容入口
+│       └── monitoring.py         # 生成器安全的耗时工具
 ├── tests/                        # unittest 自动化测试和示例文本
 ├── data/                         # 运行数据（Git 忽略）
 ├── logs/                         # 日志（Git 忽略）
 ├── .env.example                 # 无密钥配置模板
 ├── requirements.txt
 ├── requirements-dev.txt
+├── OBSERVABILITY.md              # v1.3 日志、指标、追踪指南
 └── web_app.py                    # Gradio 入口
 ```
 
@@ -112,6 +121,12 @@ python web_app.py
 | `LLM_MAX_TOKENS` | `1000` | 最大生成 Token 数 |
 | `MAX_UPLOAD_SIZE_MB` | `50` | 上传大小限制 |
 | `SERVER_HOST` | `127.0.0.1` | 无认证时不要改为公网监听 |
+| `LOG_FILE_FORMAT` | `json` | 文件日志格式，推荐 JSONL |
+| `METRICS_ENABLED` | `true` | 是否启用 Prometheus Metrics |
+| `METRICS_HOST` | `127.0.0.1` | Metrics 默认只监听本机 |
+| `METRICS_PORT` | `8000` | Metrics HTTP 端口 |
+| `TRACING_ENABLED` | `false` | 是否启用 OpenTelemetry Tracing |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | 空 | OTLP/HTTP Trace 地址 |
 
 `ALLOWED_EXTENSIONS` 是 JSON 数组，例如：
 
@@ -119,13 +134,22 @@ python web_app.py
 ALLOWED_EXTENSIONS=[".pdf", ".docx", ".txt"]
 ```
 
+## 可观测性
+
+- 结构化文件日志：`logs/rag_YYYY-MM-DD.jsonl`。
+- Metrics：启动应用后访问 `http://127.0.0.1:8000/metrics`。
+- Tracing：设置 `TRACING_ENABLED=true` 后创建 Span；只有同时配置 `OTEL_EXPORTER_OTLP_ENDPOINT` 才会向 OTLP/HTTP 后端导出。
+- 离线测试时可同时设置 `METRICS_ENABLED=false` 和 `TRACING_ENABLED=false`，不会监听端口或发送 Trace。
+
+字段、事件顺序、指标清单、Span 树与隐私约束见 [OBSERVABILITY.md](OBSERVABILITY.md)。
+
 ## 测试与检查
 
 项目测试使用标准库 `unittest`，不依赖 pytest 也可运行：
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
-python -m compileall -q app web_app.py
+python -m compileall -q app web_app.py tests
 python -m pip check
 ```
 
@@ -154,7 +178,7 @@ Remove-Item -Recurse -Force .\data\chroma_db
 - 当前只保证“完全相同文件”的重复上传幂等；同名文件内容更新后的旧版本清理属于 v1.5 文档生命周期能力。
 - 尚未保存并校验索引的 Embedding 模型、维度和分块策略版本；更换 Embedding 模型前应重建索引。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
-- v1.3 才会正式增加结构化日志、Metrics 和 Tracing；`monitoring.py` 目前只是基础计时工具。
+- 当前只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.3。
 
 ## 常见问题
 

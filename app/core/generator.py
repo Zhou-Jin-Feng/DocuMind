@@ -220,8 +220,15 @@ class UniversalLLMClient:
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-        except Exception:
-            logger.exception(f"LLM 流式生成失败: provider={self.provider}")
+        except Exception as exc:
+            logger.warning(
+                "LLM 流式生成中断",
+                event="llm_stream_failed",
+                operation="llm.generate",
+                status="error",
+                error_type=type(exc).__name__,
+                provider=self.provider,
+            )
             raise
 
 

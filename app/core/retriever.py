@@ -6,10 +6,13 @@ RAG 系统检索模块。
 
 import re
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Dict, List, Optional
 
 from rich.panel import Panel
 
+from app.observability.metrics import get_metrics
+from app.observability.tracing import trace_span
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -66,42 +69,161 @@ class Retriever:
         if score_threshold is not None and score_threshold < 0:
             raise ValueError("score_threshold 不能小于 0")
 
-        logger.info(
-            f"执行语义检索: query_length={len(normalized_query)}, top_k={top_k}, "
-            f"distance_threshold={score_threshold}"
-        )
-        try:
-            query_embedding = self.embedding_client.embed_text(normalized_query)
-            search_results = self.vector_store.search(
-                query_embedding=query_embedding,
-                n_results=top_k,
-                where=metadata_filter,
-            )
-        except Exception:
-            # 系统故障必须继续向上传播，不能伪装成“无结果”。
-            logger.exception("语义检索失败")
-            raise
-
-        results: List[RetrievalResult] = []
-        for document, metadata, distance in zip(
-            search_results["documents"],
-            search_results["metadatas"],
-            search_results["distances"],
+        metrics = get_metrics()
+        provider = str(getattr(self.embedding_client, "provider", "unknown"))
+        with trace_span(
+            "rag.retrieve",
+            attributes={
+                "provider": provider,
+                "query.length": len(normalized_query),
+                "retrieval.top_k": top_k,
+            },
         ):
-            numeric_distance = float(distance)
-            if score_threshold is not None and numeric_distance > score_threshold:
-                continue
-            results.append(
-                RetrievalResult(
-                    content=document,
-                    metadata=metadata or {},
-                    distance=numeric_distance,
-                    rank=len(results) + 1,
-                )
+            retrieval_started = perf_counter()
+            logger.info(
+                "开始语义检索",
+                event="retrieval_started",
+                operation="rag.retrieve",
+                status="started",
+                query_length=len(normalized_query),
+                top_k=top_k,
+                distance_threshold=score_threshold,
+                provider=provider,
             )
 
-        logger.info(f"语义检索完成: result_count={len(results)}")
-        return results
+            embedding_started = perf_counter()
+            try:
+                with trace_span(
+                    "embedding.query",
+                    attributes={"provider": provider},
+                ):
+                    query_embedding = self.embedding_client.embed_text(
+                        normalized_query
+                    )
+            except Exception as exc:
+                embedding_duration = perf_counter() - embedding_started
+                retrieval_duration = perf_counter() - retrieval_started
+                metrics.observe_embedding(
+                    provider, "embedding.query", "error", embedding_duration
+                )
+                metrics.observe_retrieval(
+                    provider, "error", retrieval_duration
+                )
+                metrics.record_component_error(
+                    "embedding.query", type(exc).__name__
+                )
+                logger.exception(
+                    "查询向量化失败",
+                    event="query_embedding_failed",
+                    operation="embedding.query",
+                    duration_ms=embedding_duration * 1000,
+                    status="error",
+                    error_type=type(exc).__name__,
+                    provider=provider,
+                )
+                logger.error(
+                    "语义检索失败",
+                    event="retrieval_failed",
+                    operation="rag.retrieve",
+                    duration_ms=retrieval_duration * 1000,
+                    status="error",
+                    error_type=type(exc).__name__,
+                    provider=provider,
+                )
+                raise
+
+            embedding_duration = perf_counter() - embedding_started
+            metrics.observe_embedding(
+                provider, "embedding.query", "success", embedding_duration
+            )
+            logger.info(
+                "查询向量化完成",
+                event="query_embedding_completed",
+                operation="embedding.query",
+                duration_ms=embedding_duration * 1000,
+                status="success",
+                provider=provider,
+                embedding_dimension=len(query_embedding),
+            )
+
+            search_started = perf_counter()
+            try:
+                with trace_span(
+                    "vector.search",
+                    attributes={
+                        "provider": provider,
+                        "retrieval.top_k": top_k,
+                    },
+                ):
+                    search_results = self.vector_store.search(
+                        query_embedding=query_embedding,
+                        n_results=top_k,
+                        where=metadata_filter,
+                    )
+            except Exception as exc:
+                search_duration = perf_counter() - search_started
+                retrieval_duration = perf_counter() - retrieval_started
+                metrics.observe_retrieval(
+                    provider, "error", retrieval_duration
+                )
+                metrics.record_component_error(
+                    "vector.search", type(exc).__name__
+                )
+                logger.exception(
+                    "向量检索失败",
+                    event="vector_search_failed",
+                    operation="vector.search",
+                    duration_ms=search_duration * 1000,
+                    status="error",
+                    error_type=type(exc).__name__,
+                )
+                logger.error(
+                    "语义检索失败",
+                    event="retrieval_failed",
+                    operation="rag.retrieve",
+                    duration_ms=retrieval_duration * 1000,
+                    status="error",
+                    error_type=type(exc).__name__,
+                    provider=provider,
+                )
+                raise
+
+            results: List[RetrievalResult] = []
+            for document, metadata, distance in zip(
+                search_results["documents"],
+                search_results["metadatas"],
+                search_results["distances"],
+            ):
+                numeric_distance = float(distance)
+                if score_threshold is not None and numeric_distance > score_threshold:
+                    continue
+                results.append(
+                    RetrievalResult(
+                        content=document,
+                        metadata=metadata or {},
+                        distance=numeric_distance,
+                        rank=len(results) + 1,
+                    )
+                )
+
+            retrieval_duration = perf_counter() - retrieval_started
+            metrics.observe_retrieval(
+                provider,
+                "success",
+                retrieval_duration,
+                result_count=len(results),
+            )
+            logger.info(
+                "语义检索完成",
+                event="retrieval_completed",
+                operation="rag.retrieve",
+                duration_ms=retrieval_duration * 1000,
+                status="success",
+                provider=provider,
+                result_count=len(results),
+                raw_result_count=len(search_results["documents"]),
+            )
+            return results
 
     def retrieve_with_context(
         self,

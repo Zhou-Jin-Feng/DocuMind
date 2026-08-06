@@ -25,6 +25,34 @@ class SettingsTests(unittest.TestCase):
 
     def test_default_host_is_localhost(self):
         self.assertEqual(Settings.model_fields["server_host"].default, "127.0.0.1")
+        self.assertEqual(Settings.model_fields["metrics_host"].default, "127.0.0.1")
+
+    def test_log_formats_are_normalized_and_validated(self):
+        config = Settings(
+            _env_file=None,
+            log_console_format=" TEXT ",
+            log_file_format=" JSON ",
+        )
+        self.assertEqual(config.log_console_format, "text")
+        self.assertEqual(config.log_file_format, "json")
+        with self.assertRaises(ValidationError):
+            Settings(_env_file=None, log_file_format="xml")
+
+    def test_tracing_is_disabled_and_endpoint_is_optional_by_default(self):
+        config = Settings(_env_file=None)
+        self.assertFalse(config.tracing_enabled)
+        self.assertIsNone(config.otel_exporter_otlp_endpoint)
+
+        configured = Settings(
+            _env_file=None,
+            tracing_enabled=True,
+            otel_exporter_otlp_endpoint="  http://127.0.0.1:4318/v1/traces  ",
+        )
+        self.assertEqual(
+            configured.otel_exporter_otlp_endpoint,
+            "http://127.0.0.1:4318/v1/traces",
+        )
+
 
     def test_empty_optional_value_in_env_template_is_ignored(self):
         with tempfile.TemporaryDirectory() as directory:

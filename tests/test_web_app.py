@@ -59,6 +59,9 @@ class WebAppTests(unittest.TestCase):
         app = self._app(retriever, generator)
 
         outputs = list(app.answer_question(" 什么是RAG？ ", []))
+        self.assertTrue(
+            any("正在生成回答" in item[1][-1]["content"] for item in outputs)
+        )
         final_history = outputs[-1][1]
         sources = outputs[-1][2]
         self.assertEqual(
@@ -82,7 +85,10 @@ class WebAppTests(unittest.TestCase):
         user_messages = [item for item in final_history if item["role"] == "user"]
         self.assertEqual(len(user_messages), 1)
         self.assertEqual(final_history[-1]["role"], "assistant")
+        self.assertIn("部分回答", final_history[-1]["content"])
+        self.assertIn("模型连接在流式生成过程中中断", final_history[-1]["content"])
         self.assertNotIn("stream failed", final_history[-1]["content"])
+        self.assertIn("引用来源", outputs[-1][2])
 
     def test_retrieval_failure_is_not_reported_as_no_results(self):
         app = self._app(

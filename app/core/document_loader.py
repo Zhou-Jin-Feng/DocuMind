@@ -86,7 +86,10 @@ class UniversalDocumentLoader:
                 f"目前支持: {', '.join(self.LOADERS.keys())}"
             )
 
-        self.logger.info(f"正在加载文档: {path.name}")
+        self.logger.info(
+            "正在加载文档",
+            file_extension=file_ext,
+        )
         try:
             if file_ext == ".txt":
                 documents = self._load_text(str(path))
@@ -98,10 +101,19 @@ class UniversalDocumentLoader:
 
             document_id = self._build_document_id(str(path))
             self._normalize_metadata(documents, str(path), file_ext, document_id)
-            self.logger.info(f"成功加载 {len(documents)} 个文档片段: {path.name}")
+            self.logger.info(
+                "文档加载完成",
+                file_extension=file_ext,
+                document_count=len(documents),
+                document_ref=document_id[:12],
+            )
             return documents
-        except Exception:
-            self.logger.exception(f"文档加载失败: {path.name}")
+        except Exception as exc:
+            self.logger.error(
+                "文档加载失败",
+                file_extension=file_ext,
+                error_type=type(exc).__name__,
+            )
             raise
 
     def load_directory(self, dir_path: str) -> List[Document]:
@@ -123,7 +135,11 @@ class UniversalDocumentLoader:
             try:
                 all_documents.extend(self.load_document(str(file_path)))
             except Exception as exc:
-                self.logger.warning(f"跳过文件 {file_path.name}: {exc}")
+                self.logger.warning(
+                    "跳过一个加载失败的文件",
+                    file_extension=file_path.suffix.lower(),
+                    error_type=type(exc).__name__,
+                )
 
         self.logger.info(f"目录加载完成，共 {len(all_documents)} 个文档片段")
         return all_documents

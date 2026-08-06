@@ -56,11 +56,24 @@ class Settings(BaseSettings):
     server_port: int = Field(default=7860, ge=1, le=65535)
     share_gradio: bool = False
 
-    # 日志配置
+    # 应用与日志配置
+    service_name: str = "rag-web"
+    app_env: str = "development"
     log_level: str = "INFO"
-    log_file_path: str = "./logs/rag_{time:YYYY-MM-DD}.log"
+    log_file_path: str = "./logs/rag_{time:YYYY-MM-DD}.jsonl"
     log_rotation: str = "500 MB"
     log_retention: str = "10 days"
+    log_console_format: str = "text"
+    log_file_format: str = "json"
+
+    # Metrics 配置。仅由应用主入口显式启动 HTTP 服务。
+    metrics_enabled: bool = True
+    metrics_host: str = "127.0.0.1"
+    metrics_port: int = Field(default=8000, ge=1, le=65535)
+
+    # Tracing 配置。默认关闭；endpoint 为空时不会创建网络导出器。
+    tracing_enabled: bool = False
+    otel_exporter_otlp_endpoint: Optional[str] = None
 
     # 文件上传配置
     upload_dir: str = "./data/uploads"
@@ -74,6 +87,24 @@ class Settings(BaseSettings):
     def normalize_provider(cls, value: str) -> str:
         """提供商名称统一为小写，避免环境变量大小写导致匹配失败。"""
         return value.strip().lower()
+
+    @field_validator("log_console_format", "log_file_format")
+    @classmethod
+    def validate_log_format(cls, value: str) -> str:
+        """日志格式只允许开发友好的 text 或机器可读的 json。"""
+        normalized = value.strip().lower()
+        if normalized not in {"text", "json"}:
+            raise ValueError("日志格式必须是 text 或 json")
+        return normalized
+
+    @field_validator("otel_exporter_otlp_endpoint", mode="before")
+    @classmethod
+    def normalize_optional_endpoint(cls, value):
+        """空白 OTLP 地址按未配置处理，避免意外创建导出器。"""
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
 
     @field_validator("allowed_extensions")
     @classmethod

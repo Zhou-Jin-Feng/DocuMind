@@ -43,3 +43,9 @@ numpy
 
 # --- 日志系统 (v1.2 新增) ---
 loguru
+
+# --- 可观测性 (v1.3 新增) ---
+prometheus-client
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http

@@ -1,10 +1,12 @@
-"""
+﻿"""
 RAG系统 - Web界面。
 
 使用 Gradio 提供文档上传、索引和问答入口。
 """
 
+from contextvars import copy_context
 from pathlib import Path
+from time import perf_counter
 from typing import List, Optional, Tuple
 
 import gradio as gr
@@ -16,9 +18,27 @@ from app.core.embedding_client import UniversalEmbeddingClient
 from app.core.generator import GenerationConfig, RAGGenerator, UniversalLLMClient
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
-from app.utils.logger import get_logger, setup_logger
+from app.observability.context import request_context
+from app.observability.logging import get_logger, setup_logger
+from app.observability.metrics import (
+    configure_metrics,
+    get_metrics,
+    start_metrics_server,
+)
+from app.observability.tracing import (
+    configure_tracing,
+    mark_span_error,
+    trace_span,
+)
 
 logger = get_logger(__name__)
+configure_metrics(settings.metrics_enabled)
+configure_tracing(
+    settings.tracing_enabled,
+    service_name=settings.service_name,
+    environment=settings.app_env,
+    endpoint=settings.otel_exporter_otlp_endpoint,
+)
 
 
 class RAGWebApp:
@@ -67,60 +87,229 @@ class RAGWebApp:
         if file is None:
             return "⚠️ 请先上传文件"
 
-        try:
-            file_path = self._resolve_upload_path(file)
-            if not file_path.exists() or not file_path.is_file():
-                return "❌ 上传文件不存在或不可读取"
+        with request_context(), trace_span(
+            "rag.document.ingest"
+        ) as root_span:
+            metrics = get_metrics()
+            total_started = perf_counter()
+            active_operation = "rag.document.ingest"
+            active_started = total_started
+            chunks = []
+            try:
+                file_path = self._resolve_upload_path(file)
+                if not file_path.exists() or not file_path.is_file():
+                    return "❌ 上传文件不存在或不可读取"
 
-            extension = file_path.suffix.lower()
-            if extension not in settings.allowed_extensions:
-                allowed = "、".join(settings.allowed_extensions)
-                return f"❌ 不支持的文件格式，仅允许: {allowed}"
+                extension = file_path.suffix.lower()
+                if extension not in settings.allowed_extensions:
+                    allowed = "、".join(settings.allowed_extensions)
+                    return f"❌ 不支持的文件格式，仅允许: {allowed}"
 
-            max_bytes = settings.max_upload_size_mb * 1024 * 1024
-            file_size = file_path.stat().st_size
-            if file_size > max_bytes:
-                return f"❌ 文件过大，最大允许 {settings.max_upload_size_mb} MB"
+                max_bytes = settings.max_upload_size_mb * 1024 * 1024
+                file_size = file_path.stat().st_size
+                if file_size > max_bytes:
+                    return f"❌ 文件过大，最大允许 {settings.max_upload_size_mb} MB"
 
-            logger.info(
-                f"开始处理上传文件: name={file_path.name}, size_bytes={file_size}"
-            )
-            documents = self.doc_loader.load_document(str(file_path))
-            if not documents:
-                return "❌ 文档中没有可加载的内容"
-
-            chunks = self.chunker.chunk_documents_recursive(documents)
-            if not chunks:
-                return "❌ 文档分块后没有有效内容"
-
-            texts = [chunk.page_content for chunk in chunks]
-            embeddings = self.embedding_client.embed_texts_batch(
-                texts,
-                show_progress=False,
-            )
-            if len(embeddings) != len(chunks):
-                raise RuntimeError(
-                    f"向量数量与分块数量不一致: {len(embeddings)} != {len(chunks)}"
+                metrics.record_document_upload("accepted")
+                logger.info(
+                    "收到文档上传请求",
+                    event="document_upload_received",
+                    operation="rag.document.ingest",
+                    status="started",
+                    file_extension=extension,
+                    file_size_bytes=file_size,
                 )
 
-            self.vector_store.add_documents(chunks, embeddings)
-            collection_count = self.vector_store.collection.count()
-            logger.info(
-                f"文档索引完成: name={file_path.name}, chunks={len(chunks)}, "
-                f"collection_count={collection_count}"
-            )
-            return (
-                "✅ 文档处理完成！\n\n"
-                f"📄 文件名: {file_path.name}\n"
-                f"📊 本次分块数: {len(chunks)}\n"
-                f"💾 集合文档块总数: {collection_count}\n\n"
-                "现在你可以开始提问了！"
-            )
-        except Exception:
-            logger.exception("文档处理失败")
-            return "❌ 文档处理失败，请查看服务日志后重试"
+                active_operation = "document.load"
+                active_started = perf_counter()
+                with trace_span(
+                    "document.load",
+                    attributes={
+                        "file.extension": extension,
+                        "file.size_bytes": file_size,
+                    },
+                ):
+                    documents = self.doc_loader.load_document(str(file_path))
+                logger.info(
+                    "文档加载完成",
+                    event="document_loaded",
+                    operation=active_operation,
+                    duration_ms=(perf_counter() - active_started) * 1000,
+                    status="success",
+                    document_count=len(documents),
+                    file_extension=extension,
+                )
+                if not documents:
+                    elapsed = perf_counter() - total_started
+                    metrics.record_document_ingestion("rejected", elapsed)
+                    logger.warning(
+                        "文档中没有可加载内容",
+                        event="document_indexing_completed",
+                        operation="rag.document.ingest",
+                        duration_ms=elapsed * 1000,
+                        status="rejected",
+                        rejection_reason="empty_document",
+                    )
+                    return "❌ 文档中没有可加载的内容"
+
+                active_operation = "document.chunk"
+                active_started = perf_counter()
+                with trace_span(
+                    "document.chunk",
+                    attributes={"document.count": len(documents)},
+                ):
+                    chunks = self.chunker.chunk_documents_recursive(documents)
+                logger.info(
+                    "文档分块完成",
+                    event="document_chunked",
+                    operation=active_operation,
+                    duration_ms=(perf_counter() - active_started) * 1000,
+                    status="success",
+                    chunk_count=len(chunks),
+                )
+                if not chunks:
+                    elapsed = perf_counter() - total_started
+                    metrics.record_document_ingestion("rejected", elapsed)
+                    logger.warning(
+                        "文档分块后没有有效内容",
+                        event="document_indexing_completed",
+                        operation="rag.document.ingest",
+                        duration_ms=elapsed * 1000,
+                        status="rejected",
+                        rejection_reason="empty_chunks",
+                    )
+                    return "❌ 文档分块后没有有效内容"
+
+                texts = [chunk.page_content for chunk in chunks]
+                embedding_provider = getattr(
+                    self, "embedding_provider", settings.default_embedding_provider
+                )
+                active_operation = "embedding.batch"
+                active_started = perf_counter()
+                with trace_span(
+                    "embedding.batch",
+                    attributes={
+                        "provider": embedding_provider,
+                        "chunk.count": len(chunks),
+                    },
+                ):
+                    embeddings = self.embedding_client.embed_texts_batch(
+                        texts,
+                        show_progress=False,
+                    )
+                embedding_duration = perf_counter() - active_started
+                metrics.observe_embedding(
+                    embedding_provider,
+                    active_operation,
+                    "success",
+                    embedding_duration,
+                )
+                if len(embeddings) != len(chunks):
+                    raise RuntimeError(
+                        f"向量数量与分块数量不一致: {len(embeddings)} != {len(chunks)}"
+                    )
+                logger.info(
+                    "文档向量化完成",
+                    event="document_embedding_completed",
+                    operation=active_operation,
+                    duration_ms=embedding_duration * 1000,
+                    status="success",
+                    provider=embedding_provider,
+                    chunk_count=len(chunks),
+                )
+
+                active_operation = "vector.upsert"
+                active_started = perf_counter()
+                with trace_span(
+                    "vector.upsert",
+                    attributes={"chunk.count": len(chunks)},
+                ):
+                    self.vector_store.add_documents(chunks, embeddings)
+                    collection_count = self.vector_store.collection.count()
+                logger.info(
+                    "向量幂等写入完成",
+                    event="vector_upsert_completed",
+                    operation=active_operation,
+                    duration_ms=(perf_counter() - active_started) * 1000,
+                    status="success",
+                    chunk_count=len(chunks),
+                    collection_count=collection_count,
+                )
+
+                elapsed = perf_counter() - total_started
+                metrics.record_document_ingestion(
+                    "success",
+                    elapsed,
+                    chunks_created=len(chunks),
+                    chunks_indexed=len(chunks),
+                )
+                logger.info(
+                    "文档索引完成",
+                    event="document_indexing_completed",
+                    operation="rag.document.ingest",
+                    duration_ms=elapsed * 1000,
+                    status="success",
+                    chunk_count=len(chunks),
+                    collection_count=collection_count,
+                    file_extension=extension,
+                )
+                return (
+                    "✅ 文档处理完成！\n\n"
+                    f"📄 文件名: {file_path.name}\n"
+                    f"📊 本次分块数: {len(chunks)}\n"
+                    f"💾 集合文档块总数: {collection_count}\n\n"
+                    "现在你可以开始提问了！"
+                )
+            except Exception as exc:
+                mark_span_error(root_span, exc)
+                elapsed = perf_counter() - total_started
+                metrics.record_component_error(active_operation, type(exc).__name__)
+                if active_operation == "embedding.batch":
+                    metrics.observe_embedding(
+                        getattr(
+                            self,
+                            "embedding_provider",
+                            settings.default_embedding_provider,
+                        ),
+                        active_operation,
+                        "error",
+                        perf_counter() - active_started,
+                    )
+                metrics.record_document_ingestion(
+                    "error",
+                    elapsed,
+                    chunks_created=len(chunks),
+                )
+                logger.exception(
+                    "文档处理失败",
+                    event="document_indexing_completed",
+                    operation="rag.document.ingest",
+                    duration_ms=elapsed * 1000,
+                    status="error",
+                    error_type=type(exc).__name__,
+                    failed_operation=active_operation,
+                )
+                return "❌ 文档处理失败，请查看服务日志后重试"
 
     def answer_question(
+        self,
+        message: str,
+        history: Optional[List[dict]],
+    ):
+        """在固定执行上下文中驱动流式问答，避免跨线程恢复时丢失请求标识。"""
+        stream = self._answer_question_stream(message, history)
+        stream_context = copy_context()
+        try:
+            while True:
+                try:
+                    output = stream_context.run(next, stream)
+                except StopIteration:
+                    return
+                yield output
+        finally:
+            stream_context.run(stream.close)
+
+    def _answer_question_stream(
         self,
         message: str,
         history: Optional[List[dict]],
@@ -143,58 +332,220 @@ class RAGWebApp:
             yield "", history, ""
             return
 
-        assistant_index: Optional[int] = None
-        try:
-            retrieval_results = self.retriever.retrieve_semantic(
-                normalized_message,
-                top_k=settings.retrieval_top_k,
-                score_threshold=settings.retrieval_score_threshold,
+        with request_context(), trace_span(
+            "rag.query",
+            attributes={"query.length": len(normalized_message)},
+        ) as root_span:
+            metrics = get_metrics()
+            total_started = perf_counter()
+            llm_provider = getattr(self, "llm_provider", settings.default_llm_provider)
+            active_operation = "rag.retrieve"
+            generation_started: float | None = None
+            first_token_received = False
+            logger.info(
+                "收到问答请求",
+                event="query_received",
+                operation="rag.query",
+                status="started",
+                query_length=len(normalized_message),
+                history_message_count=max(len(history) - 1, 0),
             )
-            if not retrieval_results:
-                history.append(
-                    {
-                        "role": "assistant",
-                        "content": "⚠️ 未找到达到相关性阈值的文档内容，请先上传文档或换一种问法。",
-                    }
-                )
-                yield "", history, ""
-                return
 
-            sources = self._format_sources(retrieval_results)
-            history.append({"role": "assistant", "content": ""})
-            assistant_index = len(history) - 1
+            assistant_index: Optional[int] = None
             answer_parts: List[str] = []
+            sources = ""
+            try:
+                retrieval_results = self.retriever.retrieve_semantic(
+                    normalized_message,
+                    top_k=settings.retrieval_top_k,
+                    score_threshold=settings.retrieval_score_threshold,
+                )
+                if not retrieval_results:
+                    history.append(
+                        {
+                            "role": "assistant",
+                            "content": "⚠️ 未找到达到相关性阈值的文档内容，请先上传文档或换一种问法。",
+                        }
+                    )
+                    elapsed = perf_counter() - total_started
+                    metrics.record_no_context(llm_provider)
+                    metrics.record_query(llm_provider, "no_context", elapsed)
+                    logger.info(
+                        "问答请求无可用上下文",
+                        event="response_sent",
+                        operation="rag.query",
+                        duration_ms=elapsed * 1000,
+                        status="no_context",
+                        result_count=0,
+                    )
+                    yield "", history, ""
+                    return
 
-            for chunk in self.rag_generator.generate_answer_stream(
-                normalized_message,
-                retrieval_results,
-                config=GenerationConfig(
-                    temperature=settings.llm_temperature,
-                    max_tokens=settings.llm_max_tokens,
-                    stream=True,
-                ),
-            ):
-                if not chunk:
-                    continue
-                answer_parts.append(chunk)
+                active_operation = "rag.context.build"
+                stage_started = perf_counter()
+                with trace_span(
+                    "rag.context.build",
+                    attributes={"result.count": len(retrieval_results)},
+                ):
+                    sources = self._format_sources(retrieval_results)
+                    context_chars = sum(
+                        len(result.content) for result in retrieval_results
+                    )
+                logger.info(
+                    "RAG 上下文构建完成",
+                    event="context_built",
+                    operation=active_operation,
+                    duration_ms=(perf_counter() - stage_started) * 1000,
+                    status="success",
+                    result_count=len(retrieval_results),
+                    context_chars=context_chars,
+                )
+
+                history.append({"role": "assistant", "content": ""})
+                assistant_index = len(history) - 1
+                active_operation = "llm.generate"
+                generation_started = perf_counter()
+                logger.info(
+                    "开始调用 LLM 生成回答",
+                    event="generation_started",
+                    operation=active_operation,
+                    status="started",
+                    provider=llm_provider,
+                )
                 history[assistant_index] = {
                     "role": "assistant",
-                    "content": "".join(answer_parts),
+                    "content": "⏳ 正在生成回答...",
                 }
                 yield "", list(history), sources
 
-            if not answer_parts:
-                raise RuntimeError("LLM 流式接口未返回任何文本")
-            yield "", history, sources
-        except Exception:
-            logger.exception("问答流程执行失败")
-            public_error = "❌ 系统暂时无法完成回答，请稍后重试并查看服务日志"
-            assistant_message = {"role": "assistant", "content": public_error}
-            if assistant_index is not None:
-                history[assistant_index] = assistant_message
-            else:
-                history.append(assistant_message)
-            yield "", history, ""
+                with trace_span(
+                    "llm.generate",
+                    attributes={"provider": llm_provider},
+                ):
+                    for chunk in self.rag_generator.generate_answer_stream(
+                        normalized_message,
+                        retrieval_results,
+                        config=GenerationConfig(
+                            temperature=settings.llm_temperature,
+                            max_tokens=settings.llm_max_tokens,
+                            stream=True,
+                        ),
+                    ):
+                        if not chunk:
+                            continue
+                        if not first_token_received:
+                            first_token_received = True
+                            first_token_duration = perf_counter() - generation_started
+                            metrics.observe_first_token(
+                                llm_provider, "success", first_token_duration
+                            )
+                            logger.info(
+                                "收到 LLM 首个文本块",
+                                event="first_token_received",
+                                operation=active_operation,
+                                duration_ms=first_token_duration * 1000,
+                                status="success",
+                                provider=llm_provider,
+                            )
+                        answer_parts.append(chunk)
+                        history[assistant_index] = {
+                            "role": "assistant",
+                            "content": "".join(answer_parts),
+                        }
+                        yield "", list(history), sources
+
+                    if not answer_parts:
+                        raise RuntimeError("LLM 流式接口未返回任何文本")
+
+                    answer_text = "".join(answer_parts)
+                    history[assistant_index] = {
+                        "role": "assistant",
+                        "content": answer_text,
+                    }
+                    generation_duration = perf_counter() - generation_started
+                    metrics.observe_llm_total(
+                        llm_provider, "success", generation_duration
+                    )
+                    logger.info(
+                        "LLM 回答生成完成",
+                        event="generation_completed",
+                        operation=active_operation,
+                        duration_ms=generation_duration * 1000,
+                        status="success",
+                        provider=llm_provider,
+                        response_chars=len(answer_text),
+                    )
+
+                elapsed = perf_counter() - total_started
+                metrics.record_query(llm_provider, "success", elapsed)
+                logger.info(
+                    "问答响应发送完成",
+                    event="response_sent",
+                    operation="rag.query",
+                    duration_ms=elapsed * 1000,
+                    status="success",
+                    result_count=len(retrieval_results),
+                    response_chars=len(answer_text),
+                )
+                yield "", history, sources
+            except Exception as exc:
+                mark_span_error(root_span, exc)
+                elapsed = perf_counter() - total_started
+                error_type = type(exc).__name__
+                metrics.record_component_error(active_operation, error_type)
+                generation_duration: float | None = None
+                if generation_started is not None:
+                    generation_duration = perf_counter() - generation_started
+                    if not first_token_received:
+                        metrics.observe_first_token(
+                            llm_provider, "error", generation_duration
+                        )
+                    metrics.observe_llm_total(
+                        llm_provider, "error", generation_duration
+                    )
+                    logger.warning(
+                        "LLM 流式生成未正常完成",
+                        event="generation_completed",
+                        operation="llm.generate",
+                        duration_ms=generation_duration * 1000,
+                        status="error",
+                        error_type=error_type,
+                        provider=llm_provider,
+                        partial_response_chars=len("".join(answer_parts)),
+                    )
+                metrics.record_query(llm_provider, "error", elapsed)
+                logger.exception(
+                    "问答流程执行失败",
+                    event="response_sent",
+                    operation="rag.query",
+                    duration_ms=elapsed * 1000,
+                    status="error",
+                    error_type=error_type,
+                    failed_operation=active_operation,
+                    partial_response=bool(answer_parts),
+                    response_chars=len("".join(answer_parts)),
+                )
+
+                if assistant_index is not None and answer_parts:
+                    partial_answer = "".join(answer_parts)
+                    interruption_notice = (
+                        "\n\n> ⚠️ 模型连接在流式生成过程中中断，"
+                        "以上为已收到的部分回答，请稍后重试。"
+                    )
+                    history[assistant_index] = {
+                        "role": "assistant",
+                        "content": partial_answer + interruption_notice,
+                    }
+                    yield "", list(history), sources
+                    return
+
+                public_error = "❌ 系统暂时无法完成回答，请稍后重试并查看服务日志"
+                assistant_message = {"role": "assistant", "content": public_error}
+                if assistant_index is not None:
+                    history[assistant_index] = assistant_message
+                else:
+                    history.append(assistant_message)
+                yield "", list(history), ""
 
     def _format_sources(self, retrieval_results) -> str:
         """将来源、页码、检索距离和重排分数格式化为 Markdown。"""
@@ -310,11 +661,13 @@ def create_web_interface():
             fn=rag_app.answer_question,
             inputs=[msg, chatbot],
             outputs=[msg, chatbot, sources_display],
+            stream_every=0.05,
         )
         msg.submit(
             fn=rag_app.answer_question,
             inputs=[msg, chatbot],
             outputs=[msg, chatbot, sources_display],
+            stream_every=0.05,
         )
         clear_btn.click(
             fn=rag_app.clear_conversation,
@@ -330,6 +683,14 @@ if __name__ == "__main__":
         log_file_path=settings.log_file_path,
         rotation=settings.log_rotation,
         retention=settings.log_retention,
+        service=settings.service_name,
+        environment=settings.app_env,
+        console_format=settings.log_console_format,
+        file_format=settings.log_file_format,
+    )
+    start_metrics_server(
+        host=settings.metrics_host,
+        port=settings.metrics_port,
     )
     logger.info("启动RAG Web服务...")
     demo, custom_css = create_web_interface()
