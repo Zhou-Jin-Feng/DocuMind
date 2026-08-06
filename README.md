@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.3）
+# DocuMind - RAG 知识库问答系统（v1.4）
 
-这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、流式生成、来源展示，以及结构化日志、Prometheus Metrics 和 OpenTelemetry Tracing。
+这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing 和离线 RAG 评估。
 
-> 当前版本：**v1.3 可观测性版**。Docker/Compose 按计划暂缓到后续阶段，本版本只建设应用内 Logs + Metrics + Traces。
+> 当前版本：**v1.4 评估版**。Docker/Compose 按计划暂缓到后续阶段，本版本在 v1.3 可观测性的基础上增加离线黄金评估集和回归门禁。
 
 ## 当前能力
 
@@ -16,6 +16,7 @@
 - JSONL 结构化日志内置 `request_id` / `trace_id`、阶段事件、数字毫秒耗时和敏感字段脱敏。
 - Prometheus Metrics 使用低基数标签，默认暴露在 `127.0.0.1:8000/metrics`。
 - OpenTelemetry Tracing 默认关闭，支持应用私有 Provider、OTLP/HTTP 导出和日志 Trace ID 关联。
+- 提供离线黄金评估集、Recall@K、Precision@K、MRR、Top-K 命中率、拒答准确率和回归门禁。
 
 ## 项目结构
 
@@ -39,12 +40,18 @@ DocuMind/
 │       ├── logger.py             # 日志兼容入口
 │       └── monitoring.py         # 生成器安全的耗时工具
 ├── tests/                        # unittest 自动化测试和示例文本
+├── evaluation/                   # 黄金评估集、离线 Runner、报告和回归门禁
+│   ├── datasets/
+│   ├── baselines/
+│   ├── reports/
+│   └── runner.py
 ├── data/                         # 运行数据（Git 忽略）
 ├── logs/                         # 日志（Git 忽略）
 ├── .env.example                 # 无密钥配置模板
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── OBSERVABILITY.md              # v1.3 日志、指标、追踪指南
+├── EVALUATION.md                 # v1.4 黄金评估集和回归评估指南
 └── web_app.py                    # Gradio 入口
 ```
 
@@ -143,13 +150,26 @@ ALLOWED_EXTENSIONS=[".pdf", ".docx", ".txt"]
 
 字段、事件顺序、指标清单、Span 树与隐私约束见 [OBSERVABILITY.md](OBSERVABILITY.md)。
 
+## RAG 评估
+
+离线运行默认黄金评估集，不需要 Ollama、ChromaDB、网络或真实 LLM：
+
+```powershell
+python -m evaluation.runner `
+  --dataset evaluation/datasets/golden_dataset.jsonl `
+  --output-json evaluation/reports/demo.json `
+  --output-markdown evaluation/reports/demo.md
+```
+
+数据格式、指标语义、Adapter 接入方式和回归门禁见 [EVALUATION.md](EVALUATION.md)。
+
 ## 测试与检查
 
 项目测试使用标准库 `unittest`，不依赖 pytest 也可运行：
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
-python -m compileall -q app web_app.py tests
+python -m compileall -q app evaluation web_app.py tests
 python -m pip check
 ```
 
@@ -178,7 +198,7 @@ Remove-Item -Recurse -Force .\data\chroma_db
 - 当前只保证“完全相同文件”的重复上传幂等；同名文件内容更新后的旧版本清理属于 v1.5 文档生命周期能力。
 - 尚未保存并校验索引的 Embedding 模型、维度和分块策略版本；更换 Embedding 模型前应重建索引。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
-- 当前只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.3。
+- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.4。
 
 ## 常见问题
 

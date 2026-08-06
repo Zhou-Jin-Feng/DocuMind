@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v1.3）
+# DocuMind - RAG 系统架构（v1.4）
 
 ## 1. 分层结构
 
@@ -135,13 +135,23 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 7. 当前边界
 
-v1.3 完成应用内 Logs、Metrics 和 Traces，暂不包含：
+v1.4 在应用内 Logs、Metrics、Traces 之上增加独立离线评估层。评估层只依赖 Adapter 协议，不反向依赖 Web UI。
+
+```text
+evaluation.runner
+├── evaluation.datasets       # JSONL 黄金用例
+├── evaluation.adapters       # 真实 Retriever 与 Fake Adapter 边界
+├── evaluation.metrics        # 纯函数检索/拒答指标
+├── evaluation.reports        # JSON/Markdown 报告
+└── evaluation.regression     # 基线比较和下降门禁
+```
+
+当前仍不包含：
 
 - Docker/Compose 和可观测性后端容器；
 - 历史感知检索、Query Rewrite 和正式 Reranker；
 - 文档版本与索引重建状态机；
-- 黄金评估集；
 - Celery/Redis 异步摄取；
 - 认证、多租户、限流和生产高可用。
 
-详细字段、指标与运行配置见 `OBSERVABILITY.md`。
+日志、指标、追踪和评估配置分别见 `OBSERVABILITY.md` 与 `EVALUATION.md`。

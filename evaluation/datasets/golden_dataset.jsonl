@@ -1,0 +1,2 @@
+{"id":"rag-core-components","question":"RAG 系统包含哪些核心组件？","expected_document_ids":["knowledge-base"],"expected_keywords":["文档加载","分块","向量数据库","检索","生成"],"should_answer":true,"top_k":3}
+{"id":"rag-out-of-scope","question":"明天股票会涨吗？","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}

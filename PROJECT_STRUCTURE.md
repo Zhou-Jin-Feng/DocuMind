@@ -1,4 +1,4 @@
-# 项目结构（v1.3）
+# 项目结构（v1.4）
 
 ```text
 DocuMind/
@@ -38,7 +38,21 @@ DocuMind/
 │   ├── test_monitoring.py
 │   ├── test_metrics.py
 │   ├── test_tracing.py
+│   ├── test_evaluation.py
 │   └── *.txt
+├── evaluation/
+│   ├── __init__.py
+│   ├── adapters.py
+│   ├── metrics.py
+│   ├── models.py
+│   ├── regression.py
+│   ├── reports.py
+│   ├── runner.py
+│   ├── datasets/
+│   │   ├── golden_dataset.jsonl
+│   │   └── documents/
+│   ├── baselines/
+│   └── reports/
 ├── data/                  # 本地运行数据，Git 忽略
 ├── logs/                  # JSONL 日志，Git 忽略
 ├── .env                   # 本地密钥，Git 忽略
@@ -50,6 +64,7 @@ DocuMind/
 ├── ARCHITECTURE.md
 ├── DEPENDENCIES.md
 ├── OBSERVABILITY.md
+├── EVALUATION.md
 ├── PROJECT_STRUCTURE.md
 └── web_app.py
 ```
@@ -72,6 +87,12 @@ DocuMind/
 | `observability/tracing.py` | 私有 TracerProvider、核心 Span、错误标记和 OTLP/HTTP 导出 |
 | `utils/logger.py` | 兼容旧导入路径，转发到结构化日志模块 |
 | `utils/monitoring.py` | `perf_counter()` 计时和生成器完整迭代耗时 |
+| `evaluation/models.py` | 黄金用例、检索结果和评估报告数据模型 |
+| `evaluation/metrics.py` | Recall@K、Precision@K、MRR、命中率和拒答指标 |
+| `evaluation/adapters.py` | 生产 Retriever 适配器与离线 Fake Adapter |
+| `evaluation/runner.py` | JSONL 黄金评估集加载和离线执行 |
+| `evaluation/regression.py` | 指标最低值和允许下降幅度门禁 |
+| `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
 
 ## 依赖方向
 
