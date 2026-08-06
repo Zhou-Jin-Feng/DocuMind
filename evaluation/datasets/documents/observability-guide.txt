@@ -1,0 +1,1 @@
+结构化日志使用 request_id 关联一次请求，使用 trace_id 关联分布式追踪。Metrics 默认监听 127.0.0.1:8000/metrics，结构化 JSONL 日志记录请求阶段、状态和毫秒耗时。

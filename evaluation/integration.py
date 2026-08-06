@@ -16,6 +16,7 @@ class DeterministicEmbeddingClient:
     """Small hash embedding used only by offline evaluation and integration tests."""
 
     provider = "evaluation-fake"
+    model_name = "sha256-token-hash-v1"
     dimension = 64
 
     @classmethod
@@ -34,6 +35,15 @@ class DeterministicEmbeddingClient:
             ) % self.dimension
             vector[bucket] += 1.0
         return vector
+
+    def embed_texts_batch(
+        self,
+        texts: Sequence[str],
+        *,
+        show_progress: bool = False,
+    ) -> list[list[float]]:
+        del show_progress
+        return [self.embed_text(text) for text in texts]
 
 
 class InMemoryVectorStore:

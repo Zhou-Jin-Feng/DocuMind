@@ -101,6 +101,7 @@ class RetrievedDocument:
     chunk_id: str = ""
     rank: int = 0
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    distance: float | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.document_id, str) or not self.document_id.strip():
@@ -110,6 +111,8 @@ class RetrievedDocument:
         object.__setattr__(self, "document_id", self.document_id.strip())
         object.__setattr__(self, "chunk_id", str(self.chunk_id or ""))
         object.__setattr__(self, "metadata", dict(self.metadata or {}))
+        if self.distance is not None:
+            object.__setattr__(self, "distance", float(self.distance))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -118,6 +121,7 @@ class RetrievedDocument:
             "chunk_id": self.chunk_id,
             "rank": self.rank,
             "metadata": dict(self.metadata),
+            "distance": self.distance,
         }
 
 
@@ -141,6 +145,7 @@ class CaseEvaluation:
     question: str
     top_k: int
     retrieved_document_ids: tuple[str, ...]
+    retrieved_distances: tuple[float | None, ...]
     metrics: Mapping[str, float | None]
     duration_ms: float
     status: str = "success"
@@ -153,6 +158,7 @@ class CaseEvaluation:
             "question": self.question,
             "top_k": self.top_k,
             "retrieved_document_ids": list(self.retrieved_document_ids),
+            "retrieved_distances": list(self.retrieved_distances),
             "metrics": dict(self.metrics),
             "duration_ms": round(self.duration_ms, 3),
             "status": self.status,
@@ -169,12 +175,17 @@ class EvaluationReport:
     top_k: int
     case_results: tuple[CaseEvaluation, ...]
     metrics: Mapping[str, float | None]
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "metadata", dict(self.metadata or {}))
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "dataset_name": self.dataset_name,
             "top_k": self.top_k,
             "case_count": len(self.case_results),
+            "metadata": dict(self.metadata),
             "metrics": dict(self.metrics),
             "cases": [result.to_dict() for result in self.case_results],
         }
@@ -188,12 +199,13 @@ class EvaluationReport:
             "",
             f"- Cases: {len(self.case_results)}",
             f"- Default Top-K: {self.top_k}",
-            "",
-            "## Aggregate Metrics",
-            "",
-            "| Metric | Value |",
-            "|---|---:|",
         ]
+        if self.metadata:
+            lines.extend(["", "## Run Configuration", "", "| Setting | Value |", "|---|---|"])
+            for name, value in self.metadata.items():
+                formatted = json.dumps(value, ensure_ascii=False) if value is not None else "null"
+                lines.append(f"| `{name}` | `{formatted}` |")
+        lines.extend(["", "## Aggregate Metrics", "", "| Metric | Value |", "|---|---:|"])
         for name, value in self.metrics.items():
             formatted = "N/A" if value is None else f"{value:.4f}"
             lines.append(f"| `{name}` | {formatted} |")

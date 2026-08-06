@@ -1,0 +1,1 @@
+本地 Embedding 使用 Ollama 服务，默认模型为 qwen3-embedding。Web 服务默认监听 127.0.0.1:7860，Metrics 默认监听 127.0.0.1:8000。Docker 容器化部署按路线暂缓到后续版本。

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import gc
 from collections.abc import Mapping, Sequence
-from typing import Any, Protocol
+from typing import Any, Optional, Protocol
 
 from evaluation.models import AnswerResult, RetrievedDocument
 
@@ -29,11 +30,17 @@ class AnswerAdapter(Protocol):
 class RetrieverAdapter:
     """Bridge the production ``Retriever`` to the offline runner."""
 
-    def __init__(self, retriever: Any):
+    def __init__(self, retriever: Any, score_threshold: Optional[float] = None):
+        if score_threshold is not None and score_threshold < 0:
+            raise ValueError("score_threshold 不能小于 0")
         self.retriever = retriever
+        self.score_threshold = score_threshold
 
     def retrieve(self, question: str, top_k: int) -> Sequence[RetrievedDocument]:
-        results = self.retriever.retrieve_semantic(question, top_k=top_k)
+        retrieval_kwargs = {"top_k": top_k}
+        if self.score_threshold is not None:
+            retrieval_kwargs["score_threshold"] = self.score_threshold
+        results = self.retriever.retrieve_semantic(question, **retrieval_kwargs)
         documents: list[RetrievedDocument] = []
         for rank, result in enumerate(results, 1):
             metadata = dict(getattr(result, "metadata", {}) or {})
@@ -47,9 +54,33 @@ class RetrieverAdapter:
                     chunk_id=str(metadata.get("chunk_id") or ""),
                     rank=rank,
                     metadata=metadata,
+                    distance=getattr(result, "distance", None),
                 )
             )
         return documents
+
+    def close(self) -> None:
+        """Release Chroma/client references before deleting a temporary baseline store."""
+
+        retriever = self.retriever
+        self.retriever = None
+        self.score_threshold = None
+        if retriever is not None:
+            vector_store = getattr(retriever, "vector_store", None)
+            retriever.vector_store = None
+            retriever.embedding_client = None
+            if vector_store is not None:
+                if hasattr(vector_store, "collection"):
+                    vector_store.collection = None
+                if hasattr(vector_store, "client"):
+                    vector_store.client = None
+        gc.collect()
+
+    def __enter__(self) -> "RetrieverAdapter":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
 
 
 class FakeRetrievalAdapter:

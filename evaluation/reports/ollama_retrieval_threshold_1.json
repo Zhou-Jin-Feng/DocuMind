@@ -1,0 +1,229 @@
+{
+  "dataset_name": "ollama-retrieval-baseline",
+  "top_k": 3,
+  "case_count": 8,
+  "metadata": {
+    "document_count": 5,
+    "chunk_count": 5,
+    "embedding_provider": "ollama",
+    "embedding_model": "qwen3-embedding",
+    "embedding_dimension": 4096,
+    "chunk_size": 500,
+    "chunk_overlap": 100,
+    "case_count": 8,
+    "case_top_k_values": [
+      3
+    ],
+    "score_threshold": 1.0,
+    "dataset_path": "evaluation/datasets/golden_dataset.jsonl",
+    "documents_directory": "evaluation/datasets/documents"
+  },
+  "metrics": {
+    "recall_at_k": 1.0,
+    "precision_at_k": 0.3333333333333333,
+    "mrr_at_k": 1.0,
+    "top_k_hit_rate": 1.0,
+    "correct_document_avg_rank": 1.0,
+    "no_answer_retrieval_accuracy": 1.0,
+    "refusal_accuracy": null,
+    "keyword_coverage": null,
+    "successful_case_rate": 1.0,
+    "average_duration_ms": 319.02081250518677
+  },
+  "cases": [
+    {
+      "case_id": "rag-core-components",
+      "question": "RAG 系统包含哪些核心组件？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "knowledge-base"
+      ],
+      "retrieved_distances": [
+        0.21963652968406677
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 313.384,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "stable-indexing",
+      "question": "为什么要使用稳定的 document_id 和 chunk_id？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "indexing-guide"
+      ],
+      "retrieved_distances": [
+        0.3712482154369354
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 324.298,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "observability-request",
+      "question": "结构化日志如何关联一次请求？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide"
+      ],
+      "retrieved_distances": [
+        0.32789164781570435
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 337.829,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "metrics-listening",
+      "question": "Metrics 默认监听在哪个地址？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "deployment-guide"
+      ],
+      "retrieved_distances": [
+        0.8016662001609802,
+        0.9047978520393372
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 322.354,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "distance-direction",
+      "question": "Chroma 的 distance 数值越大越相关吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-guide"
+      ],
+      "retrieved_distances": [
+        0.44731390476226807
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 317.894,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "ollama-embedding",
+      "question": "本地 Embedding 使用什么服务和模型？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-guide"
+      ],
+      "retrieved_distances": [
+        0.3569493889808655
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 308.769,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "unrelated-stock",
+      "question": "明天股票会涨吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [],
+      "retrieved_distances": [],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 1.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 313.621,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "unrelated-recipe",
+      "question": "如何制作巧克力蛋糕？",
+      "top_k": 3,
+      "retrieved_document_ids": [],
+      "retrieved_distances": [],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 1.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 314.018,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    }
+  ]
+}

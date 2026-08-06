@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 from time import perf_counter
-from typing import Sequence
+from typing import Any, Mapping, Sequence
 
 from langchain_core.documents import Document
 
@@ -17,6 +17,7 @@ from evaluation.metrics import (
     hit_at_k,
     keyword_coverage,
     mean_defined,
+    no_answer_retrieval_accuracy,
     precision_at_k,
     recall_at_k,
     reciprocal_rank_at_k,
@@ -63,6 +64,7 @@ class EvaluationRunner:
         *,
         dataset_name: str = "golden-dataset",
         default_top_k: int = 3,
+        metadata: Mapping[str, Any] | None = None,
     ):
         if default_top_k <= 0:
             raise ValueError("default_top_k 必须大于 0")
@@ -70,6 +72,7 @@ class EvaluationRunner:
         self.answer_adapter = answer_adapter
         self.dataset_name = dataset_name
         self.default_top_k = default_top_k
+        self.metadata = dict(metadata or {})
 
     def run(self, cases: Sequence[GoldenCase]) -> EvaluationReport:
         if not cases:
@@ -83,6 +86,7 @@ class EvaluationRunner:
             "mrr_at_k",
             "top_k_hit_rate",
             "correct_document_avg_rank",
+            "no_answer_retrieval_accuracy",
             "refusal_accuracy",
             "keyword_coverage",
         )
@@ -101,6 +105,7 @@ class EvaluationRunner:
             top_k=self.default_top_k,
             case_results=tuple(results),
             metrics=metrics,
+            metadata=self.metadata,
         )
 
     def _run_case(self, case: GoldenCase) -> CaseEvaluation:
@@ -113,6 +118,7 @@ class EvaluationRunner:
             "mrr_at_k": None,
             "top_k_hit_rate": None,
             "correct_document_avg_rank": None,
+            "no_answer_retrieval_accuracy": None,
             "refusal_accuracy": None,
             "keyword_coverage": None,
         }
@@ -126,6 +132,9 @@ class EvaluationRunner:
                 mrr_at_k=reciprocal_rank_at_k(case.expected_document_ids, document_ids, top_k),
                 top_k_hit_rate=hit_at_k(case.expected_document_ids, document_ids, top_k),
                 correct_document_avg_rank=first_relevant_rank(
+                    case.expected_document_ids, document_ids, top_k
+                ),
+                no_answer_retrieval_accuracy=no_answer_retrieval_accuracy(
                     case.expected_document_ids, document_ids, top_k
                 ),
             )
@@ -147,6 +156,7 @@ class EvaluationRunner:
             question=case.question,
             top_k=top_k,
             retrieved_document_ids=tuple(document.document_id for document in retrieved),
+            retrieved_distances=tuple(document.distance for document in retrieved),
             metrics=metrics,
             duration_ms=(perf_counter() - started) * 1000,
             status=status,

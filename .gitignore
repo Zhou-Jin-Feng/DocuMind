@@ -27,6 +27,7 @@ chroma_db/
 # 忽略新的数据目录
 data/chroma_db/
 data/uploads/
+data/evaluation_chroma_db*/
 
 # 忽略日志文件
 *.log

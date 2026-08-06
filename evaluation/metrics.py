@@ -96,6 +96,22 @@ def first_relevant_rank(
     return None
 
 
+def no_answer_retrieval_accuracy(
+    expected_document_ids: Sequence[str],
+    retrieved_document_ids: Sequence[str],
+    k: int,
+) -> float | None:
+    """Return 1 when a no-answer case returns no Top-K documents.
+
+    Answerable cases have no applicable value. This metric makes the current
+    threshold policy visible instead of silently excluding no-answer cases.
+    """
+
+    if _expected_set(expected_document_ids):
+        return None
+    return float(not _retrieved_ids(retrieved_document_ids, k))
+
+
 def refusal_accuracy(expected_should_answer: bool, actual_answered: bool) -> float:
     """Return 1 when an answer adapter follows the case's answerability label."""
 

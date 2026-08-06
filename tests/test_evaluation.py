@@ -10,6 +10,8 @@ from langchain_core.documents import Document
 from evaluation.adapters import FakeAnswerAdapter, FakeRetrievalAdapter, RetrieverAdapter
 from evaluation import EvaluationRunner as PublicEvaluationRunner
 from evaluation.integration import DeterministicEmbeddingClient, build_deterministic_retriever
+from evaluation.production import build_indexed_retrieval_adapter, load_text_documents
+from evaluation.production_runner import _default_report_stem
 from app.core.document_chunker import DocumentChunker
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
@@ -65,6 +67,13 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(hit_at_k(expected, retrieved, 2), 1.0)
         self.assertEqual(first_relevant_rank(expected, retrieved, 2), 2.0)
         self.assertIsNone(recall_at_k([], retrieved, 2))
+
+    def test_no_answer_retrieval_accuracy_exposes_irrelevant_hits(self):
+        from evaluation.metrics import no_answer_retrieval_accuracy
+
+        self.assertEqual(no_answer_retrieval_accuracy([], [], 3), 1.0)
+        self.assertEqual(no_answer_retrieval_accuracy([], ["irrelevant"], 3), 0.0)
+        self.assertIsNone(no_answer_retrieval_accuracy(["doc"], [], 3))
 
     def test_runner_produces_retrieval_and_refusal_metrics(self):
         cases = [
@@ -139,6 +148,50 @@ class EvaluationTests(unittest.TestCase):
         results = RetrieverAdapter(retriever).retrieve("RAG 向量检索", 1)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].document_id, "knowledge-base")
+        self.assertIsNotNone(results[0].distance)
+
+    def test_retriever_adapter_passes_and_validates_score_threshold(self):
+        class FakeRetriever:
+            def __init__(self):
+                self.calls = []
+
+            def retrieve_semantic(self, question, **kwargs):
+                self.calls.append((question, kwargs))
+                return []
+
+        retriever = FakeRetriever()
+        RetrieverAdapter(retriever, score_threshold=1.0).retrieve("q", 3)
+        self.assertEqual(
+            retriever.calls,
+            [("q", {"top_k": 3, "score_threshold": 1.0})],
+        )
+        with self.assertRaises(ValueError):
+            RetrieverAdapter(retriever, score_threshold=-0.1)
+
+    def test_threshold_report_stem_is_distinct_from_baseline(self):
+        self.assertEqual(_default_report_stem("ollama", None), "ollama_retrieval_baseline")
+        self.assertEqual(_default_report_stem("ollama", 1.0), "ollama_retrieval_threshold_1")
+        self.assertEqual(_default_report_stem("ollama", 0.75), "ollama_retrieval_threshold_0_75")
+
+    def test_threshold_can_reject_no_answer_retrieval_results(self):
+        class ThresholdRetriever:
+            def retrieve_semantic(self, question, top_k, score_threshold=None):
+                del question, top_k
+                result = type(
+                    "Result",
+                    (),
+                    {
+                        "metadata": {"document_id": "irrelevant"},
+                        "content": "irrelevant",
+                        "distance": 1.5,
+                    },
+                )()
+                return [] if score_threshold is not None and result.distance > score_threshold else [result]
+
+        report = EvaluationRunner(
+            RetrieverAdapter(ThresholdRetriever(), score_threshold=1.0)
+        ).run([GoldenCase("no-answer", "q", (), should_answer=False)])
+        self.assertEqual(report.metrics["no_answer_retrieval_accuracy"], 1.0)
 
     def test_chroma_pipeline_reaches_runner_metrics_without_network(self):
         directory = Path(tempfile.mkdtemp(prefix="rag-evaluation-chroma-"))
@@ -162,9 +215,14 @@ class EvaluationTests(unittest.TestCase):
                 collection_name="evaluation_documents",
                 persist_directory=str(directory),
             )
-            store.add_documents(chunks, [embedder.embed_text(chunk.page_content) for chunk in chunks])
+            adapter, summary = build_indexed_retrieval_adapter(
+                documents,
+                embedder,
+                store,
+                chunker=DocumentChunker(chunk_size=200, chunk_overlap=0),
+            )
             report = EvaluationRunner(
-                RetrieverAdapter(Retriever(store, embedder)),
+                adapter,
                 FakeAnswerAdapter({"RAG 如何使用向量数据库？": True}),
             ).run(
                 [
@@ -179,10 +237,27 @@ class EvaluationTests(unittest.TestCase):
             self.assertEqual(report.metrics["recall_at_k"], 1.0)
             self.assertEqual(report.metrics["top_k_hit_rate"], 1.0)
             self.assertEqual(report.metrics["successful_case_rate"], 1.0)
+            self.assertEqual(summary.document_count, 2)
+            self.assertEqual(summary.chunk_count, 2)
+            self.assertEqual(summary.embedding_dimension, 64)
+            self.assertEqual(summary.embedding_provider, "evaluation-fake")
+            self.assertEqual(summary.embedding_model, "sha256-token-hash-v1")
+            self.assertEqual(summary.chunk_size, 200)
+            self.assertEqual(summary.chunk_overlap, 0)
         finally:
+            if 'adapter' in locals() and adapter is not None:
+                adapter.close()
             store = None
             gc.collect()
             shutil.rmtree(directory, ignore_errors=True)
+
+    def test_load_text_documents_uses_stable_fixture_ids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "knowledge-base.txt"
+            path.write_text("RAG 内容", encoding="utf-8")
+            documents = load_text_documents(directory)
+        self.assertEqual(documents[0].metadata["document_id"], "knowledge-base")
+        self.assertEqual(documents[0].metadata["chunk_id"], "knowledge-base:source")
 
     def test_regression_gate_checks_drop_and_minimum(self):
         baseline = {"recall_at_k": 0.9, "successful_case_rate": 1.0}
@@ -200,12 +275,16 @@ class EvaluationTests(unittest.TestCase):
     def test_report_round_trip_shape_is_json_serializable(self):
         case = GoldenCase("case", "q", ("doc",))
         report = EvaluationRunner(
-            FakeRetrievalAdapter({"q": [RetrievedDocument("doc")]}),
+            FakeRetrievalAdapter({"q": [RetrievedDocument("doc", distance=0.25)]}),
             dataset_name="test",
+            metadata={"embedding_model": "test-model", "score_threshold": None},
         ).run([case])
         parsed = json.loads(report.to_json())
         self.assertEqual(parsed["dataset_name"], "test")
+        self.assertEqual(parsed["metadata"]["embedding_model"], "test-model")
         self.assertEqual(parsed["cases"][0]["case_id"], "case")
+        self.assertEqual(parsed["cases"][0]["retrieved_distances"], [0.25])
+        self.assertIn("Run Configuration", report.to_markdown())
 
 
 if __name__ == "__main__":

@@ -34,11 +34,12 @@ The runner reports:
 - `mrr_at_k`: reciprocal rank of the first relevant document;
 - `top_k_hit_rate`: ratio of answerable cases with at least one expected document in Top-K;
 - `correct_document_avg_rank`: average rank of the first relevant document;
+- `no_answer_retrieval_accuracy`: ratio of no-answer cases that return no Top-K documents;
 - `refusal_accuracy`: agreement between `should_answer` and the answer adapter;
 - `keyword_coverage`: expected keyword coverage when an answer adapter returns text;
 - `successful_case_rate` and `average_duration_ms`.
 
-No-answer cases are excluded from retrieval metrics because they have no positive document target. They remain included in refusal accuracy when an answer adapter is configured.
+No-answer cases are excluded from positive-target retrieval metrics because they have no relevant document ID. They are included in `no_answer_retrieval_accuracy`; with no distance threshold, a vector store will normally return an irrelevant nearest document and this metric will expose that behavior. They remain included in refusal accuracy when an answer adapter is configured.
 
 ## Offline Demo
 
@@ -54,6 +55,28 @@ Run the deterministic demo without Ollama, ChromaDB, network access, or an LLM:
 The default demo loads the sample documents and exercises the production `Retriever` through a deterministic hash Embedding and in-memory Vector Store. The answerability adapter remains fake. The demo is intentionally deterministic: its purpose is to validate the real retrieval boundary, dataset parsing, report generation, and the evaluation pipeline, not to claim production retrieval quality.
 
 For a real baseline, replace the deterministic integration components with a real `RetrieverAdapter` backed by the intended Embedding model and vector collection. Keep the same document IDs and golden dataset when comparing changes.
+
+The reusable production wiring is exposed by `build_configured_retrieval_adapter()`. It uses the configured real Embedding provider, the production chunker, Chroma `VectorStore`, and the production `Retriever`. Calling it may contact Ollama or a cloud API and should be done deliberately when creating a baseline.
+
+Create a real retrieval-only baseline with the CLI. The command does not call an LLM, so answer-generation metrics remain `N/A`:
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.production_runner `
+  --provider ollama `
+  --persist-directory .\data\evaluation_chroma_db
+```
+
+The CLI explicitly releases the Chroma adapter before exit. Use a separate collection and persistence directory from the application index.
+
+### Current Ollama Baseline
+
+The checked-in Ollama reports were generated with `qwen3-embedding` (4096 dimensions), 5 short fixture documents, and 8 cases: 6 answerable questions and 2 no-answer questions. These are real local Ollama calls, but the dataset is a small engineering baseline rather than statistically representative production evidence.
+
+Without a distance threshold, the 6 answerable cases all place their target document at rank 1 (`Recall@3=1.0`, `MRR@3=1.0`), while both no-answer cases still return irrelevant nearest documents (`no_answer_retrieval_accuracy=0.0`). `Precision@3=0.3333` is expected because each answerable case labels one relevant document while the retriever returns three. `successful_case_rate=1.0` means all calls completed without exceptions; it is not an answer-quality score.
+
+With the experimental maximum distance threshold `1.0`, the same sample keeps `Recall@3=1.0` and raises `no_answer_retrieval_accuracy` to `1.0`. This threshold is only a candidate derived from two negative examples. It must not become the online default until the dataset contains more realistic documents, paraphrases, hard negatives, and domain-specific no-answer questions.
+
+The reports record the Provider, model, actual vector dimension, chunk settings, Top-K values, threshold, and dataset sizes. Local latency is a hardware snapshot and should only be compared under the same machine and service conditions.
 
 ## Regression Gate
 

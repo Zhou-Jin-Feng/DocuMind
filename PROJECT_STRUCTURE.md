@@ -44,6 +44,8 @@ DocuMind/
 │   ├── __init__.py
 │   ├── adapters.py
 │   ├── integration.py
+│   ├── production.py
+│   ├── production_runner.py
 │   ├── metrics.py
 │   ├── models.py
 │   ├── regression.py
@@ -92,6 +94,8 @@ DocuMind/
 | `evaluation/metrics.py` | Recall@K、Precision@K、MRR、命中率和拒答指标 |
 | `evaluation/adapters.py` | 生产 Retriever 适配器与离线 Fake Adapter |
 | `evaluation/integration.py` | 确定性 Embedding、内存 Vector Store 和 Retriever 集成烟囱测试 |
+| `evaluation/production.py` | 生产组件索引构建和真实 Provider 基线入口 |
+| `evaluation/production_runner.py` | 真实 Embedding 检索基线 CLI |
 | `evaluation/runner.py` | JSONL 黄金评估集加载和离线执行 |
 | `evaluation/regression.py` | 指标最低值和允许下降幅度门禁 |
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |

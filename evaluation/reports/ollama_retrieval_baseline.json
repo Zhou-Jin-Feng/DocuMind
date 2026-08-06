@@ -1,0 +1,267 @@
+{
+  "dataset_name": "ollama-retrieval-baseline",
+  "top_k": 3,
+  "case_count": 8,
+  "metadata": {
+    "document_count": 5,
+    "chunk_count": 5,
+    "embedding_provider": "ollama",
+    "embedding_model": "qwen3-embedding",
+    "embedding_dimension": 4096,
+    "chunk_size": 500,
+    "chunk_overlap": 100,
+    "case_count": 8,
+    "case_top_k_values": [
+      3
+    ],
+    "score_threshold": null,
+    "dataset_path": "evaluation/datasets/golden_dataset.jsonl",
+    "documents_directory": "evaluation/datasets/documents"
+  },
+  "metrics": {
+    "recall_at_k": 1.0,
+    "precision_at_k": 0.3333333333333333,
+    "mrr_at_k": 1.0,
+    "top_k_hit_rate": 1.0,
+    "correct_document_avg_rank": 1.0,
+    "no_answer_retrieval_accuracy": 0.0,
+    "refusal_accuracy": null,
+    "keyword_coverage": null,
+    "successful_case_rate": 1.0,
+    "average_duration_ms": 345.15272499993443
+  },
+  "cases": [
+    {
+      "case_id": "rag-core-components",
+      "question": "RAG 系统包含哪些核心组件？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "knowledge-base",
+        "deployment-guide",
+        "indexing-guide"
+      ],
+      "retrieved_distances": [
+        0.21963652968406677,
+        1.1425853967666626,
+        1.2512794733047485
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 419.668,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "stable-indexing",
+      "question": "为什么要使用稳定的 document_id 和 chunk_id？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "indexing-guide",
+        "observability-guide",
+        "deployment-guide"
+      ],
+      "retrieved_distances": [
+        0.3712482154369354,
+        1.0160826444625854,
+        1.0500057935714722
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 363.559,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "observability-request",
+      "question": "结构化日志如何关联一次请求？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "indexing-guide",
+        "deployment-guide"
+      ],
+      "retrieved_distances": [
+        0.32789164781570435,
+        1.1562163829803467,
+        1.2072944641113281
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 337.272,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "metrics-listening",
+      "question": "Metrics 默认监听在哪个地址？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "deployment-guide",
+        "retrieval-guide"
+      ],
+      "retrieved_distances": [
+        0.8016662001609802,
+        0.9047978520393372,
+        1.2020270824432373
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 378.865,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "distance-direction",
+      "question": "Chroma 的 distance 数值越大越相关吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-guide",
+        "deployment-guide",
+        "indexing-guide"
+      ],
+      "retrieved_distances": [
+        0.44731390476226807,
+        1.1822726726531982,
+        1.1933543682098389
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 329.169,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "ollama-embedding",
+      "question": "本地 Embedding 使用什么服务和模型？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-guide",
+        "indexing-guide",
+        "knowledge-base"
+      ],
+      "retrieved_distances": [
+        0.3569493889808655,
+        1.1399648189544678,
+        1.2164443731307983
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 327.989,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "unrelated-stock",
+      "question": "明天股票会涨吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-guide",
+        "observability-guide",
+        "retrieval-guide"
+      ],
+      "retrieved_distances": [
+        1.3798620700836182,
+        1.4734416007995605,
+        1.4787724018096924
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 308.394,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    },
+    {
+      "case_id": "unrelated-recipe",
+      "question": "如何制作巧克力蛋糕？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "indexing-guide",
+        "retrieval-guide",
+        "deployment-guide"
+      ],
+      "retrieved_distances": [
+        1.5623043775558472,
+        1.5744967460632324,
+        1.5970202684402466
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 296.306,
+      "status": "success",
+      "answered": null,
+      "error_type": null
+    }
+  ]
+}

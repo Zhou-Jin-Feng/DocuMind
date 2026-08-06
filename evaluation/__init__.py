@@ -14,6 +14,12 @@ from evaluation.integration import (
     InMemoryVectorStore,
     build_deterministic_retriever,
 )
+from evaluation.production import (
+    IndexingSummary,
+    build_configured_retrieval_adapter,
+    build_indexed_retrieval_adapter,
+    load_text_documents,
+)
 
 __all__ = [
     "AnswerResult",
@@ -29,7 +35,11 @@ __all__ = [
     "RetrievedDocument",
     "RetrieverAdapter",
     "InMemoryVectorStore",
+    "IndexingSummary",
     "build_deterministic_retriever",
+    "build_configured_retrieval_adapter",
+    "build_indexed_retrieval_adapter",
+    "load_text_documents",
     "load_golden_dataset",
 ]
 
