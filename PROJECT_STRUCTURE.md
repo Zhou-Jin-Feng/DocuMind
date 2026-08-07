@@ -1,4 +1,4 @@
-# 项目结构（v1.4）
+# 项目结构（v1.5）
 
 ```text
 DocuMind/
@@ -19,6 +19,13 @@ DocuMind/
 │   │   ├── logging.py
 │   │   ├── metrics.py
 │   │   └── tracing.py
+│   ├── lifecycle/
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── cli.py
+│   │   ├── models.py
+│   │   ├── registry.py
+│   │   └── service.py
 │   └── utils/
 │       ├── __init__.py
 │       ├── logger.py
@@ -39,6 +46,8 @@ DocuMind/
 │   ├── test_metrics.py
 │   ├── test_tracing.py
 │   ├── test_evaluation.py
+│   ├── test_lifecycle.py
+│   ├── test_lifecycle_cli.py
 │   └── *.txt
 ├── evaluation/
 │   ├── __init__.py
@@ -85,7 +94,11 @@ DocuMind/
 | `vector_store.py` | Chroma 持久化、upsert、search、delete |
 | `retriever.py` | Query Embedding、距离阈值、轻量重排、检索 Span 与 Metrics |
 | `generator.py` | OpenAI 兼容/Anthropic 消息适配和流式生成 |
-| `web_app.py` | 上传校验、同步索引、问答编排、根 Span、Metrics 服务和 UI |
+| `web_app.py` | 上传校验、生命周期服务调用、问答编排、根 Span、Metrics 服务和 UI |
+| `app/lifecycle/models.py` | 文档、版本、索引清单、操作结果和审计报告模型 |
+| `app/lifecycle/registry.py` | SQLite 文档、索引、操作状态和 active 指针 |
+| `app/lifecycle/service.py` | 源文件持久化、同步构建、active 切换、清理、审计和重建 |
+| `app/lifecycle/cli.py` | `list`、`audit`、`cleanup`、`rebuild` 运维命令 |
 | `observability/context.py` | `request_id` / `trace_id` 的 ContextVar 生命周期 |
 | `observability/logging.py` | 结构化日志、标准字段、JSONL 输出和敏感信息脱敏 |
 | `observability/metrics.py` | Prometheus 指标定义、低基数标签和显式 HTTP 服务启动 |
@@ -110,7 +123,14 @@ DocuMind/
 web_app.py
 ├── app.config
 ├── app.core.*
+├── app.lifecycle.*
 └── app.observability.*
+
+app.lifecycle.service
+├── app.core.document_loader
+├── app.core.document_chunker
+├── app.core.vector_store
+└── app.lifecycle.registry
 
 app.core.retriever
 ├── app.observability.metrics
@@ -125,6 +145,7 @@ app.core.retriever
 
 - `data/chroma_db/`
 - `data/uploads/`
+- `data/document_registry.sqlite3`
 - `logs/`
 - `venv/`
 - `__pycache__/`

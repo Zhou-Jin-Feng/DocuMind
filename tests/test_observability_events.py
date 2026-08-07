@@ -9,12 +9,15 @@ from langchain_core.documents import Document
 
 from app.core.retriever import Retriever
 from app.core.retriever import RetrievalResult
+from app.lifecycle.registry import DocumentRegistry
+from app.lifecycle.service import DocumentLifecycleService
 from app.observability.logging import reset_logger, setup_logger
 from web_app import RAGWebApp
 
 
 class FakeEmbeddingClient:
     provider = "fake-embedding"
+    config = {"model": "fake-model", "dimensions": 2}
 
     def embed_text(self, text):
         return [0.1, 0.2]
@@ -44,6 +47,12 @@ class FakeVectorStore:
         self.added.append((chunks, embeddings))
         return ["chunk-1", "chunk-2"]
 
+    def count_by_index_id(self, index_id):
+        return 2
+
+    def delete_by_index_id(self, index_id):
+        return None
+
 
 class FakeGenerator:
     def generate_answer_stream(self, query, results, config):
@@ -57,6 +66,9 @@ class FakeLoader:
 
 
 class FakeChunker:
+    chunk_size = 500
+    chunk_overlap = 100
+
     def chunk_documents_recursive(self, documents):
         return [
             Document(page_content="chunk one", metadata={"chunk_id": "1"}),
@@ -218,6 +230,15 @@ class ObservabilityEventTests(unittest.TestCase):
         app.vector_store = FakeVectorStore()
 
         with tempfile.TemporaryDirectory() as directory:
+            app.registry = DocumentRegistry(str(Path(directory) / "registry.sqlite3"))
+            app.lifecycle_service = DocumentLifecycleService(
+                loader=app.doc_loader,
+                chunker=app.chunker,
+                embedding_client=app.embedding_client,
+                vector_store=app.vector_store,
+                registry=app.registry,
+                upload_dir=str(Path(directory) / "uploads"),
+            )
             file_name = "private-customer-name.txt"
             file_path = Path(directory) / file_name
             file_path.write_text("content", encoding="utf-8")

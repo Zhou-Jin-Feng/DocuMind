@@ -70,6 +70,38 @@ class VectorStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "维度"):
             self.store.add_documents(documents, [[1.0], [1.0, 0.0]])
 
+    def test_embedding_space_is_persisted_and_incompatible_models_are_rejected(self):
+        self.store.ensure_embedding_space("fake", "model-a", 2)
+        self.store.add_documents(self._documents(), [[1.0, 0.0], [0.0, 1.0]])
+
+        metadata = self.store.collection.metadata
+        self.assertEqual(metadata["embedding_provider"], "fake")
+        self.assertEqual(metadata["embedding_model"], "model-a")
+        self.assertEqual(metadata["embedding_dimension"], 2)
+        self.store.ensure_embedding_space("fake", "model-a", 2)
+
+        with self.assertRaisesRegex(ValueError, "embedding_model"):
+            self.store.ensure_embedding_space("fake", "model-b", 2)
+        with self.assertRaisesRegex(ValueError, "dimension"):
+            self.store.ensure_embedding_space("fake", "model-a", 3)
+
+    def test_empty_collection_can_reset_to_a_new_embedding_dimension(self):
+        self.store.ensure_embedding_space("fake", "model-a", 2)
+        self.store.add_documents(self._documents(), [[1.0, 0.0], [0.0, 1.0]])
+        self.store.delete_by_document_id("doc-1")
+
+        self.store.ensure_embedding_space("fake", "model-b", 3)
+        self.store.add_documents(
+            [self._documents()[0]],
+            [[1.0, 0.0, 0.0]],
+        )
+
+        self.assertEqual(self.store.collection.count(), 1)
+        self.assertEqual(
+            self.store.collection.metadata["embedding_dimension"],
+            3,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

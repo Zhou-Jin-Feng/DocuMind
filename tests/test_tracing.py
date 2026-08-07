@@ -14,6 +14,8 @@ from opentelemetry.trace import StatusCode
 
 from app.core.retriever import Retriever
 from app.core.retriever import RetrievalResult
+from app.lifecycle.registry import DocumentRegistry
+from app.lifecycle.service import DocumentLifecycleService
 from app.observability.context import get_trace_id, request_context
 from web_app import RAGWebApp
 from app.observability.logging import get_logger, reset_logger, setup_logger
@@ -26,6 +28,7 @@ from app.observability.tracing import (
 
 class FakeEmbeddingClient:
     provider = "fake-embedding"
+    config = {"model": "fake-model", "dimensions": 2}
 
     def embed_text(self, text):
         return [0.1, 0.2]
@@ -58,6 +61,12 @@ class FakeVectorStore:
     def add_documents(self, chunks, embeddings):
         return ["chunk-1", "chunk-2"]
 
+    def count_by_index_id(self, index_id):
+        return 2
+
+    def delete_by_index_id(self, index_id):
+        return None
+
 
 class FakeLoader:
     def load_document(self, path):
@@ -65,6 +74,9 @@ class FakeLoader:
 
 
 class FakeChunker:
+    chunk_size = 500
+    chunk_overlap = 100
+
     def chunk_documents_recursive(self, documents):
         return [
             Document(page_content="private chunk one", metadata={"chunk_id": "1"}),
@@ -270,6 +282,15 @@ class TracingTests(unittest.TestCase):
         app.vector_store = FakeVectorStore()
 
         with tempfile.TemporaryDirectory() as directory:
+            app.registry = DocumentRegistry(str(Path(directory) / "registry.sqlite3"))
+            app.lifecycle_service = DocumentLifecycleService(
+                loader=app.doc_loader,
+                chunker=app.chunker,
+                embedding_client=app.embedding_client,
+                vector_store=app.vector_store,
+                registry=app.registry,
+                upload_dir=str(Path(directory) / "uploads"),
+            )
             private_name = "private-customer-name.txt"
             file_path = Path(directory) / private_name
             file_path.write_text("private upload content", encoding="utf-8")

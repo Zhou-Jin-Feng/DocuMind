@@ -7,7 +7,7 @@ RAG 系统检索模块。
 import re
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from rich.panel import Panel
 
@@ -59,6 +59,7 @@ class Retriever:
         top_k: int = 5,
         score_threshold: Optional[float] = None,
         metadata_filter: Optional[Dict] = None,
+        result_predicate: Optional[Callable[[Dict], bool]] = None,
     ) -> List[RetrievalResult]:
         """执行语义检索；score_threshold 表示允许的最大距离。"""
         normalized_query = (query or "").strip()
@@ -155,9 +156,31 @@ class Retriever:
                         "retrieval.top_k": top_k,
                     },
                 ):
+                    ensure_embedding_space = getattr(
+                        self.vector_store,
+                        "ensure_embedding_space",
+                        None,
+                    )
+                    if callable(ensure_embedding_space):
+                        embedding_config = (
+                            getattr(self.embedding_client, "config", {}) or {}
+                        )
+                        embedding_model = str(
+                            embedding_config.get("model")
+                            or getattr(
+                                self.embedding_client,
+                                "model_name",
+                                "unknown",
+                            )
+                        )
+                        ensure_embedding_space(
+                            provider,
+                            embedding_model,
+                            len(query_embedding),
+                        )
                     search_results = self.vector_store.search(
                         query_embedding=query_embedding,
-                        n_results=top_k,
+                        n_results=(max(top_k * 5, top_k) if result_predicate else top_k),
                         where=metadata_filter,
                     )
             except Exception as exc:
@@ -197,6 +220,8 @@ class Retriever:
                 numeric_distance = float(distance)
                 if score_threshold is not None and numeric_distance > score_threshold:
                     continue
+                if result_predicate is not None and not result_predicate(metadata or {}):
+                    continue
                 results.append(
                     RetrievalResult(
                         content=document,
@@ -205,6 +230,8 @@ class Retriever:
                         rank=len(results) + 1,
                     )
                 )
+                if len(results) >= top_k:
+                    break
 
             retrieval_duration = perf_counter() - retrieval_started
             metrics.observe_retrieval(

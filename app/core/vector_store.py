@@ -78,6 +78,67 @@ class VectorStore:
         if any(len(embedding) != dimension for embedding in embeddings):
             raise ValueError("同一批次的 Embedding 维度不一致")
 
+    def _stored_embedding_dimension(self) -> int:
+        result = self.collection.get(limit=1, include=["embeddings"])
+        embeddings = result.get("embeddings")
+        if embeddings is None or len(embeddings) == 0:
+            raise RuntimeError(
+                "Collection is non-empty but its embedding dimension cannot be read"
+            )
+        return len(embeddings[0])
+
+    def ensure_embedding_space(
+        self,
+        provider: str,
+        model: str,
+        dimension: int,
+    ) -> None:
+        """Reject reads or writes that would mix incompatible vector spaces."""
+        provider = str(provider).strip()
+        model = str(model).strip()
+        if not provider or not model:
+            raise ValueError("Embedding provider and model cannot be empty")
+        if dimension <= 0:
+            raise ValueError("Embedding dimension must be positive")
+
+        expected = {
+            "embedding_provider": provider,
+            "embedding_model": model,
+            "embedding_dimension": dimension,
+        }
+        metadata = dict(self.collection.metadata or {})
+        count = self.collection.count()
+        if count > 0:
+            actual_dimension = self._stored_embedding_dimension()
+            if actual_dimension != dimension:
+                raise ValueError(
+                    "Embedding space is incompatible with the existing collection: "
+                    f"dimension {dimension} != {actual_dimension}"
+                )
+            for key, value in expected.items():
+                stored = metadata.get(key)
+                if stored is not None and str(stored) != str(value):
+                    raise ValueError(
+                        "Embedding space is incompatible with the existing collection: "
+                        f"{key} {value!r} != {stored!r}"
+                    )
+
+        stored_dimension = metadata.get("embedding_dimension")
+        if (
+            count == 0
+            and stored_dimension is not None
+            and int(stored_dimension) != dimension
+        ):
+            self.client.delete_collection(name=self.collection_name)
+            self.collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={**metadata, **expected},
+            )
+            return
+
+        if any(metadata.get(key) != value for key, value in expected.items()):
+            self.collection.modify(metadata={**metadata, **expected})
+
     def add_documents(
         self,
         documents: List[Document],
@@ -176,6 +237,61 @@ class VectorStore:
         except Exception:
             logger.exception("按 document_id 删除文档失败")
             raise
+
+    def delete_by_index_id(self, index_id: str) -> None:
+        """Delete all chunks belonging to one managed index version."""
+        if not index_id.strip():
+            raise ValueError("index_id cannot be empty")
+        try:
+            self.collection.delete(where={"index_id": index_id})
+            logger.info(f"已删除索引版本: index_id={index_id}")
+        except Exception:
+            logger.exception("按 index_id 删除索引失败")
+            raise
+
+    def count_by_index_id(self, index_id: str) -> int:
+        """Count chunks belonging to one managed index version."""
+        if not index_id.strip():
+            raise ValueError("index_id cannot be empty")
+        result = self.collection.get(where={"index_id": index_id}, include=[])
+        return len(result.get("ids") or [])
+
+    def list_ids_by_index_id(self, index_id: str) -> List[str]:
+        """Return chunk IDs belonging to one managed index version."""
+        if not index_id.strip():
+            raise ValueError("index_id cannot be empty")
+        result = self.collection.get(where={"index_id": index_id}, include=[])
+        return [str(value) for value in result.get("ids") or []]
+
+    def list_index_ids(self) -> List[str]:
+        """Return distinct lifecycle index IDs stored in Chroma."""
+        counts, _ = self.index_inventory()
+        return sorted(counts)
+
+    def index_inventory(self) -> tuple[Dict[str, int], int]:
+        """Return managed chunk counts and the legacy chunk count in one scan."""
+        result = self.collection.get(include=["metadatas"])
+        counts: Dict[str, int] = {}
+        legacy_count = 0
+        for metadata in result.get("metadatas") or []:
+            index_id = metadata.get("index_id") if metadata else None
+            if not index_id:
+                legacy_count += 1
+                continue
+            normalized = str(index_id)
+            counts[normalized] = counts.get(normalized, 0) + 1
+        return counts, legacy_count
+
+    def count_legacy_chunks(self) -> int:
+        """Count v1.4 chunks without lifecycle metadata."""
+        _, legacy_count = self.index_inventory()
+        return legacy_count
+
+    def close(self) -> None:
+        """Release Chroma resources held by short-lived callers and tests."""
+        client = getattr(self, "client", None)
+        if client is not None and not getattr(client, "_closed", False):
+            client.close()
 
     def delete_collection(self) -> None:
         """删除整个集合。"""

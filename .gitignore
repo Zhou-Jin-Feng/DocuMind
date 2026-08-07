@@ -27,6 +27,7 @@ chroma_db/
 # 忽略新的数据目录
 data/chroma_db/
 data/uploads/
+data/document_registry.sqlite3
 data/evaluation_chroma_db*/
 
 # 忽略日志文件
@@ -46,3 +47,8 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# 本地规划与版本记录文档（不提交到仓库）
+CLAUDE.md
+VERSION_HISTORY.md
+RAG系统工程化优化与版本演进指南.md

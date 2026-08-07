@@ -1,6 +1,8 @@
 ﻿import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from app.config import settings
 from app.core.retriever import RetrievalResult
@@ -107,6 +109,49 @@ class WebAppTests(unittest.TestCase):
             file_path.write_bytes(b"content")
             message = app.upload_and_index_document(str(file_path))
         self.assertIn("不支持的文件格式", message)
+
+    def test_persist_upload_uses_content_hash_and_original_extension(self):
+        with (
+            tempfile.TemporaryDirectory() as source_directory,
+            tempfile.TemporaryDirectory() as upload_directory,
+        ):
+            source_path = Path(source_directory) / "原始名称.TXT"
+            source_path.write_text("持久化测试", encoding="utf-8")
+
+            persisted_path = RAGWebApp._persist_upload(source_path, upload_directory)
+
+            self.assertEqual(persisted_path.parent, Path(upload_directory))
+            self.assertEqual(persisted_path.suffix, ".txt")
+            self.assertEqual(persisted_path.read_text(encoding="utf-8"), "持久化测试")
+            self.assertEqual(len(persisted_path.stem), 64)
+
+            second_path = RAGWebApp._persist_upload(source_path, upload_directory)
+            self.assertEqual(second_path, persisted_path)
+
+    def test_noop_upload_does_not_increment_chunk_metrics(self):
+        app = RAGWebApp.__new__(RAGWebApp)
+        app.lifecycle_service = SimpleNamespace(
+            ingest=lambda *args, **kwargs: SimpleNamespace(
+                status="noop",
+                chunk_count=7,
+                cleanup_pending=False,
+                collection_count=7,
+            )
+        )
+        metrics = SimpleNamespace(
+            record_document_upload=lambda *args, **kwargs: None,
+            record_document_ingestion=Mock(),
+        )
+
+        with patch("web_app.get_metrics", return_value=metrics):
+            message = app._run_lifecycle_ingest(Path("guide.txt"), 10)
+
+        self.assertIn("未重复构建", message)
+        metrics.record_document_ingestion.assert_called_once()
+        args, kwargs = metrics.record_document_ingestion.call_args
+        self.assertEqual(args[0], "noop")
+        self.assertEqual(kwargs["chunks_created"], 0)
+        self.assertEqual(kwargs["chunks_indexed"], 0)
 
 
 

@@ -75,6 +75,19 @@ class UniversalEmbeddingClient:
         }
     }
 
+    @classmethod
+    def configuration_for(cls, provider: str) -> dict:
+        """Return configured model metadata without initializing a provider."""
+        if provider not in cls.MODELS:
+            raise ValueError(
+                f"Unsupported embedding provider: {provider}. "
+                f"Supported providers: {', '.join(cls.MODELS.keys())}"
+            )
+        config = deepcopy(cls.MODELS[provider])
+        if provider == "ollama":
+            config["model"] = settings.ollama_embedding_model
+        return config
+
     def __init__(self, provider: str = 'ollama'):
         """
         初始化嵌入客户端
@@ -84,15 +97,7 @@ class UniversalEmbeddingClient:
         """
         self.provider = provider
 
-        if provider not in self.MODELS:
-            raise ValueError(
-                f"不支持的提供商: {provider}\n"
-                f"支持的选项: {', '.join(self.MODELS.keys())}"
-            )
-
-        self.config = deepcopy(self.MODELS[provider])
-        if provider == 'ollama':
-            self.config['model'] = settings.ollama_embedding_model
+        self.config = self.configuration_for(provider)
         self.type = self.config.get('type', 'api')
 
         # 根据类型初始化客户端

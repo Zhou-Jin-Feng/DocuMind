@@ -18,6 +18,8 @@ from app.core.embedding_client import UniversalEmbeddingClient
 from app.core.generator import GenerationConfig, RAGGenerator, UniversalLLMClient
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
+from app.lifecycle.registry import DocumentRegistry
+from app.lifecycle.service import DocumentLifecycleService
 from app.observability.context import request_context
 from app.observability.logging import get_logger, setup_logger
 from app.observability.metrics import (
@@ -64,6 +66,17 @@ class RAGWebApp:
                 chunk_size=settings.chunk_size,
                 chunk_overlap=settings.chunk_overlap,
             )
+            self.registry = DocumentRegistry(settings.document_registry_path)
+            self.lifecycle_service = DocumentLifecycleService(
+                loader=self.doc_loader,
+                chunker=self.chunker,
+                embedding_client=self.embedding_client,
+                vector_store=self.vector_store,
+                registry=self.registry,
+                upload_dir=settings.upload_dir,
+                tenant_id=settings.default_tenant_id,
+                collection_id=settings.collection_name,
+            )
             self.initialized = True
             logger.info("RAG系统初始化完成")
         except Exception:
@@ -79,6 +92,68 @@ class RAGWebApp:
         if not raw_path.strip():
             raise ValueError("未获取到上传文件路径")
         return Path(raw_path)
+
+    @staticmethod
+    def _persist_upload(file_path: Path, upload_dir: str) -> Path:
+        """将上传源文件持久化到运行数据目录，避免依赖 Web 框架临时文件。"""
+        return DocumentLifecycleService.persist_source_file(file_path, upload_dir)
+
+    def _get_lifecycle_service(self) -> DocumentLifecycleService:
+        service = getattr(self, "lifecycle_service", None)
+        if service is not None:
+            return service
+        registry = getattr(self, "registry", None)
+        if registry is None:
+            registry = DocumentRegistry(settings.document_registry_path)
+            self.registry = registry
+        service = DocumentLifecycleService(
+            loader=self.doc_loader,
+            chunker=self.chunker,
+            embedding_client=self.embedding_client,
+            vector_store=self.vector_store,
+            registry=registry,
+            upload_dir=settings.upload_dir,
+            tenant_id=settings.default_tenant_id,
+            collection_id=settings.collection_name,
+        )
+        self.lifecycle_service = service
+        return service
+
+    def _run_lifecycle_ingest(self, file_path: Path, file_size: int) -> str:
+        metrics = get_metrics()
+        started = perf_counter()
+        extension = file_path.suffix.lower()
+        metrics.record_document_upload("accepted")
+        logger.info(
+            "收到文档上传请求",
+            event="document_upload_received",
+            operation="rag.document.ingest",
+            status="started",
+            file_extension=extension,
+            file_size_bytes=file_size,
+        )
+        result = self._get_lifecycle_service().ingest(
+            file_path,
+            display_name=file_path.name,
+        )
+        elapsed = perf_counter() - started
+        is_noop = result.status == "noop"
+        metrics.record_document_ingestion(
+            "noop" if is_noop else "success",
+            elapsed,
+            chunks_created=0 if is_noop else result.chunk_count,
+            chunks_indexed=0 if is_noop else result.chunk_count,
+        )
+        status_line = "已存在，未重复构建" if is_noop else "已建立新版本"
+        cleanup_line = "旧索引待清理" if result.cleanup_pending else "旧索引已处理"
+        return (
+            "✅ 文档处理完成！\n\n"
+            f"📄 文件名: {file_path.name}\n"
+            f"📊 Chunk 数: {result.chunk_count}\n"
+            f"🧭 版本状态: {status_line}\n"
+            f"🧹 清理状态: {cleanup_line}\n"
+            f"💾 集合文档块总数: {result.collection_count}"
+        )
 
     def upload_and_index_document(self, file) -> str:
         """校验、加载、分块、向量化并幂等写入文档。"""
@@ -110,156 +185,7 @@ class RAGWebApp:
                 if file_size > max_bytes:
                     return f"❌ 文件过大，最大允许 {settings.max_upload_size_mb} MB"
 
-                metrics.record_document_upload("accepted")
-                logger.info(
-                    "收到文档上传请求",
-                    event="document_upload_received",
-                    operation="rag.document.ingest",
-                    status="started",
-                    file_extension=extension,
-                    file_size_bytes=file_size,
-                )
-
-                active_operation = "document.load"
-                active_started = perf_counter()
-                with trace_span(
-                    "document.load",
-                    attributes={
-                        "file.extension": extension,
-                        "file.size_bytes": file_size,
-                    },
-                ):
-                    documents = self.doc_loader.load_document(str(file_path))
-                logger.info(
-                    "文档加载完成",
-                    event="document_loaded",
-                    operation=active_operation,
-                    duration_ms=(perf_counter() - active_started) * 1000,
-                    status="success",
-                    document_count=len(documents),
-                    file_extension=extension,
-                )
-                if not documents:
-                    elapsed = perf_counter() - total_started
-                    metrics.record_document_ingestion("rejected", elapsed)
-                    logger.warning(
-                        "文档中没有可加载内容",
-                        event="document_indexing_completed",
-                        operation="rag.document.ingest",
-                        duration_ms=elapsed * 1000,
-                        status="rejected",
-                        rejection_reason="empty_document",
-                    )
-                    return "❌ 文档中没有可加载的内容"
-
-                active_operation = "document.chunk"
-                active_started = perf_counter()
-                with trace_span(
-                    "document.chunk",
-                    attributes={"document.count": len(documents)},
-                ):
-                    chunks = self.chunker.chunk_documents_recursive(documents)
-                logger.info(
-                    "文档分块完成",
-                    event="document_chunked",
-                    operation=active_operation,
-                    duration_ms=(perf_counter() - active_started) * 1000,
-                    status="success",
-                    chunk_count=len(chunks),
-                )
-                if not chunks:
-                    elapsed = perf_counter() - total_started
-                    metrics.record_document_ingestion("rejected", elapsed)
-                    logger.warning(
-                        "文档分块后没有有效内容",
-                        event="document_indexing_completed",
-                        operation="rag.document.ingest",
-                        duration_ms=elapsed * 1000,
-                        status="rejected",
-                        rejection_reason="empty_chunks",
-                    )
-                    return "❌ 文档分块后没有有效内容"
-
-                texts = [chunk.page_content for chunk in chunks]
-                embedding_provider = getattr(
-                    self, "embedding_provider", settings.default_embedding_provider
-                )
-                active_operation = "embedding.batch"
-                active_started = perf_counter()
-                with trace_span(
-                    "embedding.batch",
-                    attributes={
-                        "provider": embedding_provider,
-                        "chunk.count": len(chunks),
-                    },
-                ):
-                    embeddings = self.embedding_client.embed_texts_batch(
-                        texts,
-                        show_progress=False,
-                    )
-                embedding_duration = perf_counter() - active_started
-                metrics.observe_embedding(
-                    embedding_provider,
-                    active_operation,
-                    "success",
-                    embedding_duration,
-                )
-                if len(embeddings) != len(chunks):
-                    raise RuntimeError(
-                        f"向量数量与分块数量不一致: {len(embeddings)} != {len(chunks)}"
-                    )
-                logger.info(
-                    "文档向量化完成",
-                    event="document_embedding_completed",
-                    operation=active_operation,
-                    duration_ms=embedding_duration * 1000,
-                    status="success",
-                    provider=embedding_provider,
-                    chunk_count=len(chunks),
-                )
-
-                active_operation = "vector.upsert"
-                active_started = perf_counter()
-                with trace_span(
-                    "vector.upsert",
-                    attributes={"chunk.count": len(chunks)},
-                ):
-                    self.vector_store.add_documents(chunks, embeddings)
-                    collection_count = self.vector_store.collection.count()
-                logger.info(
-                    "向量幂等写入完成",
-                    event="vector_upsert_completed",
-                    operation=active_operation,
-                    duration_ms=(perf_counter() - active_started) * 1000,
-                    status="success",
-                    chunk_count=len(chunks),
-                    collection_count=collection_count,
-                )
-
-                elapsed = perf_counter() - total_started
-                metrics.record_document_ingestion(
-                    "success",
-                    elapsed,
-                    chunks_created=len(chunks),
-                    chunks_indexed=len(chunks),
-                )
-                logger.info(
-                    "文档索引完成",
-                    event="document_indexing_completed",
-                    operation="rag.document.ingest",
-                    duration_ms=elapsed * 1000,
-                    status="success",
-                    chunk_count=len(chunks),
-                    collection_count=collection_count,
-                    file_extension=extension,
-                )
-                return (
-                    "✅ 文档处理完成！\n\n"
-                    f"📄 文件名: {file_path.name}\n"
-                    f"📊 本次分块数: {len(chunks)}\n"
-                    f"💾 集合文档块总数: {collection_count}\n\n"
-                    "现在你可以开始提问了！"
-                )
+                return self._run_lifecycle_ingest(file_path, file_size)
             except Exception as exc:
                 mark_span_error(root_span, exc)
                 elapsed = perf_counter() - total_started
@@ -355,10 +281,18 @@ class RAGWebApp:
             answer_parts: List[str] = []
             sources = ""
             try:
+                retrieval_kwargs = {
+                    "top_k": settings.retrieval_top_k,
+                    "score_threshold": settings.retrieval_score_threshold,
+                }
+                lifecycle_service = getattr(self, "lifecycle_service", None)
+                if lifecycle_service is not None:
+                    retrieval_kwargs["result_predicate"] = (
+                        lifecycle_service.active_metadata_predicate()
+                    )
                 retrieval_results = self.retriever.retrieve_semantic(
                     normalized_message,
-                    top_k=settings.retrieval_top_k,
-                    score_threshold=settings.retrieval_score_threshold,
+                    **retrieval_kwargs,
                 )
                 if not retrieval_results:
                     history.append(

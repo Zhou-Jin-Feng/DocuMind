@@ -4,6 +4,9 @@ from app.core.retriever import RetrievalResult, Retriever
 
 
 class FakeEmbeddingClient:
+    provider = "fake"
+    config = {"model": "fake-model"}
+
     def embed_text(self, text):
         if text == "explode":
             raise RuntimeError("embedding unavailable")
@@ -13,6 +16,10 @@ class FakeEmbeddingClient:
 class FakeVectorStore:
     def __init__(self):
         self.last_n_results = None
+        self.embedding_space = None
+
+    def ensure_embedding_space(self, provider, model, dimension):
+        self.embedding_space = (provider, model, dimension)
 
     def search(self, query_embedding, n_results, where=None):
         self.last_n_results = n_results
@@ -39,6 +46,10 @@ class RetrieverTests(unittest.TestCase):
             score_threshold=0.5,
         )
         self.assertEqual(self.store.last_n_results, 4)
+        self.assertEqual(
+            self.store.embedding_space,
+            ("fake", "fake-model", 2),
+        )
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].distance, 0.2)
         self.assertEqual(results[0].page_number, 2)

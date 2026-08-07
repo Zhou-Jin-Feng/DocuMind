@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # 向量数据库配置
     chroma_persist_dir: str = "./data/chroma_db"
     collection_name: str = "rag_documents"
+    document_registry_path: str = "./data/document_registry.sqlite3"
+    default_tenant_id: str = "default"
+    default_user_id: str = "local-user"
 
     # Web 服务配置。无认证时默认仅监听本机。
     server_host: str = "127.0.0.1"

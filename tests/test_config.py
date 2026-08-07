@@ -4,10 +4,14 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from app import __version__
 from app.config import Settings
 
 
 class SettingsTests(unittest.TestCase):
+    def test_application_version_matches_current_release(self):
+        self.assertEqual(__version__, "1.5.0")
+
     def test_chunk_overlap_must_be_smaller_than_chunk_size(self):
         with self.assertRaises(ValidationError):
             Settings(_env_file=None, chunk_size=100, chunk_overlap=100)

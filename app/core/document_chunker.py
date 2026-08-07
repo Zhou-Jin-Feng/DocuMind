@@ -63,12 +63,17 @@ class DocumentChunker:
             chunk.page_content = content
 
             document_id = str(chunk.metadata["document_id"])
-            chunk_index = counters[document_id]
-            counters[document_id] += 1
+            index_identity = str(
+                chunk.metadata.get("index_id")
+                or chunk.metadata.get("document_version_id")
+                or document_id
+            )
+            chunk_index = counters[index_identity]
+            counters[index_identity] += 1
             page_number = chunk.metadata.get("page_number", "")
             content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
             chunk_id = hashlib.sha256(
-                f"{document_id}:{page_number}:{chunk_index}:{content_hash}".encode("utf-8")
+                f"{index_identity}:{page_number}:{chunk_index}:{content_hash}".encode("utf-8")
             ).hexdigest()
 
             chunk.metadata["chunk_index"] = chunk_index
@@ -337,5 +342,4 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
 
 if __name__ == "__main__":
     demo_chunking()
-
 
