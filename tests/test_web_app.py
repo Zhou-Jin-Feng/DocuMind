@@ -77,6 +77,22 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("第2页", sources)
         self.assertNotIn("相似度", sources)
 
+    def test_sources_support_lexical_results_without_fake_distance(self):
+        result = RetrievalResult(
+            content="RRF 使用倒数排名融合。",
+            metadata={"source_file": "retrieval.txt"},
+            distance=None,
+            rank=1,
+            lexical_score=2.5,
+            fusion_score=1 / 61,
+        )
+
+        sources = self._app(None, None)._format_sources([result])
+
+        self.assertIn("BM25: 2.5000", sources)
+        self.assertIn("RRF:", sources)
+        self.assertNotIn("距离:", sources)
+
     def test_exception_does_not_duplicate_user_message(self):
         app = self._app(
             CapturingRetriever([self._result()]),

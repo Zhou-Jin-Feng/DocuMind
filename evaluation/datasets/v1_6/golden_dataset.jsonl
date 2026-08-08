@@ -1,0 +1,32 @@
+{"id":"exact-rf-001","category":"exact_term","question":"RRF 的分数公式是什么？","expected_document_ids":["retrieval-quality"],"expected_keywords":["1/(k+rank_i)","RRF"],"should_answer":true,"top_k":3}
+{"id":"exact-rf-002","category":"exact_term","question":"混合检索为什么不能直接比较 Chroma distance 和 BM25 分数？","expected_document_ids":["retrieval-quality"],"expected_keywords":["不同检索器","原始分数","RRF"],"should_answer":true,"top_k":3}
+{"id":"exact-life-001","category":"exact_term","question":"旧索引清理的状态顺序是什么？","expected_document_ids":["lifecycle-operations"],"expected_keywords":["deleting","deleted"],"should_answer":true,"top_k":3}
+{"id":"exact-life-002","category":"exact_term","question":"dry-run 会校验哪一种哈希？","expected_document_ids":["lifecycle-operations"],"expected_keywords":["SHA-256","source"],"should_answer":true,"top_k":3}
+{"id":"exact-eval-001","category":"exact_term","question":"回归报告需要哪些输入指纹才能比较？","expected_document_ids":["evaluation-gates"],"expected_keywords":["dataset_sha256","documents_sha256"],"should_answer":true,"top_k":3}
+{"id":"exact-embed-001","category":"exact_term","question":"一个 Collection 的向量空间由哪些字段描述？","expected_document_ids":["embedding-compatibility"],"expected_keywords":["embedding_provider","embedding_model","embedding_dimension"],"should_answer":true,"top_k":3}
+{"id":"semantic-rf-001","category":"semantic_paraphrase","question":"如何把语义搜索和关键词搜索的结果合在一起？","expected_document_ids":["retrieval-quality"],"expected_keywords":["稠密","词法","融合"],"should_answer":true,"top_k":3}
+{"id":"semantic-rf-002","category":"semantic_paraphrase","question":"什么方法可以只依赖排名位置而不依赖不同分数的量纲？","expected_document_ids":["retrieval-quality"],"expected_keywords":["RRF","排序位置"],"should_answer":true,"top_k":3}
+{"id":"semantic-life-001","category":"semantic_paraphrase","question":"旧版本索引删除到一半重启后怎么恢复？","expected_document_ids":["lifecycle-operations"],"expected_keywords":["cleanup","deleting"],"should_answer":true,"top_k":3}
+{"id":"semantic-life-002","category":"semantic_paraphrase","question":"同一个文件再次上传什么时候不会重新建向量？","expected_document_ids":["lifecycle-operations"],"expected_keywords":["no-op","active Chunk"],"should_answer":true,"top_k":3}
+{"id":"semantic-eval-001","category":"semantic_paraphrase","question":"为什么要把评估问题按类型分别汇总？","expected_document_ids":["evaluation-gates"],"expected_keywords":["分类指标","收益来源"],"should_answer":true,"top_k":3}
+{"id":"semantic-embed-001","category":"semantic_paraphrase","question":"两个模型输出长度相同就可以共用旧索引吗？","expected_document_ids":["embedding-compatibility"],"expected_keywords":["语义空间","不兼容"],"should_answer":true,"top_k":3}
+{"id":"keyword-config-001","category":"keyword_precision","question":"哪一项配置控制最大允许的向量距离？","expected_document_ids":["retrieval-troubleshooting"],"expected_keywords":["score_threshold"],"should_answer":true,"top_k":3}
+{"id":"keyword-config-002","category":"keyword_precision","question":"默认 Metrics HTTP 地址中的端口是多少？","expected_document_ids":["deployment-baseline"],"expected_keywords":["8000"],"should_answer":true,"top_k":3}
+{"id":"keyword-config-003","category":"keyword_precision","question":"哪个字段标识一次文档生命周期操作？","expected_document_ids":["lifecycle-operations"],"expected_keywords":["operation_id"],"should_answer":true,"top_k":3}
+{"id":"keyword-config-004","category":"keyword_precision","question":"哪个指标不能在默认回归策略中下降？","expected_document_ids":["evaluation-gates"],"expected_keywords":["no_answer_retrieval_accuracy"],"should_answer":true,"top_k":3}
+{"id":"keyword-config-005","category":"keyword_precision","question":"稠密和词法候选融合建议使用什么缩写？","expected_document_ids":["retrieval-quality"],"expected_keywords":["RRF"],"should_answer":true,"top_k":3}
+{"id":"keyword-config-006","category":"keyword_precision","question":"哪个标识用于关联一次请求的结构化日志？","expected_document_ids":["observability-quality"],"expected_keywords":["request_id"],"should_answer":true,"top_k":3}
+{"id":"hard-negative-001","category":"hard_negative","question":"如果目标是精确匹配错误码和配置项，哪种检索更占优势？","expected_document_ids":["retrieval-quality"],"expected_keywords":["BM25","精确匹配"],"should_answer":true,"top_k":3}
+{"id":"hard-negative-002","category":"hard_negative","question":"系统故障能不能直接展示成没有相关文档？","expected_document_ids":["observability-quality"],"expected_keywords":["error","no-answer"],"should_answer":true,"top_k":3}
+{"id":"hard-negative-003","category":"hard_negative","question":"换了同维度 Embedding 模型后为什么仍然要换 Collection？","expected_document_ids":["embedding-compatibility"],"expected_keywords":["模型","语义空间"],"should_answer":true,"top_k":3}
+{"id":"hard-negative-004","category":"hard_negative","question":"cleanup --include-orphans 会不会删除另一个租户已经注册的索引？","expected_document_ids":["security-boundaries"],"expected_keywords":["不能","orphan"],"should_answer":true,"top_k":3}
+{"id":"hard-negative-005","category":"hard_negative","question":"为什么不能只看 Recall 就宣布检索质量提升？","expected_document_ids":["evaluation-gates"],"expected_keywords":["Precision","MRR","无答案"],"should_answer":true,"top_k":3}
+{"id":"multi-hop-001","category":"multi_hop","question":"先说明 RRF 解决什么分数问题，再说它之后为什么还可以接 Reranker。","expected_document_ids":["retrieval-quality"],"expected_keywords":["分数","候选","Reranker"],"should_answer":true,"top_k":3}
+{"id":"multi-hop-002","category":"multi_hop","question":"如果 Recall 下降，应该先检查哪些输入是否一致？","expected_document_ids":["retrieval-troubleshooting"],"expected_keywords":["数据集","文档语料","指纹"],"should_answer":true,"top_k":3}
+{"id":"multi-hop-003","category":"multi_hop","question":"为什么要先保证同步生命周期幂等，再引入 Worker？","expected_document_ids":["architecture-decisions"],"expected_keywords":["同步","异步","幂等"],"should_answer":true,"top_k":3}
+{"id":"multi-hop-004","category":"multi_hop","question":"一个请求的质量指标和 Trace 应该如何同时关联且不泄露正文？","expected_document_ids":["observability-quality"],"expected_keywords":["request_id","低基数","正文"],"should_answer":true,"top_k":3}
+{"id":"no-answer-001","category":"no_answer","question":"如何给手机安装游戏并绕过应用商店限制？","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}
+{"id":"no-answer-002","category":"no_answer","question":"北京下周的天气和空气质量怎么样？","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}
+{"id":"no-answer-003","category":"no_answer","question":"请推荐一家附近的火锅店并给出价格。","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}
+{"id":"no-answer-004","category":"no_answer","question":"如何预测明天的股票涨跌？","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}
+{"id":"no-answer-005","category":"no_answer","question":"帮我把这段英文翻译成日文。","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}

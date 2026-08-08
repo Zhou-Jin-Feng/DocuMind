@@ -1,0 +1,7 @@
+RAG 安全边界说明。
+
+当前 v1.5 是本地单用户应用，tenant_id 和 collection_id 已预留在生命周期数据和 Chunk 元数据中，但认证、授权和完整的多租户访问控制属于后续版本。
+
+查询过滤必须只允许读取当前作用域的 active index。cleanup --include-orphans 只能删除整个 Collection 中没有任何注册记录的索引，不能把另一个 tenant 的已注册索引误判成 orphan。
+
+日志可以记录可定位请求的 request_id、trace_id 和错误类型，但不能记录文档正文、用户问题、绝对上传路径或 API Key。v2.1 需要增加越权访问默认拒绝和审计记录。

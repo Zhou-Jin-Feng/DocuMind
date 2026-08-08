@@ -1,0 +1,7 @@
+RAG 评估与回归门禁说明。
+
+黄金评估用例包含问题、expected_document_ids、expected_keywords、should_answer、top_k 和 category。正向检索使用 Recall@K、Precision@K、MRR 和 Top-K 命中率；无答案问题使用 no_answer_retrieval_accuracy；系统可靠性使用 successful_case_rate 和 average_duration_ms。
+
+回归报告只有在 dataset_name、Top-K、case_count、dataset_sha256 和 documents_sha256 兼容时才能比较。默认门禁允许 Recall、Precision、MRR 和命中率有小幅绝对下降，但不允许无答案检索准确率下降，并要求成功率为 1.0。
+
+v1.6 评估集按 exact_term、semantic_paraphrase、keyword_precision、hard_negative、multi_hop 和 no_answer 分类统计。分类指标用于定位收益来源，不能替代总体回归门禁。

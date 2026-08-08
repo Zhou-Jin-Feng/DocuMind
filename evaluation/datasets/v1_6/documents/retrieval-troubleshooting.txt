@@ -1,0 +1,7 @@
+检索故障排查手册。
+
+如果查询向量维度与 Collection 不一致，先检查当前 Embedding Provider、模型和 Collection 元数据，不要直接继续写入。若模型名称不同但维度相同，也必须停止并使用新 Collection。
+
+如果 Recall 下降，先比较数据集和文档语料指纹，再检查 chunk_size、chunk_overlap、Embedding 模型、Top-K 和 score_threshold。只有输入指纹一致时，回归门禁的指标差异才有意义。
+
+如果 no_answer_retrieval_accuracy 下降，检查无答案问题是否被最近邻文档强行召回，并评估最大 distance 阈值。阈值必须由更多真实负例校准，不能仅凭两个样例直接设为线上默认。

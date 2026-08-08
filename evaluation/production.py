@@ -12,7 +12,7 @@ from langchain_core.documents import Document
 from app.config import settings
 from app.core.document_chunker import DocumentChunker
 from app.core.embedding_client import UniversalEmbeddingClient
-from app.core.retriever import Retriever
+from app.core.retriever import BM25Retriever, HybridRetriever, Retriever
 from app.core.vector_store import VectorStore
 from evaluation.adapters import RetrieverAdapter
 
@@ -125,6 +125,71 @@ def build_indexed_retrieval_adapter(
     )
 
 
+def build_hybrid_indexed_retrieval_adapter(
+    documents: Sequence[Document],
+    embedding_client: Any,
+    vector_store: Any,
+    *,
+    chunker: DocumentChunker | None = None,
+    score_threshold: float | None = None,
+    rrf_k: int = 60,
+) -> tuple[RetrieverAdapter, IndexingSummary]:
+    """Index documents once and expose Dense + BM25 RRF retrieval for evaluation."""
+    dense_adapter, summary = build_indexed_retrieval_adapter(
+        documents,
+        embedding_client,
+        vector_store,
+        chunker=chunker,
+        score_threshold=score_threshold,
+    )
+    dense_retriever = dense_adapter.retriever
+    lexical_chunker = chunker or DocumentChunker(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
+    lexical_documents = lexical_chunker.chunk_documents_recursive(list(documents))
+    hybrid = HybridRetriever(
+        dense_retriever,
+        BM25Retriever(lexical_documents),
+        rrf_k=rrf_k,
+    )
+    dense_adapter.retriever = hybrid
+    dense_adapter.retrieval_method = "retrieve_hybrid"
+    return dense_adapter, summary
+
+
+def build_lexical_retrieval_adapter(
+    documents: Sequence[Document],
+    *,
+    chunker: DocumentChunker | None = None,
+) -> tuple[RetrieverAdapter, IndexingSummary]:
+    """Build a production-tokenizer BM25-only evaluation adapter."""
+    if not documents:
+        raise ValueError("评估词法文档不能为空")
+    chunker = chunker or DocumentChunker(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
+    chunks = chunker.chunk_documents_recursive(list(documents))
+    if not chunks:
+        raise ValueError("评估词法分块结果不能为空")
+    return (
+        RetrieverAdapter(
+            BM25Retriever(chunks),
+            retrieval_method="retrieve_lexical",
+        ),
+        IndexingSummary(
+            document_count=len(documents),
+            chunk_count=len(chunks),
+            embedding_provider="none",
+            embedding_model="none",
+            embedding_dimension=0,
+            chunk_size=chunker.chunk_size,
+            chunk_overlap=chunker.chunk_overlap,
+        ),
+    )
+
+
 def build_configured_retrieval_adapter(
     documents: Sequence[Document],
     *,
@@ -149,4 +214,30 @@ def build_configured_retrieval_adapter(
         embedding_client,
         vector_store,
         score_threshold=score_threshold,
+    )
+
+
+def build_configured_hybrid_retrieval_adapter(
+    documents: Sequence[Document],
+    *,
+    provider: str | None = None,
+    collection_name: str = "rag_evaluation_hybrid",
+    persist_directory: str = "./data/evaluation_hybrid_chroma_db",
+    score_threshold: float | None = None,
+    rrf_k: int = 60,
+) -> tuple[RetrieverAdapter, IndexingSummary]:
+    """Build a real-provider Dense + BM25 RRF evaluation adapter."""
+    embedding_client = UniversalEmbeddingClient(
+        provider or settings.default_embedding_provider
+    )
+    vector_store = VectorStore(
+        collection_name=collection_name,
+        persist_directory=persist_directory,
+    )
+    return build_hybrid_indexed_retrieval_adapter(
+        documents,
+        embedding_client,
+        vector_store,
+        score_threshold=score_threshold,
+        rrf_k=rrf_k,
     )

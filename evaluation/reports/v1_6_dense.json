@@ -1,0 +1,1074 @@
+{
+  "dataset_name": "demo-golden-dataset",
+  "top_k": 3,
+  "case_count": 32,
+  "metadata": {
+    "baseline_type": "deterministic-dense",
+    "retrieval_mode": "dense",
+    "document_count": 9,
+    "embedding_provider": "evaluation-fake",
+    "embedding_model": "sha256-token-hash-v1",
+    "embedding_dimension": 64,
+    "case_count": 32,
+    "case_top_k_values": [
+      3
+    ],
+    "score_threshold": null,
+    "dataset_sha256": "014afc432bb3824a9afb7e361878adb5605dec7e35a2b2a409b777c13f07fb56",
+    "documents_sha256": "552c4de4204bda67ebba4b865d64f6a9ff4862d9dcc745f95993a7342ee10c4d"
+  },
+  "metrics": {
+    "recall_at_k": 0.25925925925925924,
+    "precision_at_k": 0.08641975308641975,
+    "mrr_at_k": 0.11728395061728394,
+    "top_k_hit_rate": 0.25925925925925924,
+    "correct_document_avg_rank": 2.5714285714285716,
+    "no_answer_retrieval_accuracy": 0.0,
+    "refusal_accuracy": 1.0,
+    "keyword_coverage": 1.0,
+    "successful_case_rate": 1.0,
+    "average_duration_ms": 0.43354687568353256
+  },
+  "category_metrics": {
+    "exact_term": {
+      "recall_at_k": 0.0,
+      "precision_at_k": 0.0,
+      "mrr_at_k": 0.0,
+      "top_k_hit_rate": 0.0,
+      "correct_document_avg_rank": null,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": 1.0,
+      "case_count": 6.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.43793333315989
+    },
+    "hard_negative": {
+      "recall_at_k": 0.4,
+      "precision_at_k": 0.13333333333333333,
+      "mrr_at_k": 0.13333333333333333,
+      "top_k_hit_rate": 0.4,
+      "correct_document_avg_rank": 3.0,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": 1.0,
+      "case_count": 5.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.4561600013403222
+    },
+    "keyword_precision": {
+      "recall_at_k": 0.3333333333333333,
+      "precision_at_k": 0.1111111111111111,
+      "mrr_at_k": 0.2222222222222222,
+      "top_k_hit_rate": 0.3333333333333333,
+      "correct_document_avg_rank": 2.0,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": 1.0,
+      "case_count": 6.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.43555000350655365
+    },
+    "multi_hop": {
+      "recall_at_k": 0.75,
+      "precision_at_k": 0.25,
+      "mrr_at_k": 0.29166666666666663,
+      "top_k_hit_rate": 0.75,
+      "correct_document_avg_rank": 2.6666666666666665,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": 1.0,
+      "case_count": 4.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.38352499905158766
+    },
+    "no_answer": {
+      "recall_at_k": null,
+      "precision_at_k": null,
+      "mrr_at_k": null,
+      "top_k_hit_rate": null,
+      "correct_document_avg_rank": null,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": null,
+      "case_count": 5.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.32063999969977885
+    },
+    "semantic_paraphrase": {
+      "recall_at_k": 0.0,
+      "precision_at_k": 0.0,
+      "mrr_at_k": 0.0,
+      "top_k_hit_rate": 0.0,
+      "correct_document_avg_rank": null,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": 1.0,
+      "case_count": 6.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.5357500000779206
+    }
+  },
+  "cases": [
+    {
+      "case_id": "exact-rf-001",
+      "question": "RRF 的分数公式是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        486.0,
+        602.0,
+        687.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.672,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "exact_term"
+    },
+    {
+      "case_id": "exact-rf-002",
+      "question": "混合检索为什么不能直接比较 Chroma distance 和 BM25 分数？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        446.0,
+        566.0,
+        611.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.446,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "exact_term"
+    },
+    {
+      "case_id": "exact-life-001",
+      "question": "旧索引清理的状态顺序是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        460.0,
+        554.0,
+        653.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.442,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "exact_term"
+    },
+    {
+      "case_id": "exact-life-002",
+      "question": "dry-run 会校验哪一种哈希？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        477.0,
+        599.0,
+        708.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.353,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "exact_term"
+    },
+    {
+      "case_id": "exact-eval-001",
+      "question": "回归报告需要哪些输入指纹才能比较？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        427.0,
+        577.0,
+        650.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.353,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "exact_term"
+    },
+    {
+      "case_id": "exact-embed-001",
+      "question": "一个 Collection 的向量空间由哪些字段描述？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        428.0,
+        546.0,
+        639.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.362,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "exact_term"
+    },
+    {
+      "case_id": "semantic-rf-001",
+      "question": "如何把语义搜索和关键词搜索的结果合在一起？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        467.0,
+        575.0,
+        648.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.357,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "semantic_paraphrase"
+    },
+    {
+      "case_id": "semantic-rf-002",
+      "question": "什么方法可以只依赖排名位置而不依赖不同分数的量纲？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        423.0,
+        551.0,
+        632.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.534,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "semantic_paraphrase"
+    },
+    {
+      "case_id": "semantic-life-001",
+      "question": "旧版本索引删除到一半重启后怎么恢复？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        446.0,
+        552.0,
+        659.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.601,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "semantic_paraphrase"
+    },
+    {
+      "case_id": "semantic-life-002",
+      "question": "同一个文件再次上传什么时候不会重新建向量？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        447.0,
+        549.0,
+        620.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.391,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "semantic_paraphrase"
+    },
+    {
+      "case_id": "semantic-eval-001",
+      "question": "为什么要把评估问题按类型分别汇总？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        439.0,
+        593.0,
+        652.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.912,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "semantic_paraphrase"
+    },
+    {
+      "case_id": "semantic-embed-001",
+      "question": "两个模型输出长度相同就可以共用旧索引吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        414.0,
+        494.0,
+        611.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.421,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "semantic_paraphrase"
+    },
+    {
+      "case_id": "keyword-config-001",
+      "question": "哪一项配置控制最大允许的向量距离？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        445.0,
+        557.0,
+        632.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.605,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "keyword_precision"
+    },
+    {
+      "case_id": "keyword-config-002",
+      "question": "默认 Metrics HTTP 地址中的端口是多少？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        464.0,
+        558.0,
+        647.0
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.486,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "keyword_precision"
+    },
+    {
+      "case_id": "keyword-config-003",
+      "question": "哪个字段标识一次文档生命周期操作？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        451.0,
+        569.0,
+        672.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.393,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "keyword_precision"
+    },
+    {
+      "case_id": "keyword-config-004",
+      "question": "哪个指标不能在默认回归策略中下降？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        429.0,
+        541.0,
+        624.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.372,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "keyword_precision"
+    },
+    {
+      "case_id": "keyword-config-005",
+      "question": "稠密和词法候选融合建议使用什么缩写？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        430.0,
+        556.0,
+        635.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.391,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "keyword_precision"
+    },
+    {
+      "case_id": "keyword-config-006",
+      "question": "哪个标识用于关联一次请求的结构化日志？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        435.0,
+        581.0,
+        632.0
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.3333333333333333,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 3.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.368,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "keyword_precision"
+    },
+    {
+      "case_id": "hard-negative-001",
+      "question": "如果目标是精确匹配错误码和配置项，哪种检索更占优势？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        449.0,
+        521.0,
+        612.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.369,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "hard_negative"
+    },
+    {
+      "case_id": "hard-negative-002",
+      "question": "系统故障能不能直接展示成没有相关文档？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        453.0,
+        581.0,
+        632.0
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.3333333333333333,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 3.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.361,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "hard_negative"
+    },
+    {
+      "case_id": "hard-negative-003",
+      "question": "换了同维度 Embedding 模型后为什么仍然要换 Collection？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        440.0,
+        572.0,
+        649.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.736,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "hard_negative"
+    },
+    {
+      "case_id": "hard-negative-004",
+      "question": "cleanup --include-orphans 会不会删除另一个租户已经注册的索引？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        421.0,
+        537.0,
+        606.0
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.3333333333333333,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 3.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.413,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "hard_negative"
+    },
+    {
+      "case_id": "hard-negative-005",
+      "question": "为什么不能只看 Recall 就宣布检索质量提升？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        444.0,
+        558.0,
+        631.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.402,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "hard_negative"
+    },
+    {
+      "case_id": "multi-hop-001",
+      "question": "先说明 RRF 解决什么分数问题，再说它之后为什么还可以接 Reranker。",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        434.0,
+        540.0,
+        611.0
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.418,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "multi_hop"
+    },
+    {
+      "case_id": "multi-hop-002",
+      "question": "如果 Recall 下降，应该先检查哪些输入是否一致？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "retrieval-troubleshooting"
+      ],
+      "retrieved_distances": [
+        441.0,
+        567.0,
+        660.0
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.3333333333333333,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 3.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.382,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "multi_hop"
+    },
+    {
+      "case_id": "multi-hop-003",
+      "question": "为什么要先保证同步生命周期幂等，再引入 Worker？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        426.0,
+        516.0,
+        629.0
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.5,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 2.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.376,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "multi_hop"
+    },
+    {
+      "case_id": "multi-hop-004",
+      "question": "一个请求的质量指标和 Trace 应该如何同时关联且不泄露正文？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        420.0,
+        536.0,
+        579.0
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.3333333333333333,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 3.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.358,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "multi_hop"
+    },
+    {
+      "case_id": "no-answer-001",
+      "question": "如何给手机安装游戏并绕过应用商店限制？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        457.0,
+        555.0,
+        652.0
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.332,
+      "status": "success",
+      "answered": false,
+      "error_type": null,
+      "category": "no_answer"
+    },
+    {
+      "case_id": "no-answer-002",
+      "question": "北京下周的天气和空气质量怎么样？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        418.0,
+        530.0,
+        639.0
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.327,
+      "status": "success",
+      "answered": false,
+      "error_type": null,
+      "category": "no_answer"
+    },
+    {
+      "case_id": "no-answer-003",
+      "question": "请推荐一家附近的火锅店并给出价格。",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        447.0,
+        551.0,
+        640.0
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.327,
+      "status": "success",
+      "answered": false,
+      "error_type": null,
+      "category": "no_answer"
+    },
+    {
+      "case_id": "no-answer-004",
+      "question": "如何预测明天的股票涨跌？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        454.0,
+        574.0,
+        647.0
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.31,
+      "status": "success",
+      "answered": false,
+      "error_type": null,
+      "category": "no_answer"
+    },
+    {
+      "case_id": "no-answer-005",
+      "question": "帮我把这段英文翻译成日文。",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "architecture-decisions",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        481.0,
+        593.0,
+        680.0
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.307,
+      "status": "success",
+      "answered": false,
+      "error_type": null,
+      "category": "no_answer"
+    }
+  ]
+}

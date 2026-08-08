@@ -13,7 +13,8 @@ The default dataset is `evaluation/datasets/golden_dataset.jsonl`. Each non-empt
   "expected_document_ids": ["knowledge-base"],
   "expected_keywords": ["文档加载", "分块", "向量数据库", "检索", "生成"],
   "should_answer": true,
-  "top_k": 3
+  "top_k": 3,
+  "category": "exact_term"
 }
 ```
 
@@ -24,6 +25,8 @@ No-answer cases use an empty `expected_document_ids` list and `should_answer: fa
 ```json
 {"id":"rag-out-of-scope","question":"明天股票会涨吗？","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}
 ```
+
+`category` is optional for old datasets and defaults to `general`. The v1.6 dataset uses `exact_term`, `semantic_paraphrase`, `keyword_precision`, `hard_negative`, `multi_hop`, and `no_answer`; reports include a separate metric table for every category.
 
 ## Metrics
 
@@ -53,6 +56,30 @@ Run the deterministic demo without Ollama, ChromaDB, network access, or an LLM:
 ```
 
 The default demo loads the sample documents and exercises the production `Retriever` through a deterministic hash Embedding and in-memory Vector Store. The answerability adapter remains fake. The demo is intentionally deterministic: its purpose is to validate the real retrieval boundary, dataset parsing, report generation, and the evaluation pipeline, not to claim production retrieval quality.
+
+### v1.6 Retrieval Comparison
+
+The expanded dataset is stored in `evaluation/datasets/v1_6/` and contains 32 cases over 9 engineering documents. Run the three deterministic comparisons with `--retrieval-mode dense`, `bm25`, or `hybrid`. Checked-in reports are `evaluation/reports/v1_6_{dense,bm25,hybrid}.{json,md}`.
+
+| Mode | Recall@3 | MRR@3 | Hit Rate | No-answer Accuracy |
+|---|---:|---:|---:|---:|
+| Dense hash smoke | 0.2593 | 0.1173 | 0.2593 | 0.0000 |
+| BM25-only | 0.9630 | 0.9012 | 0.9630 | 0.0000 |
+| Equal-weight RRF | 0.5556 | 0.4136 | 0.5556 | 0.0000 |
+
+The hash Dense backend is intentionally simple and is not a production semantic model. Equal-weight RRF improves over that Dense smoke but underperforms BM25 because the weak Dense ranking still contributes equally. This is evidence to run the same comparison with the intended real Embedding model, not evidence to tune weights against the small fixture set or switch Web defaults. All unthresholded modes still force some irrelevant candidates for no-answer questions, so abstention thresholds require separate calibration.
+
+The production baseline CLI accepts the same modes:
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.production_runner `
+  --dataset evaluation/datasets/v1_6/golden_dataset.jsonl `
+  --documents-dir evaluation/datasets/v1_6/documents `
+  --retrieval-mode hybrid `
+  --provider ollama
+```
+
+BM25-only does not call an Embedding provider and rejects `--score-threshold`. Hybrid uses RRF ranks and never compares Chroma distance with BM25 scores directly.
 
 For a real baseline, replace the deterministic integration components with a real `RetrieverAdapter` backed by the intended Embedding model and vector collection. Keep the same document IDs and golden dataset when comparing changes.
 

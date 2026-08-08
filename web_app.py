@@ -490,7 +490,13 @@ class RAGWebApp:
         for index, result in enumerate(retrieval_results, 1):
             source = result.source or "未知来源"
             page = f" 第{result.page_number}页" if result.page_number else ""
-            metrics = [f"距离: {result.distance:.4f}"]
+            metrics = []
+            if result.distance is not None:
+                metrics.append(f"距离: {result.distance:.4f}")
+            if result.lexical_score is not None:
+                metrics.append(f"BM25: {result.lexical_score:.4f}")
+            if result.fusion_score is not None:
+                metrics.append(f"RRF: {result.fusion_score:.6f}")
             if result.rerank_score is not None:
                 metrics.append(f"重排分数: {result.rerank_score:.4f}")
             content_preview = result.content[:150].replace("\n", " ")

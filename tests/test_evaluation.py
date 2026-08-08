@@ -12,7 +12,11 @@ from langchain_core.documents import Document
 from evaluation.adapters import FakeAnswerAdapter, FakeRetrievalAdapter, RetrieverAdapter
 from evaluation import EvaluationRunner as PublicEvaluationRunner
 from evaluation.integration import DeterministicEmbeddingClient, build_deterministic_retriever
-from evaluation.production import build_indexed_retrieval_adapter, load_text_documents
+from evaluation.production import (
+    build_indexed_retrieval_adapter,
+    build_lexical_retrieval_adapter,
+    load_text_documents,
+)
 from evaluation.production_runner import _default_report_stem
 from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from app.core.document_chunker import DocumentChunker
@@ -64,10 +68,12 @@ class EvaluationTests(unittest.TestCase):
                 "question": " question ",
                 "expected_document_ids": ["doc-a", "doc-a"],
                 "expected_keywords": ["RAG"],
+                "category": " Semantic_Paraphrase ",
             }
         )
         self.assertEqual(case.id, "case-1")
         self.assertEqual(case.expected_document_ids, ("doc-a",))
+        self.assertEqual(case.category, "semantic_paraphrase")
         with self.assertRaises(ValueError):
             GoldenCase.from_dict({"id": "case-2", "question": "q", "typo": True})
 
@@ -107,12 +113,14 @@ class EvaluationTests(unittest.TestCase):
                 expected_document_ids=("doc-a",),
                 expected_keywords=("answer",),
                 should_answer=True,
+                category="semantic_paraphrase",
             ),
             GoldenCase(
                 id="no-answer",
                 question="q2",
                 expected_document_ids=(),
                 should_answer=False,
+                category="no_answer",
             ),
         ]
         retrieval = FakeRetrievalAdapter(
@@ -128,7 +136,16 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(report.metrics["refusal_accuracy"], 1.0)
         self.assertEqual(report.metrics["keyword_coverage"], 1.0)
         self.assertEqual(report.metrics["successful_case_rate"], 1.0)
+        self.assertEqual(
+            report.category_metrics["semantic_paraphrase"]["recall_at_k"],
+            1.0,
+        )
+        self.assertEqual(
+            report.category_metrics["no_answer"]["no_answer_retrieval_accuracy"],
+            1.0,
+        )
         self.assertIn("Aggregate Metrics", report.to_markdown())
+        self.assertIn("Metrics By Category", report.to_markdown())
         self.assertEqual(report.to_dict()["case_count"], 2)
 
     def test_runner_records_adapter_failure_without_aborting_dataset(self):
@@ -196,6 +213,28 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(_default_report_stem("ollama", None), "ollama_retrieval_baseline")
         self.assertEqual(_default_report_stem("ollama", 1.0), "ollama_retrieval_threshold_1")
         self.assertEqual(_default_report_stem("ollama", 0.75), "ollama_retrieval_threshold_0_75")
+        self.assertEqual(
+            _default_report_stem("ollama", None, "hybrid"),
+            "ollama_hybrid_retrieval_baseline",
+        )
+
+    def test_lexical_adapter_preserves_document_ids_without_distances(self):
+        adapter, summary = build_lexical_retrieval_adapter(
+            [
+                Document(
+                    page_content="RRF 使用倒数排名融合",
+                    metadata={"document_id": "retrieval-quality"},
+                )
+            ],
+            chunker=DocumentChunker(chunk_size=200, chunk_overlap=0),
+        )
+
+        documents = adapter.retrieve("RRF 排名融合", 3)
+
+        self.assertEqual([item.document_id for item in documents], ["retrieval-quality"])
+        self.assertIsNone(documents[0].distance)
+        self.assertEqual(summary.embedding_provider, "none")
+        adapter.close()
 
     def test_threshold_can_reject_no_answer_retrieval_results(self):
         class ThresholdRetriever:
@@ -210,7 +249,12 @@ class EvaluationTests(unittest.TestCase):
                         "distance": 1.5,
                     },
                 )()
-                return [] if score_threshold is not None and result.distance > score_threshold else [result]
+                return (
+                    []
+                    if score_threshold is not None
+                    and result.distance > score_threshold
+                    else [result]
+                )
 
         report = EvaluationRunner(
             RetrieverAdapter(ThresholdRetriever(), score_threshold=1.0)

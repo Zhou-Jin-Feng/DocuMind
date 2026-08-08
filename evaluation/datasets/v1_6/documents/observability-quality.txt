@@ -1,0 +1,7 @@
+可观测性与检索质量诊断手册。
+
+一次用户请求由 request_id 关联，Trace 使用 trace_id 关联。检索阶段应记录候选数量、最终结果数量、Embedding provider、检索模式和耗时，但不能记录用户问题、文档正文或敏感文件名。
+
+混合检索需要分别观察 dense_candidates、lexical_candidates、fused_candidates 和 reranked_candidates。Metrics 标签必须保持低基数，不能把 query、document_id、index_id 或错误正文放进 Prometheus label。
+
+质量回归和系统故障要分开处理。Embedding 连接失败、向量库查询失败属于 error，不应被转换成“没有相关文档”。没有通过距离阈值或证据门槛才是 no-answer 检索结果。

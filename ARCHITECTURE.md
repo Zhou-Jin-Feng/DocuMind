@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v1.5）
+# DocuMind - RAG 系统架构（v1.6）
 
 ## 1. 分层结构
 
@@ -16,6 +16,11 @@ flowchart TD
     UI --> RET["Retriever"]
     RET --> EMB
     RET --> VS
+    EVAL["evaluation runner"] --> RET
+    EVAL --> LEX["BM25Retriever / jieba"]
+    EVAL --> HYB["HybridRetriever / RRF"]
+    HYB --> RET
+    HYB --> LEX
     UI --> GEN["RAGGenerator"]
     GEN --> LLM["UniversalLLMClient"]
     UI --> OBS["app.observability"]
@@ -83,6 +88,8 @@ source persist → claim → build → validate → activate → cleanup
 
 ## 4. 问答流程
 
+Web 默认问答链路保持 Dense-only：
+
 ```text
 用户问题
 → Query Embedding
@@ -109,6 +116,16 @@ rag.query
 - `distance` 越小越相关；
 - `score_threshold` 是允许的最大距离；
 - `rerank_score` 越大越相关，不能覆盖原始 `distance`。
+
+v1.6 离线评估同时支持 BM25-only 和 Hybrid。BM25 使用 `jieba` 处理中文，并保留英文单词、配置项和错误码；Hybrid 分别扩大 Dense 与词法候选集，再按 Chunk ID 去重并执行 RRF：
+
+```text
+Dense ranks ─┐
+             ├→ score(d) = Σ 1 / (60 + rank_i(d)) → Top-K
+BM25 ranks ──┘
+```
+
+RRF 只使用名次，不直接比较 Chroma `distance` 与 BM25 原始分数。结果分别保留 `distance`、`lexical_score`、`dense_rank`、`lexical_rank` 和 `fusion_score`，方便审计来源。词法候选没有向量距离时，UI 不显示伪造的距离值。
 
 ## 5. 可观测性架构
 
@@ -162,12 +179,12 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 8. 当前边界
 
-v1.5 在应用内 Logs、Metrics、Traces 和离线评估层之上增加独立文档生命周期层。评估层和生命周期层都不反向依赖 Web UI。
+v1.6 在 v1.5 文档生命周期基础上扩展检索质量实验层。评估层和生命周期层都不反向依赖 Web UI，混合检索在真实 Provider 门禁通过前不成为 Web 默认链路。
 
 ```text
 evaluation.runner
-├── evaluation.datasets       # JSONL 黄金用例
-├── evaluation.adapters       # 真实 Retriever 与 Fake Adapter 边界
+├── evaluation.datasets       # v1.4 / v1.6 JSONL 黄金用例
+├── evaluation.adapters       # Dense / BM25 / Hybrid 与 Fake Adapter 边界
 ├── evaluation.metrics        # 纯函数检索/拒答指标
 ├── evaluation.reports        # JSON/Markdown 报告
 └── evaluation.regression     # 基线比较和下降门禁

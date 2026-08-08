@@ -18,12 +18,17 @@ from evaluation.regression import (
 from evaluation.integration import (
     DeterministicEmbeddingClient,
     InMemoryVectorStore,
+    build_deterministic_bm25_retriever,
+    build_deterministic_hybrid_retriever,
     build_deterministic_retriever,
 )
 from evaluation.production import (
     IndexingSummary,
+    build_configured_hybrid_retrieval_adapter,
     build_configured_retrieval_adapter,
     build_indexed_retrieval_adapter,
+    build_hybrid_indexed_retrieval_adapter,
+    build_lexical_retrieval_adapter,
     load_text_documents,
 )
 
@@ -44,8 +49,13 @@ __all__ = [
     "InMemoryVectorStore",
     "IndexingSummary",
     "build_deterministic_retriever",
+    "build_deterministic_bm25_retriever",
+    "build_deterministic_hybrid_retriever",
     "build_configured_retrieval_adapter",
+    "build_configured_hybrid_retrieval_adapter",
     "build_indexed_retrieval_adapter",
+    "build_hybrid_indexed_retrieval_adapter",
+    "build_lexical_retrieval_adapter",
     "load_text_documents",
     "load_golden_dataset",
     "load_evaluation_snapshot",

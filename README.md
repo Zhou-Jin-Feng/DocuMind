@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.5）
+# DocuMind - RAG 知识库问答系统（v1.6）
 
-这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
+这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前版本：**v1.5 文档生命周期版**。本版本在 v1.4 评估门禁的基础上增加文档注册表、索引清单、active 版本切换、失败恢复和运维 CLI。Docker/Compose、混合检索和异步任务仍按后续版本推进。
+> 当前开发版本：**v1.6 检索质量实验版**。v1.5 的文档生命周期能力保持不变；v1.6 扩充黄金评估集，并增加 BM25-only 与 Dense + BM25 RRF 离线对照。Web 默认链路仍使用 Dense-only，真实 Embedding 评估达标前不切换线上行为。
 
 ## 当前能力
 
@@ -19,6 +19,8 @@
 - Prometheus Metrics 使用低基数标签，默认暴露在 `127.0.0.1:8000/metrics`。
 - OpenTelemetry Tracing 默认关闭，支持应用私有 Provider、OTLP/HTTP 导出和日志 Trace ID 关联。
 - 提供离线黄金评估集、Recall@K、Precision@K、MRR、Top-K 命中率、拒答准确率和回归门禁。
+- v1.6 评估集包含 32 条用例、9 篇文档和 6 个问题类别，并按类别输出指标。
+- 提供中文/英文标识符 BM25 检索，以及不比较原始分数的 RRF 混合检索实验入口。
 
 ## 项目结构
 
@@ -31,7 +33,7 @@ DocuMind/
 │   │   ├── document_chunker.py   # 分块与稳定 Chunk ID
 │   │   ├── embedding_client.py   # 多 Provider Embedding
 │   │   ├── vector_store.py       # Chroma upsert/search/delete
-│   │   ├── retriever.py          # 距离阈值与轻量重排
+│   │   ├── retriever.py          # Dense、BM25 与 RRF 混合检索
 │   │   └── generator.py          # 多 Provider 流式生成
 │   ├── observability/
 │   │   ├── context.py            # request_id / trace_id 上下文
@@ -49,7 +51,7 @@ DocuMind/
 │       └── monitoring.py         # 生成器安全的耗时工具
 ├── tests/                        # unittest 自动化测试和示例文本
 ├── evaluation/                   # 黄金评估集、离线 Runner、报告和回归门禁
-│   ├── datasets/
+│   ├── datasets/                 # v1.4 与 v1.6 黄金数据集
 │   ├── baselines/
 │   ├── reports/
 │   └── runner.py
@@ -194,6 +196,16 @@ python -m evaluation.runner `
 
 数据格式、指标语义、Adapter 接入方式和回归门禁见 [EVALUATION.md](EVALUATION.md)。
 
+运行 v1.6 三种确定性检索对照：
+
+```powershell
+python -m evaluation.runner --dataset evaluation/datasets/v1_6/golden_dataset.jsonl --retrieval-mode dense
+python -m evaluation.runner --dataset evaluation/datasets/v1_6/golden_dataset.jsonl --retrieval-mode bm25
+python -m evaluation.runner --dataset evaluation/datasets/v1_6/golden_dataset.jsonl --retrieval-mode hybrid
+```
+
+这些命令使用离线哈希 Embedding 验证检索与评估边界，不代表生产 Embedding 质量。真实 Provider 对照使用 `python -m evaluation.production_runner --retrieval-mode dense|bm25|hybrid`。
+
 ## 测试与检查
 
 项目测试使用标准库 `unittest`，不依赖 pytest 也可运行：
@@ -230,10 +242,10 @@ Remove-Item -Force .\data\document_registry.sqlite3
 - 对话历史目前只用于 UI 展示，尚未参与 Query Rewrite 或历史感知检索。
 - v1.4 之前写入的旧向量没有 `index_id`，当前检索会兼容保留；`audit` 会报告 legacy Chunk，后续可安排显式迁移。
 - 首次接管无 Embedding 元数据的非空 v1.4 Collection 时，只能核对实际向量维度，并假定它由当前 Provider/模型生成；旧数据本身无法反推出模型身份。
-- 非空 Collection 禁止切换 Embedding Provider、模型或维度；v1.5 不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
+- 非空 Collection 禁止切换 Embedding Provider、模型或维度；当前版本不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
 - 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.0/v2.1。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
-- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.5。
+- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.6。
 
 ## 常见问题
 

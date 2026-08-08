@@ -30,6 +30,7 @@ class GoldenCase:
     expected_keywords: tuple[str, ...] = field(default_factory=tuple)
     should_answer: bool = True
     top_k: int = 3
+    category: str = "general"
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str) or not self.id.strip():
@@ -40,12 +41,15 @@ class GoldenCase:
             raise TypeError("should_answer 必须是布尔值")
         if not isinstance(self.top_k, int) or isinstance(self.top_k, bool) or self.top_k <= 0:
             raise ValueError("top_k 必须是正整数")
+        if not isinstance(self.category, str) or not self.category.strip():
+            raise ValueError("评估用例 category 不能为空")
         object.__setattr__(
             self,
             "id",
             self.id.strip(),
         )
         object.__setattr__(self, "question", self.question.strip())
+        object.__setattr__(self, "category", self.category.strip().casefold())
         object.__setattr__(
             self,
             "expected_document_ids",
@@ -68,6 +72,7 @@ class GoldenCase:
             "expected_keywords",
             "should_answer",
             "top_k",
+            "category",
         }
         unknown = sorted(set(payload) - allowed)
         if unknown:
@@ -79,6 +84,7 @@ class GoldenCase:
             expected_keywords=tuple(payload.get("expected_keywords", ())),
             should_answer=payload.get("should_answer", True),
             top_k=payload.get("top_k", 3),
+            category=payload.get("category", "general"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -89,6 +95,7 @@ class GoldenCase:
             "expected_keywords": list(self.expected_keywords),
             "should_answer": self.should_answer,
             "top_k": self.top_k,
+            "category": self.category,
         }
 
 
@@ -151,6 +158,7 @@ class CaseEvaluation:
     status: str = "success"
     answered: bool | None = None
     error_type: str | None = None
+    category: str = "general"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -164,6 +172,7 @@ class CaseEvaluation:
             "status": self.status,
             "answered": self.answered,
             "error_type": self.error_type,
+            "category": self.category,
         }
 
 
@@ -176,9 +185,20 @@ class EvaluationReport:
     case_results: tuple[CaseEvaluation, ...]
     metrics: Mapping[str, float | None]
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    category_metrics: Mapping[str, Mapping[str, float | None]] = field(
+        default_factory=dict
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", dict(self.metadata or {}))
+        object.__setattr__(
+            self,
+            "category_metrics",
+            {
+                str(category): dict(metrics)
+                for category, metrics in (self.category_metrics or {}).items()
+            },
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -187,6 +207,10 @@ class EvaluationReport:
             "case_count": len(self.case_results),
             "metadata": dict(self.metadata),
             "metrics": dict(self.metrics),
+            "category_metrics": {
+                category: dict(metrics)
+                for category, metrics in self.category_metrics.items()
+            },
             "cases": [result.to_dict() for result in self.case_results],
         }
 
@@ -209,10 +233,42 @@ class EvaluationReport:
         for name, value in self.metrics.items():
             formatted = "N/A" if value is None else f"{value:.4f}"
             lines.append(f"| `{name}` | {formatted} |")
-        lines.extend(["", "## Cases", "", "| Case | Status | Top-K | Duration (ms) |", "|---|---|---:|---:|"])
+        if self.category_metrics:
+            lines.extend(
+                [
+                    "",
+                    "## Metrics By Category",
+                    "",
+                    "| Category | Cases | Recall@K | MRR@K | Hit Rate | No-answer Accuracy | Success | Avg ms |",
+                    "|---|---:|---:|---:|---:|---:|---:|---:|",
+                ]
+            )
+            for category, metrics in self.category_metrics.items():
+                def formatted(name: str) -> str:
+                    value = metrics.get(name)
+                    return "N/A" if value is None else f"{value:.4f}"
+
+                lines.append(
+                    f"| `{category}` | {int(metrics.get('case_count') or 0)} | "
+                    f"{formatted('recall_at_k')} | {formatted('mrr_at_k')} | "
+                    f"{formatted('top_k_hit_rate')} | "
+                    f"{formatted('no_answer_retrieval_accuracy')} | "
+                    f"{formatted('successful_case_rate')} | "
+                    f"{formatted('average_duration_ms')} |"
+                )
+        lines.extend(
+            [
+                "",
+                "## Cases",
+                "",
+                "| Case | Category | Status | Top-K | Duration (ms) |",
+                "|---|---|---|---:|---:|",
+            ]
+        )
         for result in self.case_results:
             lines.append(
-                f"| `{result.case_id}` | {result.status} | {result.top_k} | "
+                f"| `{result.case_id}` | `{result.category}` | {result.status} | "
+                f"{result.top_k} | "
                 f"{result.duration_ms:.3f} |"
             )
         return "\n".join(lines) + "\n"

@@ -30,17 +30,29 @@ class AnswerAdapter(Protocol):
 class RetrieverAdapter:
     """Bridge the production ``Retriever`` to the offline runner."""
 
-    def __init__(self, retriever: Any, score_threshold: Optional[float] = None):
+    def __init__(
+        self,
+        retriever: Any,
+        score_threshold: Optional[float] = None,
+        *,
+        retrieval_method: str = "retrieve_semantic",
+    ):
         if score_threshold is not None and score_threshold < 0:
             raise ValueError("score_threshold 不能小于 0")
         self.retriever = retriever
         self.score_threshold = score_threshold
+        if not isinstance(retrieval_method, str) or not callable(
+            getattr(retriever, retrieval_method, None)
+        ):
+            raise ValueError(f"retrieval_method 不可调用: {retrieval_method}")
+        self.retrieval_method = retrieval_method
 
     def retrieve(self, question: str, top_k: int) -> Sequence[RetrievedDocument]:
         retrieval_kwargs = {"top_k": top_k}
-        if self.score_threshold is not None:
+        if self.score_threshold is not None and self.retrieval_method != "retrieve_lexical":
             retrieval_kwargs["score_threshold"] = self.score_threshold
-        results = self.retriever.retrieve_semantic(question, **retrieval_kwargs)
+        method = getattr(self.retriever, self.retrieval_method)
+        results = method(question, **retrieval_kwargs)
         documents: list[RetrievedDocument] = []
         for rank, result in enumerate(results, 1):
             metadata = dict(getattr(result, "metadata", {}) or {})
@@ -65,10 +77,14 @@ class RetrieverAdapter:
         retriever = self.retriever
         self.retriever = None
         self.score_threshold = None
+        self.retrieval_method = "retrieve_semantic"
         if retriever is not None:
-            vector_store = getattr(retriever, "vector_store", None)
-            retriever.vector_store = None
-            retriever.embedding_client = None
+            dense_retriever = getattr(retriever, "dense_retriever", retriever)
+            vector_store = getattr(dense_retriever, "vector_store", None)
+            if hasattr(dense_retriever, "vector_store"):
+                dense_retriever.vector_store = None
+            if hasattr(dense_retriever, "embedding_client"):
+                dense_retriever.embedding_client = None
             if vector_store is not None:
                 if hasattr(vector_store, "collection"):
                     vector_store.collection = None

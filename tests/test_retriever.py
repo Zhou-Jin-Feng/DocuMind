@@ -1,6 +1,8 @@
 ﻿import unittest
 
-from app.core.retriever import RetrievalResult, Retriever
+from langchain_core.documents import Document
+
+from app.core.retriever import BM25Retriever, HybridRetriever, RetrievalResult, Retriever
 
 
 class FakeEmbeddingClient:
@@ -78,6 +80,88 @@ class RetrieverTests(unittest.TestCase):
         self.assertEqual(distances, {"a.txt": 0.4, "b.txt": 0.2})
         self.assertTrue(all(result.rerank_score is not None for result in reranked))
         self.assertEqual(reranked[0].source, "a.txt")
+
+    def test_bm25_retrieves_chinese_and_identifier_terms(self):
+        retriever = BM25Retriever(
+            [
+                Document(
+                    page_content="生命周期 dry_run 会校验 SHA_256 source hash",
+                    metadata={"chunk_id": "active", "document_id": "lifecycle", "active": True},
+                ),
+                Document(
+                    page_content="普通天气预报和气温说明",
+                    metadata={"chunk_id": "weather", "document_id": "weather", "active": True},
+                ),
+            ]
+        )
+
+        results = retriever.retrieve_lexical(
+            "dry_run 校验什么哈希",
+            top_k=2,
+            result_predicate=lambda metadata: metadata.get("active") is True,
+        )
+
+        self.assertEqual([result.metadata["chunk_id"] for result in results], ["active"])
+        self.assertIsNone(results[0].distance)
+        self.assertGreaterEqual(results[0].lexical_score, 0)
+        self.assertEqual(results[0].lexical_rank, 1)
+
+    def test_bm25_applies_metadata_filter_and_predicate(self):
+        retriever = BM25Retriever(
+            [
+                Document(
+                    page_content="RRF 混合检索",
+                    metadata={"chunk_id": "a", "tenant": "a", "active": False},
+                ),
+                Document(
+                    page_content="RRF 融合排序",
+                    metadata={"chunk_id": "b", "tenant": "b", "active": True},
+                ),
+            ]
+        )
+
+        self.assertEqual(
+            retriever.retrieve_lexical(
+                "RRF",
+                metadata_filter={"tenant": "a"},
+                result_predicate=lambda metadata: metadata["active"],
+            ),
+            [],
+        )
+
+    def test_hybrid_rrf_deduplicates_and_preserves_channel_scores(self):
+        dense_results = [
+            RetrievalResult("dense only", {"chunk_id": "dense"}, 0.1, 1),
+            RetrievalResult("shared", {"chunk_id": "shared"}, 0.2, 2),
+        ]
+
+        class Dense:
+            def retrieve_semantic(self, *args, **kwargs):
+                return dense_results
+
+        lexical = BM25Retriever(
+            [
+                Document(page_content="shared RRF exact", metadata={"chunk_id": "shared"}),
+                Document(page_content="lexical RRF exact", metadata={"chunk_id": "lexical"}),
+            ]
+        )
+        hybrid = HybridRetriever(Dense(), lexical, rrf_k=60)
+
+        results = hybrid.retrieve_semantic("RRF exact", top_k=3)
+
+        self.assertEqual(len({result.metadata["chunk_id"] for result in results}), 3)
+        shared = next(result for result in results if result.metadata["chunk_id"] == "shared")
+        self.assertEqual(shared.dense_rank, 2)
+        self.assertEqual(shared.lexical_rank, 1)
+        self.assertIsNotNone(shared.distance)
+        self.assertIsNotNone(shared.lexical_score)
+        self.assertAlmostEqual(shared.fusion_score, 1 / 62 + 1 / 61)
+        lexical_only = next(
+            result
+            for result in results
+            if result.metadata["chunk_id"] == "lexical"
+        )
+        self.assertIsNone(lexical_only.distance)
 
 
 if __name__ == "__main__":

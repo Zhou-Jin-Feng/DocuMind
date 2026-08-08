@@ -9,7 +9,7 @@ from typing import Any
 
 from langchain_core.documents import Document
 
-from app.core.retriever import Retriever
+from app.core.retriever import BM25Retriever, HybridRetriever, Retriever
 
 
 class DeterministicEmbeddingClient:
@@ -87,7 +87,10 @@ class InMemoryVectorStore:
             ),
         )[:n_results]
         return {
-            "ids": [str(document.metadata.get("chunk_id", index)) for index, (document, _) in enumerate(ranked)],
+            "ids": [
+                str(document.metadata.get("chunk_id", index))
+                for index, (document, _) in enumerate(ranked)
+            ],
             "documents": [document.page_content for document, _ in ranked],
             "metadatas": [dict(document.metadata) for document, _ in ranked],
             "distances": [
@@ -106,3 +109,21 @@ def build_deterministic_retriever(documents: Sequence[Document]) -> Retriever:
         for document in documents
     ]
     return Retriever(InMemoryVectorStore(records), embedding_client)
+
+
+def build_deterministic_bm25_retriever(documents: Sequence[Document]) -> BM25Retriever:
+    """Build the production BM25 retriever over deterministic local fixtures."""
+    return BM25Retriever(documents)
+
+
+def build_deterministic_hybrid_retriever(
+    documents: Sequence[Document],
+    *,
+    rrf_k: int = 60,
+) -> HybridRetriever:
+    """Build deterministic Dense + BM25 RRF retrieval for offline comparison."""
+    return HybridRetriever(
+        build_deterministic_retriever(documents),
+        build_deterministic_bm25_retriever(documents),
+        rrf_k=rrf_k,
+    )

@@ -4,10 +4,11 @@ RAG 系统检索模块。
 明确区分 Chroma 距离和重排分数，并保留检索异常语义。
 """
 
+import hashlib
 import re
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
 
 from rich.panel import Panel
 
@@ -24,11 +25,15 @@ class RetrievalResult:
 
     content: str
     metadata: Dict
-    distance: float
+    distance: Optional[float]
     rank: int
     source: str = ""
     page_number: Optional[int] = None
     rerank_score: Optional[float] = None
+    lexical_score: Optional[float] = None
+    dense_rank: Optional[int] = None
+    lexical_rank: Optional[int] = None
+    fusion_score: Optional[float] = None
 
     def __post_init__(self) -> None:
         self.metadata = self.metadata or {}
@@ -292,7 +297,11 @@ class Retriever:
             keyword_overlap = (
                 len(query_terms & content_terms) / len(query_terms) if query_terms else 0.0
             )
-            distance_similarity = 1 / (1 + max(result.distance, 0.0))
+            distance_similarity = (
+                1 / (1 + max(result.distance, 0.0))
+                if result.distance is not None
+                else 0.0
+            )
             result.rerank_score = 0.7 * distance_similarity + 0.3 * keyword_overlap
 
         reranked = sorted(
@@ -330,10 +339,216 @@ class Retriever:
                 if result.rerank_score is not None
                 else ""
             )
+            distance = (
+                f"{result.distance:.4f}" if result.distance is not None else "N/A"
+            )
             logger.info(
-                f"排名 {result.rank}: distance={result.distance:.4f}{rerank}, "
+                f"排名 {result.rank}: distance={distance}{rerank}, "
                 f"source={result.source or '未知'}"
             )
+
+
+class BM25Retriever:
+    """Deterministic lexical retriever over the supplied chunks."""
+
+    def __init__(self, documents: Iterable[Any]):
+        self._documents = tuple(
+            self._normalize_document(document) for document in documents
+        )
+        if not self._documents:
+            raise ValueError("BM25 文档集合不能为空")
+        from rank_bm25 import BM25Okapi
+
+        self._bm25_class = BM25Okapi
+        self._tokenized_documents = tuple(
+            self.tokenize(content) for content, _ in self._documents
+        )
+        self._bm25 = BM25Okapi(self._tokenized_documents)
+
+    @staticmethod
+    def tokenize(text: str) -> list[str]:
+        normalized = (text or "").casefold()
+        terms = re.findall(r"[a-z0-9_]+", normalized)
+        import jieba
+
+        for sequence in re.findall(r"[\u4e00-\u9fff]+", normalized):
+            terms.extend(
+                token
+                for token in jieba.lcut(sequence, cut_all=False)
+                if token.strip()
+            )
+            terms.extend(sequence)
+            terms.extend(
+                sequence[index : index + 2]
+                for index in range(len(sequence) - 1)
+            )
+        return terms
+
+    @staticmethod
+    def _normalize_document(document: Any) -> tuple[str, dict[str, Any]]:
+        content = str(
+            getattr(document, "page_content", getattr(document, "content", "")) or ""
+        )
+        metadata = dict(getattr(document, "metadata", {}) or {})
+        if not content.strip():
+            raise ValueError("BM25 文档内容不能为空")
+        return content, metadata
+
+    @staticmethod
+    def _document_key(content: str, metadata: Mapping[str, Any]) -> str:
+        chunk_id = metadata.get("chunk_id")
+        if chunk_id:
+            return str(chunk_id)
+        document_id = str(metadata.get("document_id") or "")
+        payload = f"{document_id}\0{content}".encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _matches_filter(
+        metadata: Mapping[str, Any],
+        metadata_filter: Mapping[str, Any] | None,
+    ) -> bool:
+        return not metadata_filter or all(
+            metadata.get(key) == value for key, value in metadata_filter.items()
+        )
+
+    def retrieve_lexical(
+        self,
+        query: str,
+        top_k: int = 5,
+        metadata_filter: Optional[Dict] = None,
+        result_predicate: Optional[Callable[[Dict], bool]] = None,
+    ) -> List[RetrievalResult]:
+        normalized_query = (query or "").strip()
+        if not normalized_query:
+            raise ValueError("查询内容不能为空")
+        if top_k <= 0:
+            raise ValueError("top_k 必须大于 0")
+        query_tokens = self.tokenize(normalized_query)
+        if not query_tokens:
+            return []
+        eligible_indexes = [
+            index
+            for index, (_, metadata) in enumerate(self._documents)
+            if self._matches_filter(metadata, metadata_filter)
+            and (result_predicate is None or result_predicate(metadata))
+        ]
+        if not eligible_indexes:
+            return []
+        if len(eligible_indexes) == len(self._documents):
+            scores = self._bm25.get_scores(query_tokens)
+        else:
+            filtered_model = self._bm25_class(
+                [self._tokenized_documents[index] for index in eligible_indexes]
+            )
+            scores = filtered_model.get_scores(query_tokens)
+        query_term_set = set(query_tokens)
+        ranked = [
+            (document_index, float(score))
+            for document_index, score in zip(eligible_indexes, scores)
+            if query_term_set.intersection(
+                self._tokenized_documents[document_index]
+            )
+        ]
+        ranked.sort(key=lambda item: (-item[1], item[0]))
+        return [
+            RetrievalResult(
+                content=self._documents[index][0],
+                metadata=self._documents[index][1],
+                distance=None,
+                rank=rank,
+                lexical_score=score,
+                lexical_rank=rank,
+            )
+            for rank, (index, score) in enumerate(ranked[:top_k], 1)
+        ]
+
+
+class HybridRetriever:
+    """Fuse dense and lexical rankings using reciprocal rank fusion (RRF)."""
+
+    def __init__(
+        self,
+        dense_retriever: Retriever,
+        lexical_retriever: BM25Retriever,
+        *,
+        rrf_k: int = 60,
+    ):
+        if rrf_k <= 0:
+            raise ValueError("rrf_k 必须大于 0")
+        self.dense_retriever = dense_retriever
+        self.lexical_retriever = lexical_retriever
+        self.rrf_k = rrf_k
+
+    @staticmethod
+    def _document_key(result: RetrievalResult) -> str:
+        return BM25Retriever._document_key(result.content, result.metadata)
+
+    def retrieve_hybrid(
+        self,
+        query: str,
+        top_k: int = 5,
+        *,
+        dense_top_k: Optional[int] = None,
+        lexical_top_k: Optional[int] = None,
+        score_threshold: Optional[float] = None,
+        metadata_filter: Optional[Dict] = None,
+        result_predicate: Optional[Callable[[Dict], bool]] = None,
+    ) -> List[RetrievalResult]:
+        if top_k <= 0:
+            raise ValueError("top_k 必须大于 0")
+        candidate_k = max(top_k * 5, top_k)
+        dense_results = self.dense_retriever.retrieve_semantic(
+            query,
+            top_k=dense_top_k or candidate_k,
+            score_threshold=score_threshold,
+            metadata_filter=metadata_filter,
+            result_predicate=result_predicate,
+        )
+        lexical_results = self.lexical_retriever.retrieve_lexical(
+            query,
+            top_k=lexical_top_k or candidate_k,
+            metadata_filter=metadata_filter,
+            result_predicate=result_predicate,
+        )
+        merged: dict[str, RetrievalResult] = {}
+        for rank, result in enumerate(dense_results, 1):
+            result.dense_rank = rank
+            result.fusion_score = 1 / (self.rrf_k + rank)
+            merged[self._document_key(result)] = result
+        for rank, result in enumerate(lexical_results, 1):
+            key = self._document_key(result)
+            contribution = 1 / (self.rrf_k + rank)
+            existing = merged.get(key)
+            if existing is None:
+                result.lexical_rank = rank
+                result.fusion_score = contribution
+                merged[key] = result
+            else:
+                existing.lexical_rank = rank
+                existing.lexical_score = result.lexical_score
+                existing.fusion_score = (existing.fusion_score or 0.0) + contribution
+        results = sorted(
+            merged.values(),
+            key=lambda result: (
+                -(result.fusion_score or 0.0),
+                result.dense_rank or 10**9,
+                result.lexical_rank or 10**9,
+            ),
+        )[:top_k]
+        for rank, result in enumerate(results, 1):
+            result.rank = rank
+        return results
+
+    def retrieve_semantic(
+        self,
+        query: str,
+        top_k: int = 5,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        """Compatibility entry point for callers that select a retriever by contract."""
+        return self.retrieve_hybrid(query, top_k=top_k, **kwargs)
+
 
 def demo_retrieval():
     """

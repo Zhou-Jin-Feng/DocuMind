@@ -40,6 +40,8 @@ pydantic-settings
 httpx
 requests
 numpy
+rank-bm25
+jieba
 
 # --- 日志系统 (v1.2 新增) ---
 loguru

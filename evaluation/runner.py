@@ -10,8 +10,18 @@ from typing import Any, Mapping, Sequence
 
 from langchain_core.documents import Document
 
-from evaluation.adapters import AnswerAdapter, FakeAnswerAdapter, FakeRetrievalAdapter, RetrievalAdapter
-from evaluation.integration import build_deterministic_retriever
+from evaluation.adapters import (
+    AnswerAdapter,
+    FakeAnswerAdapter,
+    FakeRetrievalAdapter,
+    RetrievalAdapter,
+    RetrieverAdapter,
+)
+from evaluation.integration import (
+    build_deterministic_bm25_retriever,
+    build_deterministic_hybrid_retriever,
+    build_deterministic_retriever,
+)
 from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from evaluation.metrics import (
     first_relevant_rank,
@@ -24,8 +34,13 @@ from evaluation.metrics import (
     reciprocal_rank_at_k,
     refusal_accuracy,
 )
-from evaluation.models import AnswerResult, CaseEvaluation, EvaluationReport, GoldenCase, RetrievedDocument
-from evaluation.adapters import RetrieverAdapter
+from evaluation.models import (
+    AnswerResult,
+    CaseEvaluation,
+    EvaluationReport,
+    GoldenCase,
+    RetrievedDocument,
+)
 
 
 def load_golden_dataset(path: str | Path) -> list[GoldenCase]:
@@ -101,13 +116,39 @@ class EvaluationRunner:
         metrics["average_duration_ms"] = sum(
             result.duration_ms for result in results
         ) / len(results)
+        category_metrics = {
+            category: self._aggregate_results(
+                [result for result in results if result.category == category],
+                metric_names,
+            )
+            for category in sorted({result.category for result in results})
+        }
         return EvaluationReport(
             dataset_name=self.dataset_name,
             top_k=self.default_top_k,
             case_results=tuple(results),
             metrics=metrics,
             metadata=self.metadata,
+            category_metrics=category_metrics,
         )
+
+    @staticmethod
+    def _aggregate_results(
+        results: Sequence[CaseEvaluation],
+        metric_names: Sequence[str],
+    ) -> dict[str, float | None]:
+        aggregate = {
+            name: mean_defined([result.metrics.get(name) for result in results])
+            for name in metric_names
+        }
+        aggregate["case_count"] = float(len(results))
+        aggregate["successful_case_rate"] = (
+            sum(result.status == "success" for result in results) / len(results)
+        )
+        aggregate["average_duration_ms"] = (
+            sum(result.duration_ms for result in results) / len(results)
+        )
+        return aggregate
 
     def _run_case(self, case: GoldenCase) -> CaseEvaluation:
         top_k = case.top_k or self.default_top_k
@@ -163,6 +204,7 @@ class EvaluationRunner:
             status=status,
             answered=answered,
             error_type=error_type,
+            category=case.category,
         )
 
 
@@ -186,7 +228,11 @@ def _load_demo_documents(dataset_path: Path) -> list[Document]:
     return documents
 
 
-def _build_demo_runner(cases: Sequence[GoldenCase], dataset_path: Path) -> EvaluationRunner:
+def _build_demo_runner(
+    cases: Sequence[GoldenCase],
+    dataset_path: Path,
+    retrieval_mode: str = "dense",
+) -> EvaluationRunner:
     answer_mapping = {}
     for case in cases:
         answer_mapping[case.question] = AnswerResult(
@@ -195,7 +241,8 @@ def _build_demo_runner(cases: Sequence[GoldenCase], dataset_path: Path) -> Evalu
         )
     documents = _load_demo_documents(dataset_path)
     metadata: dict[str, Any] = {
-        "baseline_type": "deterministic-smoke",
+        "baseline_type": f"deterministic-{retrieval_mode}",
+        "retrieval_mode": retrieval_mode,
         "document_count": len(documents),
         "embedding_provider": "evaluation-fake",
         "embedding_model": "sha256-token-hash-v1",
@@ -207,9 +254,20 @@ def _build_demo_runner(cases: Sequence[GoldenCase], dataset_path: Path) -> Evalu
     }
     if documents:
         metadata["documents_sha256"] = text_corpus_sha256(dataset_path.parent / "documents")
-        retrieval_adapter: RetrievalAdapter = RetrieverAdapter(
-            build_deterministic_retriever(documents)
-        )
+        if retrieval_mode == "dense":
+            retrieval_adapter = RetrieverAdapter(build_deterministic_retriever(documents))
+        elif retrieval_mode == "bm25":
+            retrieval_adapter = RetrieverAdapter(
+                build_deterministic_bm25_retriever(documents),
+                retrieval_method="retrieve_lexical",
+            )
+        elif retrieval_mode == "hybrid":
+            retrieval_adapter = RetrieverAdapter(
+                build_deterministic_hybrid_retriever(documents),
+                retrieval_method="retrieve_hybrid",
+            )
+        else:
+            raise ValueError(f"不支持的 retrieval_mode: {retrieval_mode}")
     else:
         retrieval_mapping = {
             case.question: tuple(
@@ -240,11 +298,17 @@ def main() -> int:
     )
     parser.add_argument("--output-json", help="Write JSON report to this path")
     parser.add_argument("--output-markdown", help="Write Markdown report to this path")
+    parser.add_argument(
+        "--retrieval-mode",
+        choices=("dense", "bm25", "hybrid"),
+        default="dense",
+        help="Deterministic retrieval strategy used by the offline smoke run",
+    )
     args = parser.parse_args()
 
     dataset_path = Path(args.dataset)
     cases = load_golden_dataset(dataset_path)
-    report = _build_demo_runner(cases, dataset_path).run(cases)
+    report = _build_demo_runner(cases, dataset_path, args.retrieval_mode).run(cases)
     if args.output_json:
         Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output_json).write_text(report.to_json(), encoding="utf-8")
