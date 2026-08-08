@@ -81,6 +81,10 @@ class RetrieverAdapter:
                     rank=rank,
                     metadata=metadata,
                     distance=getattr(result, "distance", None),
+                    lexical_score=getattr(result, "lexical_score", None),
+                    fusion_score=getattr(result, "fusion_score", None),
+                    query_fusion_score=getattr(result, "query_fusion_score", None),
+                    rerank_score=getattr(result, "rerank_score", None),
                 )
             )
         return documents
@@ -94,7 +98,19 @@ class RetrieverAdapter:
         self.lexical_score_threshold = None
         self.retrieval_method = "retrieve_semantic"
         if retriever is not None:
-            dense_retriever = getattr(retriever, "dense_retriever", retriever)
+            current = retriever
+            wrappers: list[Any] = []
+            seen: set[int] = set()
+            while current is not None and id(current) not in seen:
+                seen.add(id(current))
+                wrappers.append(current)
+                if hasattr(current, "base_retriever"):
+                    current = current.base_retriever
+                elif hasattr(current, "dense_retriever"):
+                    current = current.dense_retriever
+                else:
+                    break
+            dense_retriever = current
             vector_store = getattr(dense_retriever, "vector_store", None)
             if hasattr(dense_retriever, "vector_store"):
                 dense_retriever.vector_store = None
@@ -105,6 +121,13 @@ class RetrieverAdapter:
                     vector_store.collection = None
                 if hasattr(vector_store, "client"):
                     vector_store.client = None
+            for wrapper in wrappers:
+                reranker = getattr(wrapper, "reranker", None)
+                close = getattr(reranker, "close", None)
+                if callable(close):
+                    close()
+                if hasattr(wrapper, "base_retriever"):
+                    wrapper.base_retriever = None
         gc.collect()
 
     def __enter__(self) -> "RetrieverAdapter":

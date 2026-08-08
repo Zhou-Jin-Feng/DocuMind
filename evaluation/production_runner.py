@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from importlib.metadata import version as package_version
 from math import isfinite
 from pathlib import Path
 from typing import Sequence
@@ -13,6 +14,7 @@ from evaluation.production import (
     build_configured_hybrid_retrieval_adapter,
     build_configured_retrieval_adapter,
     build_lexical_retrieval_adapter,
+    enhance_retrieval_adapter,
     load_text_documents,
 )
 from evaluation.reports import write_json_report, write_markdown_report
@@ -29,6 +31,7 @@ def _default_report_stem(
     rrf_k: int = 60,
     candidate_multiplier: int = 5,
     lexical_score_threshold: float | None = None,
+    enhancement_mode: str = "baseline",
 ) -> str:
     """Keep threshold experiments from overwriting the unfiltered baseline."""
 
@@ -51,7 +54,11 @@ def _default_report_stem(
     if lexical_score_threshold is not None:
         label = format(lexical_score_threshold, "g").replace("-", "minus").replace(".", "_")
         calibration.append(f"lex_{label}")
-    return f"{stem}_{'_'.join(calibration)}" if calibration else stem
+    if calibration:
+        stem = f"{stem}_{'_'.join(calibration)}"
+    if enhancement_mode != "baseline":
+        stem = f"{stem}_{enhancement_mode.replace('-', '_')}"
+    return stem
 
 
 def _validate_calibration_args(
@@ -92,6 +99,24 @@ def _validate_calibration_args(
             parser.error(f"--{name.replace('_', '-')} must be a non-negative finite number")
     if args.dense_weight == 0 and args.lexical_weight == 0:
         parser.error("--dense-weight and --lexical-weight cannot both be zero")
+
+
+def _validate_enhancement_args(
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> None:
+    positive_integer_names = (
+        "max_rewrites",
+        "rewrite_max_tokens",
+        "query_rrf_k",
+        "per_query_candidate_multiplier",
+        "rerank_candidate_multiplier",
+        "reranker_batch_size",
+    )
+    for name in positive_integer_names:
+        value = getattr(args, name)
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be a positive integer")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -141,6 +166,39 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--rrf-k", type=int, default=60)
     parser.add_argument("--candidate-multiplier", type=int, default=5)
     parser.add_argument(
+        "--enhancement-mode",
+        choices=("baseline", "rewrite", "rerank", "rewrite-rerank"),
+        default="baseline",
+        help="Optional v1.7 retrieval experiment; Web remains unchanged",
+    )
+    parser.add_argument(
+        "--rewrite-provider",
+        default=None,
+        help="LLM provider for Query Rewrite; defaults to DEFAULT_LLM_PROVIDER",
+    )
+    parser.add_argument("--rewrite-model", default=None)
+    parser.add_argument(
+        "--rewrite-map",
+        default=None,
+        help="Pre-generated rewrite artifact for reproducible offline evaluation",
+    )
+    parser.add_argument("--max-rewrites", type=int, default=2)
+    parser.add_argument("--rewrite-max-tokens", type=int, default=256)
+    parser.add_argument("--query-rrf-k", type=int, default=60)
+    parser.add_argument("--per-query-candidate-multiplier", type=int, default=1)
+    parser.add_argument(
+        "--reranker-model",
+        default="BAAI/bge-reranker-base",
+    )
+    parser.add_argument("--reranker-batch-size", type=int, default=16)
+    parser.add_argument("--reranker-device", default=None)
+    parser.add_argument(
+        "--reranker-local-files-only",
+        action="store_true",
+        help="Load the reranker only from the local Hugging Face cache",
+    )
+    parser.add_argument("--rerank-candidate-multiplier", type=int, default=5)
+    parser.add_argument(
         "--persist-directory",
         default="./data/evaluation_chroma_db",
         help="Chroma persistence directory",
@@ -153,16 +211,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--output-markdown",
         default=None,
-        help="Markdown report path; defaults to evaluation/reports/{provider}_retrieval_baseline.md",
+        help=(
+            "Markdown report path; defaults to "
+            "evaluation/reports/{provider}_retrieval_baseline.md"
+        ),
     )
     args = parser.parse_args(argv)
     _validate_calibration_args(parser, args)
+    _validate_enhancement_args(parser, args)
+    if args.rewrite_map and args.enhancement_mode not in {
+        "rewrite",
+        "rewrite-rerank",
+    }:
+        parser.error("--rewrite-map requires rewrite or rewrite-rerank mode")
 
     provider = args.provider or settings.default_embedding_provider
     dataset_path = Path(args.dataset)
     cases = load_golden_dataset(dataset_path)
+    dataset_sha256 = file_sha256(dataset_path)
     documents = load_text_documents(args.documents_dir)
     adapter = None
+    rewrite_provider = None
+    rewrite_model = None
+    rewrite_map_sha256 = None
+    reranker_library_version = None
     try:
         if args.retrieval_mode == "dense":
             adapter, summary = build_configured_retrieval_adapter(
@@ -190,6 +262,57 @@ def main(argv: Sequence[str] | None = None) -> int:
                 candidate_multiplier=args.candidate_multiplier,
                 lexical_score_threshold=args.lexical_score_threshold,
             )
+        query_rewriter = None
+        reranker = None
+        if args.enhancement_mode in {"rewrite", "rewrite-rerank"}:
+            if args.rewrite_map:
+                from evaluation.rewrite_artifacts import load_rewrite_artifact
+
+                artifact = load_rewrite_artifact(
+                    args.rewrite_map,
+                    expected_dataset_sha256=dataset_sha256,
+                    expected_questions=[case.question for case in cases],
+                )
+                query_rewriter = artifact.to_rewriter(
+                    max_rewrites=args.max_rewrites
+                )
+                rewrite_provider = artifact.provider
+                rewrite_model = artifact.model
+                rewrite_map_sha256 = file_sha256(args.rewrite_map)
+            else:
+                from app.core.generator import UniversalLLMClient
+                from app.core.query_rewriter import LLMQueryRewriter
+
+                llm_client = UniversalLLMClient(
+                    provider=args.rewrite_provider or settings.default_llm_provider,
+                    model=args.rewrite_model,
+                )
+                query_rewriter = LLMQueryRewriter(
+                    llm_client,
+                    max_rewrites=args.max_rewrites,
+                    max_tokens=args.rewrite_max_tokens,
+                )
+                rewrite_provider = llm_client.provider
+                rewrite_model = llm_client.model
+        if args.enhancement_mode in {"rerank", "rewrite-rerank"}:
+            from app.core.reranker import CrossEncoderReranker
+
+            reranker_library_version = package_version("sentence-transformers")
+            reranker = CrossEncoderReranker(
+                args.reranker_model,
+                batch_size=args.reranker_batch_size,
+                device=args.reranker_device,
+                local_files_only=args.reranker_local_files_only,
+            )
+        if query_rewriter is not None or reranker is not None:
+            enhance_retrieval_adapter(
+                adapter,
+                query_rewriter=query_rewriter,
+                reranker=reranker,
+                query_rrf_k=args.query_rrf_k,
+                per_query_candidate_multiplier=args.per_query_candidate_multiplier,
+                rerank_candidate_multiplier=args.rerank_candidate_multiplier,
+            )
         case_top_k_values = sorted({case.top_k for case in cases})
         report = EvaluationRunner(
             adapter,
@@ -210,9 +333,65 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "rrf_k": args.rrf_k,
                 "candidate_multiplier": args.candidate_multiplier,
                 "retrieval_mode": args.retrieval_mode,
+                "enhancement_mode": args.enhancement_mode,
+                "rewrite_provider": rewrite_provider,
+                "rewrite_model": rewrite_model,
+                "rewrite_map_path": (
+                    Path(args.rewrite_map).as_posix()
+                    if args.rewrite_map
+                    else None
+                ),
+                "rewrite_map_sha256": rewrite_map_sha256,
+                "max_rewrites": (
+                    args.max_rewrites
+                    if args.enhancement_mode in {"rewrite", "rewrite-rerank"}
+                    else None
+                ),
+                "rewrite_max_tokens": (
+                    args.rewrite_max_tokens
+                    if args.enhancement_mode in {"rewrite", "rewrite-rerank"}
+                    and not args.rewrite_map
+                    else None
+                ),
+                "query_rrf_k": (
+                    args.query_rrf_k
+                    if args.enhancement_mode in {"rewrite", "rewrite-rerank"}
+                    else None
+                ),
+                "per_query_candidate_multiplier": (
+                    args.per_query_candidate_multiplier
+                    if args.enhancement_mode in {"rewrite", "rewrite-rerank"}
+                    else None
+                ),
+                "reranker_model": (
+                    args.reranker_model
+                    if args.enhancement_mode in {"rerank", "rewrite-rerank"}
+                    else None
+                ),
+                "sentence_transformers_version": reranker_library_version,
+                "reranker_batch_size": (
+                    args.reranker_batch_size
+                    if args.enhancement_mode in {"rerank", "rewrite-rerank"}
+                    else None
+                ),
+                "reranker_device": (
+                    args.reranker_device
+                    if args.enhancement_mode in {"rerank", "rewrite-rerank"}
+                    else None
+                ),
+                "reranker_local_files_only": (
+                    args.reranker_local_files_only
+                    if args.enhancement_mode in {"rerank", "rewrite-rerank"}
+                    else None
+                ),
+                "rerank_candidate_multiplier": (
+                    args.rerank_candidate_multiplier
+                    if args.enhancement_mode in {"rerank", "rewrite-rerank"}
+                    else None
+                ),
                 "dataset_path": dataset_path.as_posix(),
                 "documents_directory": Path(args.documents_dir).as_posix(),
-                "dataset_sha256": file_sha256(dataset_path),
+                "dataset_sha256": dataset_sha256,
                 "documents_sha256": text_corpus_sha256(args.documents_dir),
             },
         ).run(cases)
@@ -230,6 +409,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         rrf_k=args.rrf_k,
         candidate_multiplier=args.candidate_multiplier,
         lexical_score_threshold=args.lexical_score_threshold,
+        enhancement_mode=args.enhancement_mode,
     )
     json_path = Path(args.output_json or output_dir / f"{report_stem}.json")
     markdown_path = Path(

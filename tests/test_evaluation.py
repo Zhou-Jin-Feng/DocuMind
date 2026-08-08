@@ -15,11 +15,14 @@ from evaluation.integration import DeterministicEmbeddingClient, build_determini
 from evaluation.production import (
     build_indexed_retrieval_adapter,
     build_lexical_retrieval_adapter,
+    enhance_retrieval_adapter,
     load_text_documents,
 )
 from evaluation.production_runner import _default_report_stem, main as production_main
 from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from app.core.document_chunker import DocumentChunker
+from app.core.query_rewriter import MappingQueryRewriter
+from app.core.reranker import CrossEncoderReranker
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
 from evaluation.metrics import (
@@ -36,6 +39,11 @@ from evaluation.regression import (
     report_compatibility_issues,
 )
 from evaluation.regression_runner import main as regression_main
+from evaluation.rewrite_artifacts import (
+    RewriteArtifact,
+    build_rewrite_artifact,
+    load_rewrite_artifact,
+)
 from evaluation.runner import EvaluationRunner, load_golden_dataset
 
 
@@ -274,6 +282,15 @@ class EvaluationTests(unittest.TestCase):
             ),
             "ollama_hybrid_retrieval_threshold_1_lex_12_2",
         )
+        self.assertEqual(
+            _default_report_stem(
+                "ollama",
+                1.0,
+                "hybrid",
+                enhancement_mode="rewrite-rerank",
+            ),
+            "ollama_hybrid_retrieval_threshold_1_rewrite_rerank",
+        )
 
     def test_production_cli_rejects_incompatible_parameters_before_indexing(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
@@ -281,6 +298,105 @@ class EvaluationTests(unittest.TestCase):
                 ["--retrieval-mode", "dense", "--lexical-score-threshold", "1.0"]
             )
         self.assertEqual(error.exception.code, 2)
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            production_main(["--rerank-candidate-multiplier", "0"])
+        self.assertEqual(error.exception.code, 2)
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            production_main(["--rewrite-map", "rewrites.json"])
+        self.assertEqual(error.exception.code, 2)
+
+    def test_rewrite_artifact_is_strict_and_bound_to_dataset_fingerprint(self):
+        cases = [GoldenCase("one", "How does RRF work?", ("doc",))]
+        artifact = build_rewrite_artifact(
+            cases,
+            MappingQueryRewriter(
+                {"How does RRF work?": ["reciprocal rank fusion"]}
+            ),
+            provider="deepseek",
+            model="deepseek-chat",
+            max_rewrites=2,
+            dataset_sha256="dataset-sha",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rewrites.json"
+            path.write_text(artifact.to_json(), encoding="utf-8")
+            loaded = load_rewrite_artifact(
+                path,
+                expected_dataset_sha256="dataset-sha",
+                expected_questions=["How does RRF work?"],
+            )
+            self.assertEqual(
+                loaded.to_rewriter().rewrite("How does RRF work?").queries,
+                ("How does RRF work?", "reciprocal rank fusion"),
+            )
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                load_rewrite_artifact(
+                    path,
+                    expected_dataset_sha256="different",
+                    expected_questions=["How does RRF work?"],
+                )
+            path.write_text(
+                '{"provider":"deepseek","model":"model","max_rewrites":1,'
+                '"dataset_sha256":"dataset-sha","rewrites":{},"rewrites":{}}',
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError):
+                load_rewrite_artifact(
+                    path,
+                    expected_dataset_sha256="dataset-sha",
+                    expected_questions=[],
+                )
+        with self.assertRaises(ValueError):
+            RewriteArtifact.from_dict(
+                {
+                    "provider": "deepseek",
+                    "model": "model",
+                    "max_rewrites": 1,
+                    "dataset_sha256": "sha",
+                    "rewrites": {},
+                    "unexpected": True,
+                }
+            )
+
+    def test_enhanced_adapter_records_query_fusion_and_rerank_scores(self):
+        retriever = build_deterministic_retriever(
+            [
+                Document(
+                    page_content="RAG uses retrieval augmented generation.",
+                    metadata={"document_id": "rag", "chunk_id": "rag:1"},
+                ),
+                Document(
+                    page_content="Weather forecasts contain temperature.",
+                    metadata={"document_id": "weather", "chunk_id": "weather:1"},
+                ),
+            ]
+        )
+
+        class KeywordModel:
+            def predict(self, pairs, **kwargs):
+                del kwargs
+                return [1.0 if "RAG" in content else 0.0 for _, content in pairs]
+
+        adapter = RetrieverAdapter(retriever)
+        enhance_retrieval_adapter(
+            adapter,
+            query_rewriter=MappingQueryRewriter(
+                {"how does retrieval augmentation work": ["RAG retrieval"]}
+            ),
+            reranker=CrossEncoderReranker(
+                "fake/model",
+                model_factory=lambda *args, **kwargs: KeywordModel(),
+            ),
+            rerank_candidate_multiplier=2,
+        )
+        try:
+            documents = adapter.retrieve("how does retrieval augmentation work", 1)
+        finally:
+            adapter.close()
+
+        self.assertEqual(documents[0].document_id, "rag")
+        self.assertIsNotNone(documents[0].query_fusion_score)
+        self.assertEqual(documents[0].rerank_score, 1.0)
 
     def test_lexical_adapter_preserves_document_ids_without_distances(self):
         adapter, summary = build_lexical_retrieval_adapter(
@@ -462,7 +578,35 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(parsed["metadata"]["embedding_model"], "test-model")
         self.assertEqual(parsed["cases"][0]["case_id"], "case")
         self.assertEqual(parsed["cases"][0]["retrieved_distances"], [0.25])
+        self.assertEqual(parsed["cases"][0]["retrieved_rerank_scores"], [None])
         self.assertIn("Run Configuration", report.to_markdown())
+
+
+    def test_rewrite_artifact_rejects_normalized_duplicates(self):
+        with self.assertRaises(ValueError):
+            RewriteArtifact(
+                provider="deepseek",
+                model="model",
+                max_rewrites=2,
+                dataset_sha256="sha",
+                rewrites={"q": ["alternative"], " q ": ["other"]},
+            )
+        with self.assertRaises(ValueError):
+            RewriteArtifact(
+                provider="deepseek",
+                model="model",
+                max_rewrites=2,
+                dataset_sha256="sha",
+                rewrites={"q": ["alternative", " ALTERNATIVE "]},
+            )
+        with self.assertRaises(TypeError):
+            RewriteArtifact(
+                provider="deepseek",
+                model="model",
+                max_rewrites=2,
+                dataset_sha256="sha",
+                rewrites=[],
+            )
 
 
 if __name__ == "__main__":

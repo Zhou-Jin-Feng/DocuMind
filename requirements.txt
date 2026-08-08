@@ -25,6 +25,9 @@ docx2txt
 # --- 嵌入模型支持 ---
 tiktoken
 
+# --- Cross-Encoder 重排（v1.7 新增，运行时延迟加载模型）---
+sentence-transformers
+
 # --- Web 界面 ---
 gradio
 

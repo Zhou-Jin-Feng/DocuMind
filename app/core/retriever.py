@@ -7,7 +7,7 @@ RAG 系统检索模块。
 import hashlib
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from time import perf_counter
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
 
@@ -35,6 +35,8 @@ class RetrievalResult:
     dense_rank: Optional[int] = None
     lexical_rank: Optional[int] = None
     fusion_score: Optional[float] = None
+    query_fusion_score: Optional[float] = None
+    query_ranks: Dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.metadata = self.metadata or {}
@@ -608,6 +610,200 @@ class HybridRetriever:
     ) -> List[RetrievalResult]:
         """Compatibility entry point for callers that select a retriever by contract."""
         return self.retrieve_hybrid(query, top_k=top_k, **kwargs)
+
+
+class MultiQueryRetriever:
+    """Retrieve each rewritten query independently and fuse ranks with RRF."""
+
+    SUPPORTED_METHODS = {
+        "retrieve_semantic",
+        "retrieve_lexical",
+        "retrieve_hybrid",
+    }
+
+    def __init__(
+        self,
+        base_retriever: Any,
+        query_rewriter: Any,
+        *,
+        retrieval_method: str = "retrieve_semantic",
+        rrf_k: int = 60,
+        candidate_multiplier: int = 1,
+    ):
+        if retrieval_method not in self.SUPPORTED_METHODS or not callable(
+            getattr(base_retriever, retrieval_method, None)
+        ):
+            raise ValueError(f"retrieval_method 不可调用: {retrieval_method}")
+        if not callable(getattr(query_rewriter, "rewrite", None)):
+            raise TypeError("query_rewriter 必须提供 rewrite 方法")
+        if not isinstance(rrf_k, int) or isinstance(rrf_k, bool) or rrf_k <= 0:
+            raise ValueError("rrf_k 必须是大于 0 的整数")
+        if not isinstance(candidate_multiplier, int) or isinstance(
+            candidate_multiplier, bool
+        ) or candidate_multiplier <= 0:
+            raise ValueError("candidate_multiplier 必须是大于 0 的整数")
+        self.base_retriever = base_retriever
+        self.query_rewriter = query_rewriter
+        self.retrieval_method = retrieval_method
+        self.rrf_k = rrf_k
+        self.candidate_multiplier = candidate_multiplier
+        self.last_queries: tuple[str, ...] = ()
+
+    @staticmethod
+    def _chunk_id(result: RetrievalResult) -> str:
+        chunk_id = (result.metadata or {}).get("chunk_id")
+        if not isinstance(chunk_id, str) or not chunk_id.strip():
+            raise ValueError("多查询融合要求每条候选都包含稳定 metadata.chunk_id")
+        return chunk_id.strip()
+
+    def _retrieve(
+        self,
+        query: str,
+        top_k: int,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
+            raise ValueError("top_k 必须是大于 0 的整数")
+        rewrite_result = self.query_rewriter.rewrite(query)
+        queries = tuple(getattr(rewrite_result, "queries", ()))
+        if not queries:
+            raise ValueError("query_rewriter 未返回任何查询")
+        original = " ".join((query or "").split())
+        if queries[0] != original:
+            raise ValueError("query_rewriter 必须将原始查询保留在第一项")
+        self.last_queries = queries
+
+        candidate_k = max(top_k * self.candidate_multiplier, top_k)
+        method = getattr(self.base_retriever, self.retrieval_method)
+        merged: dict[str, RetrievalResult] = {}
+        first_seen: dict[str, int] = {}
+        sequence = 0
+        for rewritten_query in queries:
+            results = method(rewritten_query, top_k=candidate_k, **kwargs)
+            seen_in_query: set[str] = set()
+            for rank, result in enumerate(results, 1):
+                chunk_id = self._chunk_id(result)
+                if chunk_id in seen_in_query:
+                    continue
+                seen_in_query.add(chunk_id)
+                contribution = 1.0 / (self.rrf_k + rank)
+                existing = merged.get(chunk_id)
+                if existing is None:
+                    merged[chunk_id] = replace(
+                        result,
+                        metadata=dict(result.metadata),
+                        query_fusion_score=contribution,
+                        query_ranks={rewritten_query: rank},
+                    )
+                    first_seen[chunk_id] = sequence
+                    sequence += 1
+                else:
+                    merged[chunk_id] = replace(
+                        existing,
+                        query_fusion_score=(existing.query_fusion_score or 0.0)
+                        + contribution,
+                        query_ranks={**existing.query_ranks, rewritten_query: rank},
+                    )
+
+        results = sorted(
+            merged.values(),
+            key=lambda result: (
+                -(result.query_fusion_score or 0.0),
+                min(result.query_ranks.values(), default=10**9),
+                first_seen[self._chunk_id(result)],
+            ),
+        )[:top_k]
+        for rank, result in enumerate(results, 1):
+            result.rank = rank
+        return results
+
+    def retrieve_semantic(
+        self,
+        query: str,
+        top_k: int = 5,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        return self._retrieve(query, top_k, **kwargs)
+
+    def retrieve_lexical(
+        self,
+        query: str,
+        top_k: int = 5,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        return self._retrieve(query, top_k, **kwargs)
+
+    def retrieve_hybrid(
+        self,
+        query: str,
+        top_k: int = 5,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        return self._retrieve(query, top_k, **kwargs)
+
+
+class RerankingRetriever:
+    """Expand a base candidate set, then apply a dedicated reranker."""
+
+    def __init__(
+        self,
+        base_retriever: Any,
+        reranker: Any,
+        *,
+        retrieval_method: str = "retrieve_semantic",
+        candidate_multiplier: int = 5,
+    ):
+        if retrieval_method not in MultiQueryRetriever.SUPPORTED_METHODS or not callable(
+            getattr(base_retriever, retrieval_method, None)
+        ):
+            raise ValueError(f"retrieval_method 不可调用: {retrieval_method}")
+        if not callable(getattr(reranker, "rerank", None)):
+            raise TypeError("reranker 必须提供 rerank 方法")
+        if not isinstance(candidate_multiplier, int) or isinstance(
+            candidate_multiplier, bool
+        ) or candidate_multiplier <= 0:
+            raise ValueError("candidate_multiplier 必须是大于 0 的整数")
+        self.base_retriever = base_retriever
+        self.reranker = reranker
+        self.retrieval_method = retrieval_method
+        self.candidate_multiplier = candidate_multiplier
+
+    def _retrieve(
+        self,
+        query: str,
+        top_k: int,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
+            raise ValueError("top_k 必须是大于 0 的整数")
+        candidate_k = max(top_k * self.candidate_multiplier, top_k)
+        method = getattr(self.base_retriever, self.retrieval_method)
+        candidates = method(query, top_k=candidate_k, **kwargs)
+        return self.reranker.rerank(query, candidates, top_k=top_k)
+
+    def retrieve_semantic(
+        self,
+        query: str,
+        top_k: int = 5,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        return self._retrieve(query, top_k, **kwargs)
+
+    def retrieve_lexical(
+        self,
+        query: str,
+        top_k: int = 5,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        return self._retrieve(query, top_k, **kwargs)
+
+    def retrieve_hybrid(
+        self,
+        query: str,
+        top_k: int = 5,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
+        return self._retrieve(query, top_k, **kwargs)
 
 
 def demo_retrieval():

@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v1.6.1）
+# DocuMind - RAG 系统架构（v1.7.0）
 
 ## 1. 分层结构
 
@@ -127,6 +127,19 @@ BM25 ranks ──┘
 
 RRF 只使用名次，不直接比较 Chroma `distance` 与 BM25 原始分数。v1.6.1 使用 `dense_weight/(rrf_k+dense_rank) + lexical_weight/(rrf_k+lexical_rank)`，候选深度由 `candidate_multiplier` 控制；零权重通道不执行检索。BM25 可用 `lexical_score_threshold` 拒绝低分词法候选。结果分别保留 `distance`、`lexical_score`、`dense_rank`、`lexical_rank` 和 `fusion_score`，方便审计来源。词法候选没有向量距离时，UI 不显示伪造的距离值。
 
+v1.7 仅在评估编排中增加可选链路：
+
+```text
+原始问题 + Rewrite artifact
+→ 每条查询独立检索
+→ stable chunk_id 去重 + Query RRF
+→ 扩大候选集
+→ Cross-Encoder Reranker
+→ Top-K 评估报告
+```
+
+原问题必须在改写列表首位；Query RRF 与 Hybrid RRF 分别保存，不能复用或覆盖 `fusion_score`。Cross-Encoder 只改变最终名次并写入 `rerank_score`，不会把其数值伪装成 Chroma distance。LLM 改写先生成与数据集 SHA-256 绑定的 artifact，之后的本地检索评估不访问 LLM；这使同一 artifact、语料和配置下的报告可复现。
+
 ## 5. 可观测性架构
 
 ### 5.1 请求上下文
@@ -179,12 +192,13 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 8. 当前边界
 
-v1.6.1 在 v1.6 检索质量实验层上增加独立 holdout、按 split 汇总、真实 Provider 校准参数和门禁报告。评估层和生命周期层都不反向依赖 Web UI；虽然本地 Ollama holdout 校准通过，样本规模仍不足以自动改变 Web 默认 Dense-only 链路。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。评估层和生命周期层都不反向依赖 Web UI；虽然本地 Ollama holdout 的 Reranker 门禁通过，样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
 
 ```text
-evaluation.runner
-├── evaluation.datasets       # v1.4 / v1.6 / v1.6.1 JSONL 黄金与 holdout 用例
-├── evaluation.adapters       # Dense / BM25 / Hybrid 与 Fake Adapter 边界
+evaluation.runner / production_runner
+├── evaluation.datasets       # v1.4 / v1.6 JSONL 黄金与 holdout 用例
+├── evaluation.rewrite_artifacts # 带数据集指纹的 LLM 改写输入
+├── evaluation.adapters       # Dense / BM25 / Hybrid / Rewrite / Rerank 边界
 ├── evaluation.metrics        # 纯函数检索/拒答指标
 ├── evaluation.reports        # JSON/Markdown 报告
 └── evaluation.regression     # 基线比较和下降门禁
@@ -193,7 +207,7 @@ evaluation.runner
 当前仍不包含：
 
 - Docker/Compose 和可观测性后端容器；
-- 历史感知检索、Query Rewrite 和正式 Reranker；
+- 历史感知检索，以及 Query Rewrite / Reranker 的 Web 默认接入；
 - Celery/Redis 异步摄取；
 - 认证、多租户、限流和生产高可用。
 

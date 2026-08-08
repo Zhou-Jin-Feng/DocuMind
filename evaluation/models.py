@@ -119,6 +119,10 @@ class RetrievedDocument:
     rank: int = 0
     metadata: Mapping[str, Any] = field(default_factory=dict)
     distance: float | None = None
+    lexical_score: float | None = None
+    fusion_score: float | None = None
+    query_fusion_score: float | None = None
+    rerank_score: float | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.document_id, str) or not self.document_id.strip():
@@ -130,6 +134,15 @@ class RetrievedDocument:
         object.__setattr__(self, "metadata", dict(self.metadata or {}))
         if self.distance is not None:
             object.__setattr__(self, "distance", float(self.distance))
+        for field_name in (
+            "lexical_score",
+            "fusion_score",
+            "query_fusion_score",
+            "rerank_score",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                object.__setattr__(self, field_name, float(value))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -139,6 +152,10 @@ class RetrievedDocument:
             "rank": self.rank,
             "metadata": dict(self.metadata),
             "distance": self.distance,
+            "lexical_score": self.lexical_score,
+            "fusion_score": self.fusion_score,
+            "query_fusion_score": self.query_fusion_score,
+            "rerank_score": self.rerank_score,
         }
 
 
@@ -163,6 +180,10 @@ class CaseEvaluation:
     top_k: int
     retrieved_document_ids: tuple[str, ...]
     retrieved_distances: tuple[float | None, ...]
+    retrieved_lexical_scores: tuple[float | None, ...]
+    retrieved_fusion_scores: tuple[float | None, ...]
+    retrieved_query_fusion_scores: tuple[float | None, ...]
+    retrieved_rerank_scores: tuple[float | None, ...]
     metrics: Mapping[str, float | None]
     duration_ms: float
     status: str = "success"
@@ -178,6 +199,12 @@ class CaseEvaluation:
             "top_k": self.top_k,
             "retrieved_document_ids": list(self.retrieved_document_ids),
             "retrieved_distances": list(self.retrieved_distances),
+            "retrieved_lexical_scores": list(self.retrieved_lexical_scores),
+            "retrieved_fusion_scores": list(self.retrieved_fusion_scores),
+            "retrieved_query_fusion_scores": list(
+                self.retrieved_query_fusion_scores
+            ),
+            "retrieved_rerank_scores": list(self.retrieved_rerank_scores),
             "metrics": dict(self.metrics),
             "duration_ms": round(self.duration_ms, 3),
             "status": self.status,

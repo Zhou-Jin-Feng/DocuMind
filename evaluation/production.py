@@ -13,7 +13,13 @@ from langchain_core.documents import Document
 from app.config import settings
 from app.core.document_chunker import DocumentChunker
 from app.core.embedding_client import UniversalEmbeddingClient
-from app.core.retriever import BM25Retriever, HybridRetriever, Retriever
+from app.core.retriever import (
+    BM25Retriever,
+    HybridRetriever,
+    MultiQueryRetriever,
+    RerankingRetriever,
+    Retriever,
+)
 from app.core.vector_store import VectorStore
 from evaluation.adapters import RetrieverAdapter
 
@@ -268,3 +274,39 @@ def build_configured_hybrid_retrieval_adapter(
         candidate_multiplier=candidate_multiplier,
         lexical_score_threshold=lexical_score_threshold,
     )
+
+
+def enhance_retrieval_adapter(
+    adapter: RetrieverAdapter,
+    *,
+    query_rewriter: Any | None = None,
+    reranker: Any | None = None,
+    query_rrf_k: int = 60,
+    per_query_candidate_multiplier: int = 1,
+    rerank_candidate_multiplier: int = 5,
+) -> RetrieverAdapter:
+    """Compose optional rewrite and rerank stages around an indexed adapter."""
+
+    if adapter.retriever is None:
+        raise ValueError("adapter 已关闭")
+    retriever = adapter.retriever
+    retrieval_method = adapter.retrieval_method
+    if query_rewriter is not None:
+        retriever = MultiQueryRetriever(
+            retriever,
+            query_rewriter,
+            retrieval_method=retrieval_method,
+            rrf_k=query_rrf_k,
+            candidate_multiplier=per_query_candidate_multiplier,
+        )
+    if reranker is not None:
+        retriever = RerankingRetriever(
+            retriever,
+            reranker,
+            retrieval_method=retrieval_method,
+            candidate_multiplier=rerank_candidate_multiplier,
+        )
+    if query_rewriter is None and reranker is None:
+        raise ValueError("至少需要启用 Query Rewrite 或 Reranker")
+    adapter.retriever = retriever
+    return adapter

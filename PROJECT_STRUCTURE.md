@@ -1,4 +1,4 @@
-# 项目结构（v1.6.1）
+# 项目结构（v1.7.0）
 
 ```text
 DocuMind/
@@ -12,6 +12,8 @@ DocuMind/
 │   │   ├── embedding_client.py
 │   │   ├── vector_store.py
 │   │   ├── retriever.py
+│   │   ├── query_rewriter.py
+│   │   ├── reranker.py
 │   │   └── generator.py
 │   ├── observability/
 │   │   ├── __init__.py
@@ -56,6 +58,8 @@ DocuMind/
 │   ├── fingerprints.py
 │   ├── production.py
 │   ├── production_runner.py
+│   ├── rewrite_artifacts.py
+│   ├── rewrite_runner.py
 │   ├── metrics.py
 │   ├── models.py
 │   ├── regression.py
@@ -65,10 +69,11 @@ DocuMind/
 │   ├── datasets/
 │   │   ├── golden_dataset.jsonl
 │   │   ├── documents/
-│   │   └── v1_6/
+│   │   ├── v1_6/
 │   │       ├── golden_dataset.jsonl
 │   │       ├── holdout_dataset.jsonl
 │   │       └── documents/
+│   │   └── v1_7/                # 经数据集指纹绑定的 Rewrite artifact
 │   ├── baselines/
 │   └── reports/
 ├── data/                  # 本地运行数据，Git 忽略
@@ -96,7 +101,9 @@ DocuMind/
 | `document_chunker.py` | 文档分块、稳定 Chunk ID、空块过滤 |
 | `embedding_client.py` | Ollama 和 API Embedding 统一调用 |
 | `vector_store.py` | Chroma 持久化、upsert、search、delete |
-| `retriever.py` | Dense 检索、BM25 中文/标识符分词、RRF 融合、结果分数契约、检索 Span 与 Metrics |
+| `retriever.py` | Dense 检索、BM25 中文/标识符分词、RRF、多查询融合、重排编排和结果分数契约 |
+| `query_rewriter.py` | 原问题保留、规范化去重、严格 JSON LLM 改写和确定性映射 |
+| `reranker.py` | 延迟加载 Cross-Encoder，扩大候选后赋予独立 `rerank_score` |
 | `generator.py` | OpenAI 兼容/Anthropic 消息适配和流式生成 |
 | `web_app.py` | 上传校验、生命周期服务调用、问答编排、根 Span、Metrics 服务和 UI |
 | `app/lifecycle/models.py` | 文档、版本、索引清单、操作结果和审计报告模型 |
@@ -111,11 +118,13 @@ DocuMind/
 | `utils/monitoring.py` | `perf_counter()` 计时和生成器完整迭代耗时 |
 | `evaluation/models.py` | 黄金用例、问题类别、检索结果和分类评估报告数据模型 |
 | `evaluation/metrics.py` | Recall@K、Precision@K、MRR、命中率和拒答指标 |
-| `evaluation/adapters.py` | Dense、BM25、Hybrid Retriever 适配器与离线 Fake Adapter |
+| `evaluation/adapters.py` | Dense、BM25、Hybrid、Rewrite、Rerank 适配器与离线 Fake Adapter |
 | `evaluation/integration.py` | 确定性 Embedding、内存 Vector Store 和三种检索模式集成烟囱测试 |
 | `evaluation/fingerprints.py` | 黄金数据集和评估文档语料的稳定 SHA-256 指纹 |
-| `evaluation/production.py` | Dense、BM25 和 Hybrid 生产组件评估装配 |
-| `evaluation/production_runner.py` | 真实 Provider 三种检索模式基线 CLI |
+| `evaluation/production.py` | Dense、BM25、Hybrid 和 v1.7 实验组件评估装配 |
+| `evaluation/production_runner.py` | 真实 Provider 基线、Rewrite、Rerank 实验 CLI |
+| `evaluation/rewrite_artifacts.py` | 严格 Rewrite artifact 生成、读取和数据集指纹校验 |
+| `evaluation/rewrite_runner.py` | 通过 LLM 生成可复现 Rewrite artifact 的 CLI |
 | `evaluation/runner.py` | JSONL 黄金评估集加载、分类汇总和确定性三模式执行 |
 | `evaluation/regression.py` | 指标最低值和允许下降幅度门禁 |
 | `evaluation/regression_runner.py` | 报告兼容性校验和自动回归门禁 CLI |

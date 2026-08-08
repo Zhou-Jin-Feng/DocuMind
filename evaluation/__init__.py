@@ -29,6 +29,7 @@ from evaluation.production import (
     build_indexed_retrieval_adapter,
     build_hybrid_indexed_retrieval_adapter,
     build_lexical_retrieval_adapter,
+    enhance_retrieval_adapter,
     load_text_documents,
 )
 
@@ -56,6 +57,7 @@ __all__ = [
     "build_indexed_retrieval_adapter",
     "build_hybrid_indexed_retrieval_adapter",
     "build_lexical_retrieval_adapter",
+    "enhance_retrieval_adapter",
     "load_text_documents",
     "load_golden_dataset",
     "load_evaluation_snapshot",

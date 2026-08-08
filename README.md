@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.6.1）
+# DocuMind - RAG 知识库问答系统（v1.7.0）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前开发版本：**v1.6.1 检索校准版**。在 v1.6 Dense/BM25/RRF 对照基础上增加独立 holdout、可配置 RRF 权重与候选深度、BM25 最低分阈值，并完成真实 Ollama Provider 校准。Web 默认链路仍使用 Dense-only，不自动采用实验阈值。
+> 当前开发版本：**v1.7 Query Rewrite + Cross-Encoder 实验版**。v1.6.1 的真实 Ollama 校准结果作为基线，新增严格 Query Rewrite artifact、多查询 RRF 融合和延迟加载 Cross-Encoder Reranker。Web 默认链路仍使用 Dense-only，不自动采用实验参数。
 
 ## 当前能力
 
@@ -22,6 +22,23 @@
 - v1.6 评估集包含 32 条原始用例和 12 条独立 holdout，用例按类别与 split 分别输出指标。
 - 提供中文/英文标识符 BM25 检索，以及可配置权重、RRF 常数和候选深度的混合检索实验入口。
 - Dense 最大距离和 BM25 最低词法分数可独立校准，并写入评估报告元数据。
+- v1.7 评估链路始终保留原问题，按稳定 `chunk_id` 融合多条查询，并在扩大候选集后记录独立 `rerank_score`；原始 distance、词法和 RRF 分数不会被覆盖。
+
+## 版本迭代记录
+
+README 保留面向仓库用户的公开版本摘要；当前架构边界见 [ARCHITECTURE.md](ARCHITECTURE.md)，评估指标、报告和质量门禁见 [EVALUATION.md](EVALUATION.md)。版本的详细设计路线和本地提交级历史分别记录在被 `.gitignore` 忽略的 `RAG系统工程化优化与版本演进指南.md` 与 `VERSION_HISTORY.md` 中，因此不会随仓库提交到 GitHub。
+
+| 版本 | 迭代内容 |
+|---|---|
+| v1.0 | 初始 RAG 原型：文档加载、向量索引、检索和生成 |
+| v1.2 | 项目分层、依赖整理和基础稳定性修正 |
+| v1.3 | 结构化日志、Prometheus Metrics 和 OpenTelemetry Tracing |
+| v1.4 | 黄金评估集、真实 Provider 验证和回归门禁 |
+| v1.5 | 文档注册表、索引生命周期、active 切换和失败恢复 |
+| v1.6 | Dense、BM25、Hybrid/RRF 检索质量对照 |
+| v1.6.1 | 真实 Ollama holdout、阈值/RRF 校准和质量门禁 |
+| v1.7 | 严格 Query Rewrite artifact、多查询 RRF 和 Cross-Encoder Reranker 评估实验 |
+
 
 ## 项目结构
 
@@ -34,7 +51,9 @@ DocuMind/
 │   │   ├── document_chunker.py   # 分块与稳定 Chunk ID
 │   │   ├── embedding_client.py   # 多 Provider Embedding
 │   │   ├── vector_store.py       # Chroma upsert/search/delete
-│   │   ├── retriever.py          # Dense、BM25 与 RRF 混合检索
+│   │   ├── retriever.py          # Dense、BM25、RRF、多查询与重排编排
+│   │   ├── query_rewriter.py     # 严格 JSON Query Rewrite 与确定性映射
+│   │   ├── reranker.py           # 延迟加载 Cross-Encoder 重排
 │   │   └── generator.py          # 多 Provider 流式生成
 │   ├── observability/
 │   │   ├── context.py            # request_id / trace_id 上下文
@@ -55,14 +74,16 @@ DocuMind/
 │   ├── datasets/                 # v1.4 与 v1.6 黄金数据集
 │   ├── baselines/
 │   ├── reports/
+│   ├── rewrite_artifacts.py
+│   ├── rewrite_runner.py
 │   └── runner.py
 ├── data/                         # 运行数据（Git 忽略）
 ├── logs/                         # 日志（Git 忽略）
 ├── .env.example                 # 无密钥配置模板
 ├── requirements.txt
 ├── requirements-dev.txt
-├── OBSERVABILITY.md              # v1.3 日志、指标、追踪指南
-├── EVALUATION.md                 # v1.4 黄金评估集和回归评估指南
+├── OBSERVABILITY.md              # 日志、指标、追踪指南
+├── EVALUATION.md                 # v1.4-v1.7 评估、报告和回归门禁指南
 └── web_app.py                    # Gradio 入口
 ```
 
@@ -218,6 +239,40 @@ python -m evaluation.production_runner `
 
 离线命令使用哈希 Embedding 验证检索与评估边界，不代表生产 Embedding 质量。真实 Provider 对照支持 `dense|bm25|hybrid`，详细参数、报告和门禁命令见 [EVALUATION.md](EVALUATION.md)。
 
+### v1.7 Query Rewrite 与 Reranker 实验
+
+先生成与数据集 SHA-256 绑定的 Query Rewrite artifact，再运行本地检索评估。生成 artifact 会调用指定 LLM，检索评估阶段不再访问 LLM：
+
+```powershell
+python -m evaluation.rewrite_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --provider deepseek --model deepseek-chat `
+  --output evaluation/datasets/v1_7/holdout_rewrites_deepseek.json
+
+python -m evaluation.production_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --documents-dir evaluation/datasets/v1_6/documents `
+  --provider ollama --retrieval-mode hybrid `
+  --score-threshold 1.0 --lexical-score-threshold 12.2 `
+  --enhancement-mode rewrite `
+  --rewrite-map evaluation/datasets/v1_7/holdout_rewrites_deepseek.json
+```
+
+仅运行真实 Cross-Encoder 重排时，先确保模型已缓存，再加 `--reranker-local-files-only` 以禁止评估阶段探测外网：
+
+```powershell
+python -m evaluation.production_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --documents-dir evaluation/datasets/v1_6/documents `
+  --provider ollama --retrieval-mode hybrid `
+  --score-threshold 1.0 --lexical-score-threshold 12.2 `
+  --enhancement-mode rerank `
+  --reranker-model BAAI/bge-reranker-base `
+  --reranker-local-files-only
+```
+
+实验链路只用于评估，不会改变 Web 默认行为；使用 `evaluation.regression_runner` 对相同 holdout 执行门禁后，才考虑后续线上接入。
+
 ## 测试与检查
 
 项目测试使用标准库 `unittest`，不依赖 pytest 也可运行：
@@ -251,13 +306,13 @@ Remove-Item -Force .\data\document_registry.sqlite3
 
 ## 已知限制
 
-- 对话历史目前只用于 UI 展示，尚未参与 Query Rewrite 或历史感知检索。
+- Web 对话历史目前只用于 UI 展示；v1.7 Query Rewrite 只在评估 CLI 中运行，尚未接入历史感知的线上问答。
 - v1.4 之前写入的旧向量没有 `index_id`，当前检索会兼容保留；`audit` 会报告 legacy Chunk，后续可安排显式迁移。
 - 首次接管无 Embedding 元数据的非空 v1.4 Collection 时，只能核对实际向量维度，并假定它由当前 Provider/模型生成；旧数据本身无法反推出模型身份。
 - 非空 Collection 禁止切换 Embedding Provider、模型或维度；当前版本不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
 - 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.0/v2.1。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
-- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.6。
+- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.7。
 
 ## 常见问题
 

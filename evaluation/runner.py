@@ -207,6 +207,18 @@ class EvaluationRunner:
             top_k=top_k,
             retrieved_document_ids=tuple(document.document_id for document in retrieved),
             retrieved_distances=tuple(document.distance for document in retrieved),
+            retrieved_lexical_scores=tuple(
+                document.lexical_score for document in retrieved
+            ),
+            retrieved_fusion_scores=tuple(
+                document.fusion_score for document in retrieved
+            ),
+            retrieved_query_fusion_scores=tuple(
+                document.query_fusion_score for document in retrieved
+            ),
+            retrieved_rerank_scores=tuple(
+                document.rerank_score for document in retrieved
+            ),
             metrics=metrics,
             duration_ms=(perf_counter() - started) * 1000,
             status=status,

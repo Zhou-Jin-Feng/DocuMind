@@ -2,7 +2,15 @@
 
 from langchain_core.documents import Document
 
-from app.core.retriever import BM25Retriever, HybridRetriever, RetrievalResult, Retriever
+from app.core.query_rewriter import MappingQueryRewriter
+from app.core.retriever import (
+    BM25Retriever,
+    HybridRetriever,
+    MultiQueryRetriever,
+    RerankingRetriever,
+    RetrievalResult,
+    Retriever,
+)
 
 
 class FakeEmbeddingClient:
@@ -251,6 +259,97 @@ class RetrieverTests(unittest.TestCase):
         results = hybrid.retrieve_hybrid("RRF exact", top_k=1)
 
         self.assertEqual(results[0].metadata["chunk_id"], "lexical")
+
+    def test_multi_query_rrf_deduplicates_by_stable_chunk_id(self):
+        original_results = [
+            RetrievalResult("original only", {"chunk_id": "original"}, 0.1, 1),
+            RetrievalResult("shared", {"chunk_id": "shared"}, 0.2, 2),
+        ]
+        rewritten_results = [
+            RetrievalResult("shared", {"chunk_id": "shared"}, 0.3, 1),
+            RetrievalResult("rewrite only", {"chunk_id": "rewrite"}, 0.4, 2),
+        ]
+
+        class BaseRetriever:
+            def __init__(self):
+                self.calls = []
+
+            def retrieve_semantic(self, query, top_k, **kwargs):
+                self.calls.append((query, top_k, kwargs))
+                return original_results if query == "why rrf" else rewritten_results
+
+        base = BaseRetriever()
+        retriever = MultiQueryRetriever(
+            base,
+            MappingQueryRewriter({"why rrf": ["rank fusion"]}),
+            rrf_k=10,
+            candidate_multiplier=2,
+        )
+
+        results = retriever.retrieve_semantic("why rrf", top_k=2, score_threshold=1.0)
+
+        self.assertEqual(
+            [result.metadata["chunk_id"] for result in results],
+            ["shared", "original"],
+        )
+        self.assertEqual(base.calls[0], ("why rrf", 4, {"score_threshold": 1.0}))
+        self.assertEqual(base.calls[1], ("rank fusion", 4, {"score_threshold": 1.0}))
+        self.assertAlmostEqual(results[0].query_fusion_score, 1 / 12 + 1 / 11)
+        self.assertEqual(results[0].query_ranks, {"why rrf": 2, "rank fusion": 1})
+        self.assertIsNone(original_results[1].query_fusion_score)
+
+    def test_multi_query_requires_stable_chunk_id(self):
+        class BaseRetriever:
+            def retrieve_semantic(self, query, top_k, **kwargs):
+                del query, top_k, kwargs
+                return [RetrievalResult("missing id", {}, 0.1, 1)]
+
+        retriever = MultiQueryRetriever(
+            BaseRetriever(),
+            MappingQueryRewriter({}),
+        )
+        with self.assertRaisesRegex(ValueError, "chunk_id"):
+            retriever.retrieve_semantic("q", top_k=1)
+
+        class NonStringChunkIdRetriever:
+            def retrieve_semantic(self, query, top_k, **kwargs):
+                del query, top_k, kwargs
+                return [RetrievalResult("numeric id", {"chunk_id": 1}, 0.1, 1)]
+
+        retriever = MultiQueryRetriever(
+            NonStringChunkIdRetriever(),
+            MappingQueryRewriter({}),
+        )
+        with self.assertRaisesRegex(ValueError, "chunk_id"):
+            retriever.retrieve_semantic("q", top_k=1)
+
+    def test_reranking_retriever_expands_candidates_before_reranking(self):
+        class BaseRetriever:
+            def __init__(self):
+                self.top_k = None
+
+            def retrieve_semantic(self, query, top_k, **kwargs):
+                del query, kwargs
+                self.top_k = top_k
+                return [RetrievalResult("a", {"chunk_id": "a"}, 0.1, 1)]
+
+        class Reranker:
+            def __init__(self):
+                self.calls = []
+
+            def rerank(self, query, candidates, *, top_k):
+                self.calls.append((query, candidates, top_k))
+                return list(candidates[:top_k])
+
+        base = BaseRetriever()
+        reranker = Reranker()
+        retriever = RerankingRetriever(base, reranker, candidate_multiplier=5)
+
+        results = retriever.retrieve_semantic("q", top_k=3)
+
+        self.assertEqual(base.top_k, 15)
+        self.assertEqual(reranker.calls[0][2], 3)
+        self.assertEqual(len(results), 1)
 
 
 if __name__ == "__main__":

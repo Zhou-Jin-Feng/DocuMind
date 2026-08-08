@@ -151,6 +151,55 @@ With the experimental maximum distance threshold `1.0`, the same sample keeps `R
 
 The reports record the Provider, model, actual vector dimension, chunk settings, Top-K values, threshold, and dataset sizes. Local latency is a hardware snapshot and should only be compared under the same machine and service conditions.
 
+## v1.7 Query Rewrite And Reranker
+
+v1.7 keeps the Web application unchanged and introduces two evaluation-only stages:
+
+- Query Rewrite always retains the normalized original question as the first query. The LLM response must be one strict JSON object, `{"queries":[...]}`; empty, duplicate, markdown-wrapped, or extra-field responses fail the case instead of silently changing retrieval behavior.
+- Multi-query retrieval runs each query independently, deduplicates only by stable `metadata.chunk_id`, and uses a second RRF layer over ranks. It does not compare raw scores across queries.
+- Cross-Encoder reranking receives an expanded candidate set and writes `rerank_score` without replacing `distance`, `lexical_score`, Hybrid `fusion_score`, or Query RRF `query_fusion_score`.
+
+`evaluation.rewrite_runner` separates external LLM generation from retrieval evaluation. It creates a strict artifact containing the provider, model, maximum rewrite count, dataset SHA-256, and the alternatives for every question. `evaluation.production_runner --rewrite-map` rejects an artifact with a different dataset fingerprint or question set, so a later local run is deterministic with respect to its LLM inputs.
+
+```powershell
+python -m evaluation.rewrite_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --provider deepseek --model deepseek-chat `
+  --max-rewrites 2 `
+  --output evaluation/datasets/v1_7/holdout_rewrites_deepseek.json
+
+python -m evaluation.production_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --documents-dir evaluation/datasets/v1_6/documents `
+  --provider ollama --retrieval-mode hybrid `
+  --score-threshold 1.0 --lexical-score-threshold 12.2 `
+  --enhancement-mode rewrite `
+  --rewrite-map evaluation/datasets/v1_7/holdout_rewrites_deepseek.json
+```
+
+The production runner supports `baseline`, `rewrite`, `rerank`, and `rewrite-rerank` modes. Every report records the enhancement mode and all enabled-stage parameters. A cached Cross-Encoder can be forced offline with `--reranker-local-files-only`, which prevents per-case Hugging Face metadata checks in restricted environments.
+
+```powershell
+python -m evaluation.production_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --documents-dir evaluation/datasets/v1_6/documents `
+  --provider ollama --retrieval-mode hybrid `
+  --score-threshold 1.0 --lexical-score-threshold 12.2 `
+  --enhancement-mode rerank `
+  --reranker-model BAAI/bge-reranker-base `
+  --reranker-batch-size 8 --reranker-device cpu `
+  --reranker-local-files-only
+```
+
+The checked-in v1.7 rerank report uses local Ollama `qwen3-embedding`, `BAAI/bge-reranker-base` on CPU, the same 12-case holdout, and the calibrated Hybrid baseline:
+
+| Mode | Recall@3 | MRR@3 | No-answer Accuracy | Success | Avg Duration |
+|---|---:|---:|---:|---:|---:|
+| v1.6.1 calibrated Hybrid | 1.0000 | 0.9545 | 1.0000 | 1.0000 | 420.7 ms |
+| v1.7 calibrated Hybrid + Reranker | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 937.9 ms |
+
+The reranker fixes the observed ranking error but adds approximately 517.2 ms on this CPU. It is evidence for a constrained experiment only, not authorization to switch the Web default. Run the same holdout gate after creating a real Rewrite artifact, then compare `rewrite` and `rewrite-rerank` against this baseline before any online integration decision.
+
 ## Regression Gate
 
 Compare a current report with a saved baseline in Python:
@@ -185,4 +234,4 @@ Exit codes are stable for local scripts and CI: `0` means pass, `1` means a qual
 
 ## Scope
 
-This version deliberately does not add Docker, Prometheus/Grafana containers, Celery, Redis, authentication, query rewriting, or a production reranker. Those remain later roadmap items.
+This version deliberately keeps Query Rewrite and Cross-Encoder Reranking out of the Web request path. Docker, Prometheus/Grafana containers, Celery, Redis, authentication, online history-aware retrieval, and a production rollout policy remain later roadmap items.
