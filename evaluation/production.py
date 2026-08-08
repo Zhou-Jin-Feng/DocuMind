@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -77,8 +78,10 @@ def build_indexed_retrieval_adapter(
 
     if not documents:
         raise ValueError("评估索引文档不能为空")
-    if score_threshold is not None and score_threshold < 0:
-        raise ValueError("score_threshold 不能小于 0")
+    if score_threshold is not None and (
+        not isfinite(score_threshold) or score_threshold < 0
+    ):
+        raise ValueError("score_threshold 必须是非负有限数")
     chunker = chunker or DocumentChunker(
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
@@ -133,8 +136,16 @@ def build_hybrid_indexed_retrieval_adapter(
     chunker: DocumentChunker | None = None,
     score_threshold: float | None = None,
     rrf_k: int = 60,
+    dense_weight: float = 1.0,
+    lexical_weight: float = 1.0,
+    candidate_multiplier: int = 5,
+    lexical_score_threshold: float | None = None,
 ) -> tuple[RetrieverAdapter, IndexingSummary]:
     """Index documents once and expose Dense + BM25 RRF retrieval for evaluation."""
+    if lexical_score_threshold is not None and (
+        not isfinite(lexical_score_threshold) or lexical_score_threshold < 0
+    ):
+        raise ValueError("lexical_score_threshold 必须是非负有限数")
     dense_adapter, summary = build_indexed_retrieval_adapter(
         documents,
         embedding_client,
@@ -152,9 +163,13 @@ def build_hybrid_indexed_retrieval_adapter(
         dense_retriever,
         BM25Retriever(lexical_documents),
         rrf_k=rrf_k,
+        dense_weight=dense_weight,
+        lexical_weight=lexical_weight,
+        candidate_multiplier=candidate_multiplier,
     )
     dense_adapter.retriever = hybrid
     dense_adapter.retrieval_method = "retrieve_hybrid"
+    dense_adapter.lexical_score_threshold = lexical_score_threshold
     return dense_adapter, summary
 
 
@@ -162,6 +177,7 @@ def build_lexical_retrieval_adapter(
     documents: Sequence[Document],
     *,
     chunker: DocumentChunker | None = None,
+    lexical_score_threshold: float | None = None,
 ) -> tuple[RetrieverAdapter, IndexingSummary]:
     """Build a production-tokenizer BM25-only evaluation adapter."""
     if not documents:
@@ -177,6 +193,7 @@ def build_lexical_retrieval_adapter(
         RetrieverAdapter(
             BM25Retriever(chunks),
             retrieval_method="retrieve_lexical",
+            lexical_score_threshold=lexical_score_threshold,
         ),
         IndexingSummary(
             document_count=len(documents),
@@ -200,8 +217,10 @@ def build_configured_retrieval_adapter(
 ) -> tuple[RetrieverAdapter, IndexingSummary]:
     """Build a baseline adapter using the configured real Embedding provider."""
 
-    if score_threshold is not None and score_threshold < 0:
-        raise ValueError("score_threshold 不能小于 0")
+    if score_threshold is not None and (
+        not isfinite(score_threshold) or score_threshold < 0
+    ):
+        raise ValueError("score_threshold 必须是非负有限数")
     embedding_client = UniversalEmbeddingClient(
         provider or settings.default_embedding_provider
     )
@@ -225,6 +244,10 @@ def build_configured_hybrid_retrieval_adapter(
     persist_directory: str = "./data/evaluation_hybrid_chroma_db",
     score_threshold: float | None = None,
     rrf_k: int = 60,
+    dense_weight: float = 1.0,
+    lexical_weight: float = 1.0,
+    candidate_multiplier: int = 5,
+    lexical_score_threshold: float | None = None,
 ) -> tuple[RetrieverAdapter, IndexingSummary]:
     """Build a real-provider Dense + BM25 RRF evaluation adapter."""
     embedding_client = UniversalEmbeddingClient(
@@ -240,4 +263,8 @@ def build_configured_hybrid_retrieval_adapter(
         vector_store,
         score_threshold=score_threshold,
         rrf_k=rrf_k,
+        dense_weight=dense_weight,
+        lexical_weight=lexical_weight,
+        candidate_multiplier=candidate_multiplier,
+        lexical_score_threshold=lexical_score_threshold,
     )

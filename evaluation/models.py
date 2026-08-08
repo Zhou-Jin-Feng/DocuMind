@@ -31,6 +31,7 @@ class GoldenCase:
     should_answer: bool = True
     top_k: int = 3
     category: str = "general"
+    split: str = "all"
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str) or not self.id.strip():
@@ -43,6 +44,8 @@ class GoldenCase:
             raise ValueError("top_k 必须是正整数")
         if not isinstance(self.category, str) or not self.category.strip():
             raise ValueError("评估用例 category 不能为空")
+        if not isinstance(self.split, str) or not self.split.strip():
+            raise ValueError("评估用例 split 不能为空")
         object.__setattr__(
             self,
             "id",
@@ -50,6 +53,10 @@ class GoldenCase:
         )
         object.__setattr__(self, "question", self.question.strip())
         object.__setattr__(self, "category", self.category.strip().casefold())
+        normalized_split = self.split.strip().casefold()
+        if normalized_split not in {"all", "train", "validation", "holdout"}:
+            raise ValueError("评估用例 split 必须是 all/train/validation/holdout")
+        object.__setattr__(self, "split", normalized_split)
         object.__setattr__(
             self,
             "expected_document_ids",
@@ -73,6 +80,7 @@ class GoldenCase:
             "should_answer",
             "top_k",
             "category",
+            "split",
         }
         unknown = sorted(set(payload) - allowed)
         if unknown:
@@ -85,6 +93,7 @@ class GoldenCase:
             should_answer=payload.get("should_answer", True),
             top_k=payload.get("top_k", 3),
             category=payload.get("category", "general"),
+            split=payload.get("split", "all"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -96,6 +105,7 @@ class GoldenCase:
             "should_answer": self.should_answer,
             "top_k": self.top_k,
             "category": self.category,
+            "split": self.split,
         }
 
 
@@ -159,6 +169,7 @@ class CaseEvaluation:
     answered: bool | None = None
     error_type: str | None = None
     category: str = "general"
+    split: str = "all"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -173,6 +184,7 @@ class CaseEvaluation:
             "answered": self.answered,
             "error_type": self.error_type,
             "category": self.category,
+            "split": self.split,
         }
 
 
@@ -188,6 +200,9 @@ class EvaluationReport:
     category_metrics: Mapping[str, Mapping[str, float | None]] = field(
         default_factory=dict
     )
+    split_metrics: Mapping[str, Mapping[str, float | None]] = field(
+        default_factory=dict
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", dict(self.metadata or {}))
@@ -197,6 +212,14 @@ class EvaluationReport:
             {
                 str(category): dict(metrics)
                 for category, metrics in (self.category_metrics or {}).items()
+            },
+        )
+        object.__setattr__(
+            self,
+            "split_metrics",
+            {
+                str(split): dict(metrics)
+                for split, metrics in (self.split_metrics or {}).items()
             },
         )
 
@@ -210,6 +233,10 @@ class EvaluationReport:
             "category_metrics": {
                 category: dict(metrics)
                 for category, metrics in self.category_metrics.items()
+            },
+            "split_metrics": {
+                split: dict(metrics)
+                for split, metrics in self.split_metrics.items()
             },
             "cases": [result.to_dict() for result in self.case_results],
         }
@@ -256,18 +283,42 @@ class EvaluationReport:
                     f"{formatted('successful_case_rate')} | "
                     f"{formatted('average_duration_ms')} |"
                 )
+        if self.split_metrics:
+            lines.extend(
+                [
+                    "",
+                    "## Metrics By Split",
+                    "",
+                    "| Split | Cases | Recall@K | MRR@K | Hit Rate | No-answer Accuracy | Success | Avg ms |",
+                    "|---|---:|---:|---:|---:|---:|---:|---:|",
+                ]
+            )
+            for split, metrics in self.split_metrics.items():
+                def formatted(name: str) -> str:
+                    value = metrics.get(name)
+                    return "N/A" if value is None else f"{value:.4f}"
+
+                lines.append(
+                    f"| `{split}` | {int(metrics.get('case_count') or 0)} | "
+                    f"{formatted('recall_at_k')} | {formatted('mrr_at_k')} | "
+                    f"{formatted('top_k_hit_rate')} | "
+                    f"{formatted('no_answer_retrieval_accuracy')} | "
+                    f"{formatted('successful_case_rate')} | "
+                    f"{formatted('average_duration_ms')} |"
+                )
         lines.extend(
             [
                 "",
                 "## Cases",
                 "",
-                "| Case | Category | Status | Top-K | Duration (ms) |",
-                "|---|---|---|---:|---:|",
+                "| Case | Category | Split | Status | Top-K | Duration (ms) |",
+                "|---|---|---|---|---:|---:|",
             ]
         )
         for result in self.case_results:
             lines.append(
-                f"| `{result.case_id}` | `{result.category}` | {result.status} | "
+                f"| `{result.case_id}` | `{result.category}` | `{result.split}` | "
+                f"{result.status} | "
                 f"{result.top_k} | "
                 f"{result.duration_ms:.3f} |"
             )

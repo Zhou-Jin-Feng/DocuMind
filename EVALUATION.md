@@ -28,6 +28,8 @@ No-answer cases use an empty `expected_document_ids` list and `should_answer: fa
 
 `category` is optional for old datasets and defaults to `general`. The v1.6 dataset uses `exact_term`, `semantic_paraphrase`, `keyword_precision`, `hard_negative`, `multi_hop`, and `no_answer`; reports include a separate metric table for every category.
 
+`split` is also optional and defaults to `all` for backward compatibility. Supported values are `all`, `train`, `validation`, and `holdout`. Reports aggregate the same metrics by category and by split. The v1.6.1 holdout cases live in `evaluation/datasets/v1_6/holdout_dataset.jsonl`; keep them separate from tuning cases and use them for final calibration checks.
+
 ## Metrics
 
 The runner reports:
@@ -80,6 +82,50 @@ The production baseline CLI accepts the same modes:
 ```
 
 BM25-only does not call an Embedding provider and rejects `--score-threshold`. Hybrid uses RRF ranks and never compares Chroma distance with BM25 scores directly.
+
+### v1.6.1 Retrieval Calibration
+
+v1.6.1 adds a separate 12-case holdout set and makes Hybrid calibration explicit. The CLI options are:
+
+- `--dense-weight` and `--lexical-weight`: non-negative RRF channel weights; they cannot both be zero;
+- `--rrf-k`: positive RRF smoothing constant;
+- `--candidate-multiplier`: positive candidate-depth multiplier;
+- `--score-threshold`: maximum accepted Dense distance;
+- `--lexical-score-threshold`: minimum accepted BM25 score.
+
+All values are written to report metadata. A zero-weight channel is not queried. The Web application remains Dense-only and does not consume these experimental settings.
+
+The checked-in real-provider reports use local Ollama `qwen3-embedding` (4096 dimensions), 9 documents, 10 production chunks, and the 12 holdout cases:
+
+| Mode | Recall@3 | MRR@3 | No-answer Accuracy | Result |
+|---|---:|---:|---:|---|
+| Dense, no threshold | 1.0000 | 1.0000 | 0.0000 | baseline |
+| BM25, no threshold | 1.0000 | 0.9394 | 0.0000 | baseline |
+| Equal-weight Hybrid, no threshold | 1.0000 | 1.0000 | 0.0000 | baseline |
+| Dense, distance <= 1.0 | 1.0000 | 1.0000 | 1.0000 | calibrated candidate |
+| Hybrid, distance <= 1.0 and BM25 >= 12.2 | 1.0000 | 0.9545 | 1.0000 | calibrated candidate |
+
+Run the calibrated Hybrid candidate and its holdout gate:
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.production_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --documents-dir evaluation/datasets/v1_6/documents `
+  --provider ollama --retrieval-mode hybrid `
+  --score-threshold 1.0 --lexical-score-threshold 12.2 `
+  --dense-weight 1.0 --lexical-weight 1.0 `
+  --rrf-k 60 --candidate-multiplier 5
+
+.\venv\Scripts\python.exe -m evaluation.regression_runner `
+  --baseline evaluation/reports/v1_6_1_ollama_holdout_hybrid.json `
+  --current evaluation/reports/v1_6_1_ollama_holdout_hybrid_calibrated.json `
+  --allowed-drop mrr_at_k=0.05 `
+  --minimum recall_at_k=1.0 `
+  --minimum no_answer_retrieval_accuracy=1.0 `
+  --minimum successful_case_rate=1.0
+```
+
+These thresholds are calibrated evidence for this fixture corpus, not online defaults. Revalidate them after changing the corpus, chunking, provider, model, or distance metric.
 
 For a real baseline, replace the deterministic integration components with a real `RetrieverAdapter` backed by the intended Embedding model and vector collection. Keep the same document IDs and golden dataset when comparing changes.
 

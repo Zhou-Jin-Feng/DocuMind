@@ -123,6 +123,13 @@ class EvaluationRunner:
             )
             for category in sorted({result.category for result in results})
         }
+        split_metrics = {
+            split: self._aggregate_results(
+                [result for result in results if result.split == split],
+                metric_names,
+            )
+            for split in sorted({result.split for result in results})
+        }
         return EvaluationReport(
             dataset_name=self.dataset_name,
             top_k=self.default_top_k,
@@ -130,6 +137,7 @@ class EvaluationRunner:
             metrics=metrics,
             metadata=self.metadata,
             category_metrics=category_metrics,
+            split_metrics=split_metrics,
         )
 
     @staticmethod
@@ -205,6 +213,7 @@ class EvaluationRunner:
             answered=answered,
             error_type=error_type,
             category=case.category,
+            split=case.split,
         )
 
 
@@ -232,6 +241,12 @@ def _build_demo_runner(
     cases: Sequence[GoldenCase],
     dataset_path: Path,
     retrieval_mode: str = "dense",
+    *,
+    rrf_k: int = 60,
+    dense_weight: float = 1.0,
+    lexical_weight: float = 1.0,
+    candidate_multiplier: int = 5,
+    lexical_score_threshold: float | None = None,
 ) -> EvaluationRunner:
     answer_mapping = {}
     for case in cases:
@@ -250,6 +265,11 @@ def _build_demo_runner(
         "case_count": len(cases),
         "case_top_k_values": sorted({case.top_k for case in cases}),
         "score_threshold": None,
+        "lexical_score_threshold": lexical_score_threshold,
+        "dense_weight": dense_weight,
+        "lexical_weight": lexical_weight,
+        "rrf_k": rrf_k,
+        "candidate_multiplier": candidate_multiplier,
         "dataset_sha256": file_sha256(dataset_path),
     }
     if documents:
@@ -260,11 +280,19 @@ def _build_demo_runner(
             retrieval_adapter = RetrieverAdapter(
                 build_deterministic_bm25_retriever(documents),
                 retrieval_method="retrieve_lexical",
+                lexical_score_threshold=lexical_score_threshold,
             )
         elif retrieval_mode == "hybrid":
             retrieval_adapter = RetrieverAdapter(
-                build_deterministic_hybrid_retriever(documents),
+                build_deterministic_hybrid_retriever(
+                    documents,
+                    rrf_k=rrf_k,
+                    dense_weight=dense_weight,
+                    lexical_weight=lexical_weight,
+                    candidate_multiplier=candidate_multiplier,
+                ),
                 retrieval_method="retrieve_hybrid",
+                lexical_score_threshold=lexical_score_threshold,
             )
         else:
             raise ValueError(f"不支持的 retrieval_mode: {retrieval_mode}")
@@ -304,11 +332,25 @@ def main() -> int:
         default="dense",
         help="Deterministic retrieval strategy used by the offline smoke run",
     )
+    parser.add_argument("--rrf-k", type=int, default=60)
+    parser.add_argument("--dense-weight", type=float, default=1.0)
+    parser.add_argument("--lexical-weight", type=float, default=1.0)
+    parser.add_argument("--candidate-multiplier", type=int, default=5)
+    parser.add_argument("--lexical-score-threshold", type=float, default=None)
     args = parser.parse_args()
 
     dataset_path = Path(args.dataset)
     cases = load_golden_dataset(dataset_path)
-    report = _build_demo_runner(cases, dataset_path, args.retrieval_mode).run(cases)
+    report = _build_demo_runner(
+        cases,
+        dataset_path,
+        args.retrieval_mode,
+        rrf_k=args.rrf_k,
+        dense_weight=args.dense_weight,
+        lexical_weight=args.lexical_weight,
+        candidate_multiplier=args.candidate_multiplier,
+        lexical_score_threshold=args.lexical_score_threshold,
+    ).run(cases)
     if args.output_json:
         Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output_json).write_text(report.to_json(), encoding="utf-8")

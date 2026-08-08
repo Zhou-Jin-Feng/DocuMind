@@ -55,6 +55,8 @@ class RetrieverTests(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].distance, 0.2)
         self.assertEqual(results[0].page_number, 2)
+        with self.assertRaises(ValueError):
+            self.retriever.retrieve_semantic("什么是RAG", score_threshold=float("nan"))
 
     def test_system_failure_is_not_converted_to_empty_results(self):
         with self.assertRaises(RuntimeError):
@@ -162,6 +164,93 @@ class RetrieverTests(unittest.TestCase):
             if result.metadata["chunk_id"] == "lexical"
         )
         self.assertIsNone(lexical_only.distance)
+
+    def test_hybrid_supports_weights_and_candidate_multiplier(self):
+        dense_results = [
+            RetrievalResult("shared", {"chunk_id": "shared"}, 0.1, 1),
+            RetrievalResult("dense", {"chunk_id": "dense"}, 0.2, 2),
+        ]
+
+        class Dense:
+            def __init__(self):
+                self.calls = []
+
+            def retrieve_semantic(self, *args, **kwargs):
+                self.calls.append((args, kwargs))
+                return dense_results
+
+        dense = Dense()
+        lexical = BM25Retriever(
+            [
+                Document(page_content="shared exact", metadata={"chunk_id": "shared"}),
+                Document(page_content="lexical exact", metadata={"chunk_id": "lexical"}),
+            ]
+        )
+        hybrid = HybridRetriever(
+            dense,
+            lexical,
+            rrf_k=10,
+            dense_weight=2.0,
+            lexical_weight=3.0,
+            candidate_multiplier=4,
+        )
+
+        results = hybrid.retrieve_hybrid("exact", top_k=2)
+
+        self.assertEqual(dense.calls[0][1]["top_k"], 8)
+        shared = next(result for result in results if result.metadata["chunk_id"] == "shared")
+        self.assertAlmostEqual(shared.fusion_score, 2 / 11 + 3 / 11)
+
+    def test_bm25_lexical_score_threshold_filters_low_score_hits(self):
+        retriever = BM25Retriever(
+            [
+                Document(page_content="alpha beta", metadata={"chunk_id": "alpha"}),
+                Document(page_content="gamma", metadata={"chunk_id": "gamma"}),
+            ]
+        )
+
+        results = retriever.retrieve_lexical(
+            "alpha",
+            top_k=2,
+            lexical_score_threshold=10**9,
+        )
+
+        self.assertEqual(results, [])
+        with self.assertRaises(ValueError):
+            retriever.retrieve_lexical("alpha", lexical_score_threshold=-0.1)
+
+    def test_hybrid_rejects_invalid_calibration(self):
+        lexical = BM25Retriever(
+            [Document(page_content="alpha", metadata={"chunk_id": "alpha"})]
+        )
+
+        class Dense:
+            def retrieve_semantic(self, *args, **kwargs):
+                return []
+
+        with self.assertRaises(ValueError):
+            HybridRetriever(Dense(), lexical, dense_weight=0, lexical_weight=0)
+        with self.assertRaises(ValueError):
+            HybridRetriever(Dense(), lexical, candidate_multiplier=0)
+
+    def test_hybrid_skips_zero_weight_channel(self):
+        class DisabledDense:
+            def retrieve_semantic(self, *args, **kwargs):
+                raise AssertionError("zero-weight Dense channel should not run")
+
+        lexical = BM25Retriever(
+            [Document(page_content="RRF exact", metadata={"chunk_id": "lexical"})]
+        )
+        hybrid = HybridRetriever(
+            DisabledDense(),
+            lexical,
+            dense_weight=0,
+            lexical_weight=1,
+        )
+
+        results = hybrid.retrieve_hybrid("RRF exact", top_k=1)
+
+        self.assertEqual(results[0].metadata["chunk_id"], "lexical")
 
 
 if __name__ == "__main__":

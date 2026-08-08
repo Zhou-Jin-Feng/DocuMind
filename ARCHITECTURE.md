@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v1.6）
+# DocuMind - RAG 系统架构（v1.6.1）
 
 ## 1. 分层结构
 
@@ -125,7 +125,7 @@ Dense ranks ─┐
 BM25 ranks ──┘
 ```
 
-RRF 只使用名次，不直接比较 Chroma `distance` 与 BM25 原始分数。结果分别保留 `distance`、`lexical_score`、`dense_rank`、`lexical_rank` 和 `fusion_score`，方便审计来源。词法候选没有向量距离时，UI 不显示伪造的距离值。
+RRF 只使用名次，不直接比较 Chroma `distance` 与 BM25 原始分数。v1.6.1 使用 `dense_weight/(rrf_k+dense_rank) + lexical_weight/(rrf_k+lexical_rank)`，候选深度由 `candidate_multiplier` 控制；零权重通道不执行检索。BM25 可用 `lexical_score_threshold` 拒绝低分词法候选。结果分别保留 `distance`、`lexical_score`、`dense_rank`、`lexical_rank` 和 `fusion_score`，方便审计来源。词法候选没有向量距离时，UI 不显示伪造的距离值。
 
 ## 5. 可观测性架构
 
@@ -179,11 +179,11 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 8. 当前边界
 
-v1.6 在 v1.5 文档生命周期基础上扩展检索质量实验层。评估层和生命周期层都不反向依赖 Web UI，混合检索在真实 Provider 门禁通过前不成为 Web 默认链路。
+v1.6.1 在 v1.6 检索质量实验层上增加独立 holdout、按 split 汇总、真实 Provider 校准参数和门禁报告。评估层和生命周期层都不反向依赖 Web UI；虽然本地 Ollama holdout 校准通过，样本规模仍不足以自动改变 Web 默认 Dense-only 链路。
 
 ```text
 evaluation.runner
-├── evaluation.datasets       # v1.4 / v1.6 JSONL 黄金用例
+├── evaluation.datasets       # v1.4 / v1.6 / v1.6.1 JSONL 黄金与 holdout 用例
 ├── evaluation.adapters       # Dense / BM25 / Hybrid 与 Fake Adapter 边界
 ├── evaluation.metrics        # 纯函数检索/拒答指标
 ├── evaluation.reports        # JSON/Markdown 报告

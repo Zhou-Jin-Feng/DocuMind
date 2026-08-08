@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+from math import isfinite
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional, Protocol
 
@@ -36,11 +37,19 @@ class RetrieverAdapter:
         score_threshold: Optional[float] = None,
         *,
         retrieval_method: str = "retrieve_semantic",
+        lexical_score_threshold: Optional[float] = None,
     ):
-        if score_threshold is not None and score_threshold < 0:
-            raise ValueError("score_threshold 不能小于 0")
+        if score_threshold is not None and (
+            not isfinite(score_threshold) or score_threshold < 0
+        ):
+            raise ValueError("score_threshold 必须是非负有限数")
+        if lexical_score_threshold is not None and (
+            not isfinite(lexical_score_threshold) or lexical_score_threshold < 0
+        ):
+            raise ValueError("lexical_score_threshold 必须是非负有限数")
         self.retriever = retriever
         self.score_threshold = score_threshold
+        self.lexical_score_threshold = lexical_score_threshold
         if not isinstance(retrieval_method, str) or not callable(
             getattr(retriever, retrieval_method, None)
         ):
@@ -51,6 +60,11 @@ class RetrieverAdapter:
         retrieval_kwargs = {"top_k": top_k}
         if self.score_threshold is not None and self.retrieval_method != "retrieve_lexical":
             retrieval_kwargs["score_threshold"] = self.score_threshold
+        if self.lexical_score_threshold is not None and self.retrieval_method in {
+            "retrieve_lexical",
+            "retrieve_hybrid",
+        }:
+            retrieval_kwargs["lexical_score_threshold"] = self.lexical_score_threshold
         method = getattr(self.retriever, self.retrieval_method)
         results = method(question, **retrieval_kwargs)
         documents: list[RetrievedDocument] = []
@@ -77,6 +91,7 @@ class RetrieverAdapter:
         retriever = self.retriever
         self.retriever = None
         self.score_threshold = None
+        self.lexical_score_threshold = None
         self.retrieval_method = "retrieve_semantic"
         if retriever is not None:
             dense_retriever = getattr(retriever, "dense_retriever", retriever)

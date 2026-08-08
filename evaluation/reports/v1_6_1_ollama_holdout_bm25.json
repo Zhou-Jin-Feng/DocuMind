@@ -1,0 +1,523 @@
+{
+  "dataset_name": "ollama-bm25-retrieval-baseline",
+  "top_k": 3,
+  "case_count": 12,
+  "metadata": {
+    "document_count": 9,
+    "chunk_count": 10,
+    "embedding_provider": "none",
+    "embedding_model": "none",
+    "embedding_dimension": 0,
+    "chunk_size": 500,
+    "chunk_overlap": 100,
+    "case_count": 12,
+    "case_top_k_values": [
+      3
+    ],
+    "score_threshold": null,
+    "lexical_score_threshold": null,
+    "dense_weight": 1.0,
+    "lexical_weight": 1.0,
+    "rrf_k": 60,
+    "candidate_multiplier": 5,
+    "retrieval_mode": "bm25",
+    "dataset_path": "evaluation/datasets/v1_6/holdout_dataset.jsonl",
+    "documents_directory": "evaluation/datasets/v1_6/documents",
+    "dataset_sha256": "82e5e1cefcb230eea220ff6bd26c90e087d7f8fe36c7b5a18d5c729693273eba",
+    "documents_sha256": "552c4de4204bda67ebba4b865d64f6a9ff4862d9dcc745f95993a7342ee10c4d"
+  },
+  "metrics": {
+    "recall_at_k": 1.0,
+    "precision_at_k": 0.3333333333333333,
+    "mrr_at_k": 0.9393939393939394,
+    "top_k_hit_rate": 1.0,
+    "correct_document_avg_rank": 1.1818181818181819,
+    "no_answer_retrieval_accuracy": 0.0,
+    "refusal_accuracy": null,
+    "keyword_coverage": null,
+    "successful_case_rate": 1.0,
+    "average_duration_ms": 0.41565833453205414
+  },
+  "category_metrics": {
+    "exact_term": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 0.7777777777777778,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.6666666666666667,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 3.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.3857666694481547
+    },
+    "hard_negative": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.0,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 2.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.5413999970187433
+    },
+    "no_answer": {
+      "recall_at_k": null,
+      "precision_at_k": null,
+      "mrr_at_k": null,
+      "top_k_hit_rate": null,
+      "correct_document_avg_rank": null,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 1.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.40689999877940863
+    },
+    "observability": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.0,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 1.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.4010999982710928
+    },
+    "quality_gate": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.0,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 1.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.3831000067293644
+    },
+    "retrieval_quality": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.0,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 2.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.46440000005532056
+    },
+    "security": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.0,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 2.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.3139500040560961
+    }
+  },
+  "split_metrics": {
+    "holdout": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 0.9393939393939394,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.1818181818181819,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 12.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.41565833453205414
+    }
+  },
+  "cases": [
+    {
+      "case_id": "holdout-life-001",
+      "question": "cleanup 如何收敛 deleting 状态？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "retrieval-troubleshooting",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.429,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "exact_term",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-life-002",
+      "question": "相同内容且 active Chunk 完整时重复上传会怎样？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "security-boundaries",
+        "deployment-baseline"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.575,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-embed-001",
+      "question": "Embedding 空间兼容性由哪些字段共同决定？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "embedding-compatibility",
+        "observability-quality",
+        "retrieval-quality"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.377,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "exact_term",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-embed-002",
+      "question": "只要向量维度相同，不同模型可以共用非空 Collection 吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "embedding-compatibility",
+        "retrieval-troubleshooting",
+        "deployment-baseline"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.507,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-eval-001",
+      "question": "回归报告要比较哪些输入指纹？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-baseline",
+        "retrieval-troubleshooting",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.3333333333333333,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 3.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.351,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "exact_term",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-eval-002",
+      "question": "质量门禁是否允许 no-answer 检索准确率下降？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "retrieval-troubleshooting",
+        "observability-quality"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.383,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "quality_gate",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-observe-001",
+      "question": "一次请求和一次 Trace 分别使用什么关联标识？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-quality",
+        "lifecycle-operations",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.401,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "observability",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-observe-002",
+      "question": "检索质量指标的标签为什么不能放 document_id？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-quality",
+        "retrieval-troubleshooting",
+        "retrieval-quality"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.361,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "security",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-security-001",
+      "question": "cleanup --include-orphans 的删除边界是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "security-boundaries",
+        "lifecycle-operations",
+        "retrieval-quality"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.267,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "security",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-retrieval-001",
+      "question": "为什么混合检索要先扩大候选集再融合？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "observability-quality",
+        "architecture-decisions"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.452,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "retrieval_quality",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-troubleshoot-001",
+      "question": "Recall 下降时为什么要先核对数据集和语料指纹？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-troubleshooting",
+        "evaluation-gates",
+        "architecture-decisions"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.477,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "retrieval_quality",
+      "split": "holdout"
+    },
+    {
+      "case_id": "holdout-no-answer-001",
+      "question": "请推荐上海下周的餐厅并给出实时价格。",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "embedding-compatibility",
+        "lifecycle-operations",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.407,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "no_answer",
+      "split": "holdout"
+    }
+  ]
+}

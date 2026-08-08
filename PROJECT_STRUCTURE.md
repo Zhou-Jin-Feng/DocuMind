@@ -1,4 +1,4 @@
-# 项目结构（v1.6）
+# 项目结构（v1.6.1）
 
 ```text
 DocuMind/
@@ -67,6 +67,7 @@ DocuMind/
 │   │   ├── documents/
 │   │   └── v1_6/
 │   │       ├── golden_dataset.jsonl
+│   │       ├── holdout_dataset.jsonl
 │   │       └── documents/
 │   ├── baselines/
 │   └── reports/

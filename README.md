@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.6）
+# DocuMind - RAG 知识库问答系统（v1.6.1）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前开发版本：**v1.6 检索质量实验版**。v1.5 的文档生命周期能力保持不变；v1.6 扩充黄金评估集，并增加 BM25-only 与 Dense + BM25 RRF 离线对照。Web 默认链路仍使用 Dense-only，真实 Embedding 评估达标前不切换线上行为。
+> 当前开发版本：**v1.6.1 检索校准版**。在 v1.6 Dense/BM25/RRF 对照基础上增加独立 holdout、可配置 RRF 权重与候选深度、BM25 最低分阈值，并完成真实 Ollama Provider 校准。Web 默认链路仍使用 Dense-only，不自动采用实验阈值。
 
 ## 当前能力
 
@@ -19,8 +19,9 @@
 - Prometheus Metrics 使用低基数标签，默认暴露在 `127.0.0.1:8000/metrics`。
 - OpenTelemetry Tracing 默认关闭，支持应用私有 Provider、OTLP/HTTP 导出和日志 Trace ID 关联。
 - 提供离线黄金评估集、Recall@K、Precision@K、MRR、Top-K 命中率、拒答准确率和回归门禁。
-- v1.6 评估集包含 32 条用例、9 篇文档和 6 个问题类别，并按类别输出指标。
-- 提供中文/英文标识符 BM25 检索，以及不比较原始分数的 RRF 混合检索实验入口。
+- v1.6 评估集包含 32 条原始用例和 12 条独立 holdout，用例按类别与 split 分别输出指标。
+- 提供中文/英文标识符 BM25 检索，以及可配置权重、RRF 常数和候选深度的混合检索实验入口。
+- Dense 最大距离和 BM25 最低词法分数可独立校准，并写入评估报告元数据。
 
 ## 项目结构
 
@@ -204,7 +205,18 @@ python -m evaluation.runner --dataset evaluation/datasets/v1_6/golden_dataset.js
 python -m evaluation.runner --dataset evaluation/datasets/v1_6/golden_dataset.jsonl --retrieval-mode hybrid
 ```
 
-这些命令使用离线哈希 Embedding 验证检索与评估边界，不代表生产 Embedding 质量。真实 Provider 对照使用 `python -m evaluation.production_runner --retrieval-mode dense|bm25|hybrid`。
+运行 v1.6.1 独立 holdout 和真实 Provider 校准：
+
+```powershell
+python -m evaluation.runner --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl --retrieval-mode hybrid
+python -m evaluation.production_runner `
+  --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
+  --documents-dir evaluation/datasets/v1_6/documents `
+  --provider ollama --retrieval-mode hybrid `
+  --score-threshold 1.0 --lexical-score-threshold 12.2
+```
+
+离线命令使用哈希 Embedding 验证检索与评估边界，不代表生产 Embedding 质量。真实 Provider 对照支持 `dense|bm25|hybrid`，详细参数、报告和门禁命令见 [EVALUATION.md](EVALUATION.md)。
 
 ## 测试与检查
 

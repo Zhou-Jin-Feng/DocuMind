@@ -5,6 +5,7 @@ RAG 系统检索模块。
 """
 
 import hashlib
+import math
 import re
 from dataclasses import dataclass
 from time import perf_counter
@@ -72,8 +73,10 @@ class Retriever:
             raise ValueError("查询内容不能为空")
         if top_k <= 0:
             raise ValueError("top_k 必须大于 0")
-        if score_threshold is not None and score_threshold < 0:
-            raise ValueError("score_threshold 不能小于 0")
+        if score_threshold is not None and (
+            not math.isfinite(float(score_threshold)) or float(score_threshold) < 0
+        ):
+            raise ValueError("score_threshold 必须是非负有限数")
 
         metrics = get_metrics()
         provider = str(getattr(self.embedding_client, "provider", "unknown"))
@@ -418,12 +421,18 @@ class BM25Retriever:
         top_k: int = 5,
         metadata_filter: Optional[Dict] = None,
         result_predicate: Optional[Callable[[Dict], bool]] = None,
+        lexical_score_threshold: Optional[float] = None,
     ) -> List[RetrievalResult]:
         normalized_query = (query or "").strip()
         if not normalized_query:
             raise ValueError("查询内容不能为空")
         if top_k <= 0:
             raise ValueError("top_k 必须大于 0")
+        if lexical_score_threshold is not None and (
+            not math.isfinite(float(lexical_score_threshold))
+            or float(lexical_score_threshold) < 0
+        ):
+            raise ValueError("lexical_score_threshold 必须是非负有限数")
         query_tokens = self.tokenize(normalized_query)
         if not query_tokens:
             return []
@@ -449,6 +458,10 @@ class BM25Retriever:
             if query_term_set.intersection(
                 self._tokenized_documents[document_index]
             )
+            and (
+                lexical_score_threshold is None
+                or float(score) >= float(lexical_score_threshold)
+            )
         ]
         ranked.sort(key=lambda item: (-item[1], item[0]))
         return [
@@ -473,12 +486,30 @@ class HybridRetriever:
         lexical_retriever: BM25Retriever,
         *,
         rrf_k: int = 60,
+        dense_weight: float = 1.0,
+        lexical_weight: float = 1.0,
+        candidate_multiplier: int = 5,
     ):
-        if rrf_k <= 0:
+        if not isinstance(rrf_k, int) or isinstance(rrf_k, bool) or rrf_k <= 0:
             raise ValueError("rrf_k 必须大于 0")
+        if not isinstance(candidate_multiplier, int) or isinstance(
+            candidate_multiplier, bool
+        ) or candidate_multiplier <= 0:
+            raise ValueError("candidate_multiplier 必须是大于 0 的整数")
+        for name, weight in (
+            ("dense_weight", dense_weight),
+            ("lexical_weight", lexical_weight),
+        ):
+            if not math.isfinite(float(weight)) or float(weight) < 0:
+                raise ValueError(f"{name} 必须是非负有限数")
+        if float(dense_weight) == 0 and float(lexical_weight) == 0:
+            raise ValueError("dense_weight 和 lexical_weight 不能同时为 0")
         self.dense_retriever = dense_retriever
         self.lexical_retriever = lexical_retriever
         self.rrf_k = rrf_k
+        self.dense_weight = float(dense_weight)
+        self.lexical_weight = float(lexical_weight)
+        self.candidate_multiplier = candidate_multiplier
 
     @staticmethod
     def _document_key(result: RetrievalResult) -> str:
@@ -491,43 +522,72 @@ class HybridRetriever:
         *,
         dense_top_k: Optional[int] = None,
         lexical_top_k: Optional[int] = None,
+        candidate_multiplier: Optional[int] = None,
         score_threshold: Optional[float] = None,
+        lexical_score_threshold: Optional[float] = None,
         metadata_filter: Optional[Dict] = None,
         result_predicate: Optional[Callable[[Dict], bool]] = None,
     ) -> List[RetrievalResult]:
         if top_k <= 0:
             raise ValueError("top_k 必须大于 0")
-        candidate_k = max(top_k * 5, top_k)
-        dense_results = self.dense_retriever.retrieve_semantic(
-            query,
-            top_k=dense_top_k or candidate_k,
-            score_threshold=score_threshold,
-            metadata_filter=metadata_filter,
-            result_predicate=result_predicate,
+        multiplier = (
+            self.candidate_multiplier
+            if candidate_multiplier is None
+            else candidate_multiplier
         )
-        lexical_results = self.lexical_retriever.retrieve_lexical(
-            query,
-            top_k=lexical_top_k or candidate_k,
-            metadata_filter=metadata_filter,
-            result_predicate=result_predicate,
+        if (
+            not isinstance(multiplier, int)
+            or isinstance(multiplier, bool)
+            or multiplier <= 0
+        ):
+            raise ValueError("candidate_multiplier 必须是大于 0 的整数")
+        if dense_top_k is not None and dense_top_k <= 0:
+            raise ValueError("dense_top_k 必须大于 0")
+        if lexical_top_k is not None and lexical_top_k <= 0:
+            raise ValueError("lexical_top_k 必须大于 0")
+        candidate_k = max(top_k * multiplier, top_k)
+        dense_results = (
+            self.dense_retriever.retrieve_semantic(
+                query,
+                top_k=dense_top_k or candidate_k,
+                score_threshold=score_threshold,
+                metadata_filter=metadata_filter,
+                result_predicate=result_predicate,
+            )
+            if self.dense_weight > 0
+            else []
+        )
+        lexical_kwargs: dict[str, Any] = {
+            "top_k": lexical_top_k or candidate_k,
+            "metadata_filter": metadata_filter,
+            "result_predicate": result_predicate,
+        }
+        if lexical_score_threshold is not None:
+            lexical_kwargs["lexical_score_threshold"] = lexical_score_threshold
+        lexical_results = (
+            self.lexical_retriever.retrieve_lexical(query, **lexical_kwargs)
+            if self.lexical_weight > 0
+            else []
         )
         merged: dict[str, RetrievalResult] = {}
-        for rank, result in enumerate(dense_results, 1):
-            result.dense_rank = rank
-            result.fusion_score = 1 / (self.rrf_k + rank)
-            merged[self._document_key(result)] = result
-        for rank, result in enumerate(lexical_results, 1):
-            key = self._document_key(result)
-            contribution = 1 / (self.rrf_k + rank)
-            existing = merged.get(key)
-            if existing is None:
-                result.lexical_rank = rank
-                result.fusion_score = contribution
-                merged[key] = result
-            else:
-                existing.lexical_rank = rank
-                existing.lexical_score = result.lexical_score
-                existing.fusion_score = (existing.fusion_score or 0.0) + contribution
+        if self.dense_weight > 0:
+            for rank, result in enumerate(dense_results, 1):
+                result.dense_rank = rank
+                result.fusion_score = self.dense_weight / (self.rrf_k + rank)
+                merged[self._document_key(result)] = result
+        if self.lexical_weight > 0:
+            for rank, result in enumerate(lexical_results, 1):
+                key = self._document_key(result)
+                contribution = self.lexical_weight / (self.rrf_k + rank)
+                existing = merged.get(key)
+                if existing is None:
+                    result.lexical_rank = rank
+                    result.fusion_score = contribution
+                    merged[key] = result
+                else:
+                    existing.lexical_rank = rank
+                    existing.lexical_score = result.lexical_score
+                    existing.fusion_score = (existing.fusion_score or 0.0) + contribution
         results = sorted(
             merged.values(),
             key=lambda result: (

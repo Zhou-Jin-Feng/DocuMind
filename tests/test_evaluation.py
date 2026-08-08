@@ -4,7 +4,7 @@ import gc
 import shutil
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -17,7 +17,7 @@ from evaluation.production import (
     build_lexical_retrieval_adapter,
     load_text_documents,
 )
-from evaluation.production_runner import _default_report_stem
+from evaluation.production_runner import _default_report_stem, main as production_main
 from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from app.core.document_chunker import DocumentChunker
 from app.core.retriever import Retriever
@@ -76,6 +76,15 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(case.category, "semantic_paraphrase")
         with self.assertRaises(ValueError):
             GoldenCase.from_dict({"id": "case-2", "question": "q", "typo": True})
+
+    def test_golden_case_split_is_backward_compatible_and_serialized(self):
+        legacy = GoldenCase.from_dict({"id": "legacy", "question": "q"})
+        holdout = GoldenCase.from_dict(
+            {"id": "holdout", "question": "q2", "split": " HOLDOUT "}
+        )
+        self.assertEqual(legacy.split, "all")
+        self.assertEqual(holdout.split, "holdout")
+        self.assertEqual(holdout.to_dict()["split"], "holdout")
 
     def test_dataset_loader_rejects_duplicate_ids(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -148,6 +157,23 @@ class EvaluationTests(unittest.TestCase):
         self.assertIn("Metrics By Category", report.to_markdown())
         self.assertEqual(report.to_dict()["case_count"], 2)
 
+    def test_runner_aggregates_metrics_by_split(self):
+        cases = [
+            GoldenCase("train", "q1", ("doc-a",), split="train"),
+            GoldenCase("holdout", "q2", (), should_answer=False, split="holdout"),
+        ]
+        retrieval = FakeRetrievalAdapter(
+            {"q1": [RetrievedDocument("doc-a")], "q2": []}
+        )
+        report = EvaluationRunner(retrieval).run(cases)
+        self.assertEqual(report.split_metrics["train"]["recall_at_k"], 1.0)
+        self.assertEqual(
+            report.split_metrics["holdout"]["no_answer_retrieval_accuracy"],
+            1.0,
+        )
+        self.assertEqual(report.case_results[1].split, "holdout")
+        self.assertIn("Metrics By Split", report.to_markdown())
+
     def test_runner_records_adapter_failure_without_aborting_dataset(self):
         class BrokenAdapter:
             def retrieve(self, question, top_k):
@@ -208,6 +234,28 @@ class EvaluationTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             RetrieverAdapter(retriever, score_threshold=-0.1)
+        with self.assertRaises(ValueError):
+            RetrieverAdapter(retriever, score_threshold=float("nan"))
+
+    def test_retriever_adapter_passes_lexical_score_threshold(self):
+        class FakeRetriever:
+            def __init__(self):
+                self.calls = []
+
+            def retrieve_lexical(self, question, **kwargs):
+                self.calls.append((question, kwargs))
+                return []
+
+        retriever = FakeRetriever()
+        RetrieverAdapter(
+            retriever,
+            retrieval_method="retrieve_lexical",
+            lexical_score_threshold=0.25,
+        ).retrieve("q", 3)
+        self.assertEqual(
+            retriever.calls,
+            [("q", {"top_k": 3, "lexical_score_threshold": 0.25})],
+        )
 
     def test_threshold_report_stem_is_distinct_from_baseline(self):
         self.assertEqual(_default_report_stem("ollama", None), "ollama_retrieval_baseline")
@@ -217,6 +265,22 @@ class EvaluationTests(unittest.TestCase):
             _default_report_stem("ollama", None, "hybrid"),
             "ollama_hybrid_retrieval_baseline",
         )
+        self.assertEqual(
+            _default_report_stem(
+                "ollama",
+                1.0,
+                "hybrid",
+                lexical_score_threshold=12.2,
+            ),
+            "ollama_hybrid_retrieval_threshold_1_lex_12_2",
+        )
+
+    def test_production_cli_rejects_incompatible_parameters_before_indexing(self):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            production_main(
+                ["--retrieval-mode", "dense", "--lexical-score-threshold", "1.0"]
+            )
+        self.assertEqual(error.exception.code, 2)
 
     def test_lexical_adapter_preserves_document_ids_without_distances(self):
         adapter, summary = build_lexical_retrieval_adapter(

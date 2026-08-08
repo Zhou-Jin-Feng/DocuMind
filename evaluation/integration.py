@@ -120,10 +120,16 @@ def build_deterministic_hybrid_retriever(
     documents: Sequence[Document],
     *,
     rrf_k: int = 60,
+    dense_weight: float = 1.0,
+    lexical_weight: float = 1.0,
+    candidate_multiplier: int = 5,
 ) -> HybridRetriever:
     """Build deterministic Dense + BM25 RRF retrieval for offline comparison."""
     return HybridRetriever(
         build_deterministic_retriever(documents),
         build_deterministic_bm25_retriever(documents),
         rrf_k=rrf_k,
+        dense_weight=dense_weight,
+        lexical_weight=lexical_weight,
+        candidate_multiplier=candidate_multiplier,
     )
