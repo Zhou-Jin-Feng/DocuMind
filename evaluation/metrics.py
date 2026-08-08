@@ -47,8 +47,8 @@ def precision_at_k(
     expected = _expected_set(expected_document_ids)
     if not expected:
         return None
-    retrieved = _retrieved_ids(retrieved_document_ids, k)
-    return sum(item in expected for item in retrieved) / k
+    retrieved = set(_retrieved_ids(retrieved_document_ids, k))
+    return len(expected & retrieved) / k
 
 
 def reciprocal_rank_at_k(

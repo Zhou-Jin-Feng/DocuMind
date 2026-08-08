@@ -6,6 +6,7 @@ RAG系统 - 生成模块。
 
 import os
 from dataclasses import dataclass
+from math import isfinite
 from typing import Dict, Generator, List, Optional, Tuple
 
 from anthropic import Anthropic
@@ -59,7 +60,13 @@ class UniversalLLMClient:
         },
     }
 
-    def __init__(self, provider: str = "openai", model: Optional[str] = None):
+    def __init__(
+        self,
+        provider: str = "openai",
+        model: Optional[str] = None,
+        *,
+        request_timeout_seconds: float | None = None,
+    ):
         self.provider = provider.strip().lower()
         if self.provider not in self.MODELS:
             raise ValueError(
@@ -68,24 +75,41 @@ class UniversalLLMClient:
             )
 
         self.model = model or self.MODELS[self.provider]["default_model"]
+        if (
+            request_timeout_seconds is not None
+            and (
+                isinstance(request_timeout_seconds, bool)
+                or not isinstance(request_timeout_seconds, (int, float))
+                or not isfinite(request_timeout_seconds)
+                or request_timeout_seconds <= 0
+            )
+        ):
+            raise ValueError("request_timeout_seconds 必须是正有限数字")
+        self.request_timeout_seconds = request_timeout_seconds
         self.client = self._initialize_client()
         logger.info(f"已初始化LLM客户端: {self.provider}")
         logger.info(f"  模型: {self.model}")
 
     def _initialize_client(self):
         """根据提供商初始化 API 客户端。"""
+        timeout_options = (
+            {"timeout": self.request_timeout_seconds}
+            if self.request_timeout_seconds is not None
+            else {}
+        )
         if self.provider == "openai":
             if not settings.openai_api_key:
                 raise ValueError("未配置OPENAI_API_KEY")
             return OpenAI(
                 api_key=settings.openai_api_key,
                 base_url=settings.openai_base_url,
+                **timeout_options,
             )
 
         if self.provider == "claude":
             if not settings.anthropic_api_key:
                 raise ValueError("未配置ANTHROPIC_API_KEY")
-            return Anthropic(api_key=settings.anthropic_api_key)
+            return Anthropic(api_key=settings.anthropic_api_key, **timeout_options)
 
         if self.provider == "deepseek":
             if not settings.deepseek_api_key:
@@ -93,6 +117,7 @@ class UniversalLLMClient:
             return OpenAI(
                 api_key=settings.deepseek_api_key,
                 base_url=settings.deepseek_base_url,
+                **timeout_options,
             )
 
         if self.provider == "glm":
@@ -101,6 +126,7 @@ class UniversalLLMClient:
             return OpenAI(
                 api_key=settings.glm_api_key,
                 base_url=settings.glm_base_url,
+                **timeout_options,
             )
 
         raise RuntimeError(f"未实现的LLM提供商: {self.provider}")

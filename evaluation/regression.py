@@ -11,6 +11,34 @@ from typing import Any, Mapping
 from evaluation.models import EvaluationReport
 
 
+def _reject_duplicate_json_keys(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise ValueError(f"评估报告 JSON 包含重复字段: {key}")
+        payload[key] = value
+    return payload
+
+
+COMPARABLE_METADATA_KEYS = (
+    "embedding_provider",
+    "embedding_model",
+    "embedding_dimension",
+    "chunk_size",
+    "chunk_overlap",
+    "case_top_k_values",
+    "score_threshold",
+    "lexical_score_threshold",
+    "dense_weight",
+    "lexical_weight",
+    "rrf_k",
+    "candidate_multiplier",
+    "retrieval_mode",
+)
+
+
 @dataclass(frozen=True)
 class EvaluationSnapshot:
     """Validated report fields required by the regression gate."""
@@ -76,7 +104,10 @@ def load_evaluation_snapshot(path: str | Path) -> EvaluationSnapshot:
     if not report_path.is_file():
         raise FileNotFoundError(f"评估报告不存在: {report_path}")
     try:
-        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        payload = json.loads(
+            report_path.read_text(encoding="utf-8"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+        )
     except json.JSONDecodeError as exc:
         raise ValueError(f"评估报告不是有效 JSON: {report_path}") from exc
     return EvaluationSnapshot.from_dict(payload)
@@ -103,6 +134,15 @@ def report_compatibility_issues(
         if not baseline_value or not current_value:
             issues.append(f"缺少可比性字段: metadata.{key}")
         elif baseline_value != current_value:
+            issues.append(f"metadata.{key} 不一致")
+    for key in COMPARABLE_METADATA_KEYS:
+        baseline_has_key = key in baseline.metadata
+        current_has_key = key in current.metadata
+        if not baseline_has_key and not current_has_key:
+            continue
+        if not baseline_has_key or not current_has_key:
+            issues.append(f"metadata.{key} 仅存在于一份报告")
+        elif baseline.metadata[key] != current.metadata[key]:
             issues.append(f"metadata.{key} 不一致")
     return tuple(issues)
 
@@ -140,7 +180,12 @@ class RegressionGate:
         for name, value in {**self.allowed_drops, **self.minimums}.items():
             if not isinstance(name, str) or not name.strip():
                 raise ValueError("回归指标名称不能为空")
-            if not isinstance(value, (int, float)) or not isfinite(value) or value < 0:
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not isfinite(value)
+                or value < 0
+            ):
                 raise ValueError(f"回归阈值必须是非负有限数字: {name}")
 
     @staticmethod

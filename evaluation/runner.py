@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from math import floor
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Mapping, Sequence
@@ -41,6 +42,35 @@ from evaluation.models import (
     GoldenCase,
     RetrievedDocument,
 )
+
+
+def _percentile(values: Sequence[float], percentile: float) -> float:
+    """Return a linearly interpolated percentile for a non-empty sample."""
+
+    if not values:
+        raise ValueError("延迟样本不能为空")
+    if not 0.0 <= percentile <= 1.0:
+        raise ValueError("percentile 必须在 0 和 1 之间")
+    ordered = sorted(float(value) for value in values)
+    position = (len(ordered) - 1) * percentile
+    lower = floor(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def _duration_statistics(
+    results: Sequence[CaseEvaluation],
+) -> dict[str, float]:
+    durations = [result.duration_ms for result in results]
+    if not durations:
+        raise ValueError("延迟统计结果不能为空")
+    return {
+        "average_duration_ms": sum(durations) / len(durations),
+        "p50_duration_ms": _percentile(durations, 0.50),
+        "p95_duration_ms": _percentile(durations, 0.95),
+        "maximum_duration_ms": max(durations),
+    }
 
 
 def load_golden_dataset(path: str | Path) -> list[GoldenCase]:
@@ -113,9 +143,7 @@ class EvaluationRunner:
         metrics["successful_case_rate"] = sum(
             result.status == "success" for result in results
         ) / len(results)
-        metrics["average_duration_ms"] = sum(
-            result.duration_ms for result in results
-        ) / len(results)
+        metrics.update(_duration_statistics(results))
         category_metrics = {
             category: self._aggregate_results(
                 [result for result in results if result.category == category],
@@ -153,9 +181,7 @@ class EvaluationRunner:
         aggregate["successful_case_rate"] = (
             sum(result.status == "success" for result in results) / len(results)
         )
-        aggregate["average_duration_ms"] = (
-            sum(result.duration_ms for result in results) / len(results)
-        )
+        aggregate.update(_duration_statistics(results))
         return aggregate
 
     def _run_case(self, case: GoldenCase) -> CaseEvaluation:

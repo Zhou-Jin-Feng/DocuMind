@@ -46,6 +46,20 @@ class QueryRewriterTests(unittest.TestCase):
         self.assertEqual(len(result.queries), 3)
         self.assertEqual(client.calls[0][1].temperature, 0.0)
         self.assertFalse(client.calls[0][1].stream)
+        self.assertIn(
+            "Do not repeat the original question",
+            client.calls[0][0][1]["content"],
+        )
+        self.assertIn("Preserve command names", client.calls[0][0][0]["content"])
+        self.assertEqual(len(rewriter.prompt_sha256), 64)
+        self.assertEqual(
+            rewriter.prompt_sha256,
+            LLMQueryRewriter(FakeLLMClient("unused"), max_rewrites=2).prompt_sha256,
+        )
+        self.assertNotEqual(
+            rewriter.prompt_sha256,
+            LLMQueryRewriter(FakeLLMClient("unused"), max_rewrites=1).prompt_sha256,
+        )
 
     def test_llm_rewriter_rejects_markdown_extra_keys_and_non_strings(self):
         invalid_responses = (
@@ -62,6 +76,26 @@ class QueryRewriterTests(unittest.TestCase):
         for response in invalid_responses:
             with self.subTest(response=response), self.assertRaises(ValueError):
                 LLMQueryRewriter(FakeLLMClient(response)).rewrite("q")
+
+    def test_llm_rewriter_preserves_command_flags_and_identifiers(self):
+        client = FakeLLMClient(
+            '{"queries":["cleanup --include-orphans 清理边界",'
+            '"cleanup --include-orphans 删除范围"]}'
+        )
+
+        result = LLMQueryRewriter(client).rewrite(
+            "cleanup --include-orphans 的删除边界是什么？"
+        )
+
+        self.assertEqual(len(result.queries), 3)
+        prompt = client.calls[0][0][1]["content"]
+        self.assertIn("cleanup, --include-orphans", prompt)
+        with self.assertRaisesRegex(ValueError, "required exact tokens"):
+            LLMQueryRewriter(
+                FakeLLMClient(
+                    '{"queries":["docker system prune --include-orphans 删除对象"]}'
+                )
+            ).rewrite("cleanup --include-orphans 的删除边界是什么？")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,127 @@
+{
+  "modes": [
+    "baseline",
+    "rewrite",
+    "rerank",
+    "rewrite-rerank"
+  ],
+  "common_metadata": {
+    "embedding_provider": "ollama",
+    "embedding_model": "qwen3-embedding",
+    "embedding_dimension": 4096,
+    "chunk_size": 500,
+    "chunk_overlap": 100,
+    "case_top_k_values": [
+      3
+    ],
+    "score_threshold": 1.0,
+    "lexical_score_threshold": 12.2,
+    "dense_weight": 1.0,
+    "lexical_weight": 1.0,
+    "rrf_k": 60,
+    "candidate_multiplier": 5,
+    "retrieval_mode": "hybrid",
+    "dataset_sha256": "82e5e1cefcb230eea220ff6bd26c90e087d7f8fe36c7b5a18d5c729693273eba",
+    "documents_sha256": "552c4de4204bda67ebba4b865d64f6a9ff4862d9dcc745f95993a7342ee10c4d"
+  },
+  "metrics_by_mode": {
+    "baseline": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 0.9545454545454546,
+      "top_k_hit_rate": 1.0,
+      "no_answer_retrieval_accuracy": 1.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 308.3464749979612,
+      "p50_duration_ms": 308.67169999692123,
+      "p95_duration_ms": 325.7434000101057,
+      "maximum_duration_ms": 326.6872000094736
+    },
+    "rewrite": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "no_answer_retrieval_accuracy": 1.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 890.2285749997342,
+      "p50_duration_ms": 878.5420999993221,
+      "p95_duration_ms": 961.3559950041235,
+      "maximum_duration_ms": 969.7704999998678
+    },
+    "rerank": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "no_answer_retrieval_accuracy": 1.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 1018.8613916664812,
+      "p50_duration_ms": 690.013049999834,
+      "p95_duration_ms": 2461.9963149991218,
+      "maximum_duration_ms": 3789.3799000012223
+    },
+    "rewrite-rerank": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "no_answer_retrieval_accuracy": 1.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 1742.619341667402,
+      "p50_duration_ms": 1674.4020499972976,
+      "p95_duration_ms": 2608.7051250004147,
+      "maximum_duration_ms": 3059.941900006379
+    }
+  },
+  "deltas_from_baseline": {
+    "baseline": {
+      "recall_at_k": 0.0,
+      "precision_at_k": 0.0,
+      "mrr_at_k": 0.0,
+      "top_k_hit_rate": 0.0,
+      "no_answer_retrieval_accuracy": 0.0,
+      "successful_case_rate": 0.0,
+      "average_duration_ms": 0.0,
+      "p50_duration_ms": 0.0,
+      "p95_duration_ms": 0.0,
+      "maximum_duration_ms": 0.0
+    },
+    "rewrite": {
+      "recall_at_k": 0.0,
+      "precision_at_k": 0.0,
+      "mrr_at_k": 0.045454545454545414,
+      "top_k_hit_rate": 0.0,
+      "no_answer_retrieval_accuracy": 0.0,
+      "successful_case_rate": 0.0,
+      "average_duration_ms": 581.882100001773,
+      "p50_duration_ms": 569.8704000024009,
+      "p95_duration_ms": 635.6125949940179,
+      "maximum_duration_ms": 643.0832999903942
+    },
+    "rerank": {
+      "recall_at_k": 0.0,
+      "precision_at_k": 0.0,
+      "mrr_at_k": 0.045454545454545414,
+      "top_k_hit_rate": 0.0,
+      "no_answer_retrieval_accuracy": 0.0,
+      "successful_case_rate": 0.0,
+      "average_duration_ms": 710.51491666852,
+      "p50_duration_ms": 381.3413500029128,
+      "p95_duration_ms": 2136.252914989016,
+      "maximum_duration_ms": 3462.6926999917487
+    },
+    "rewrite-rerank": {
+      "recall_at_k": 0.0,
+      "precision_at_k": 0.0,
+      "mrr_at_k": 0.045454545454545414,
+      "top_k_hit_rate": 0.0,
+      "no_answer_retrieval_accuracy": 0.0,
+      "successful_case_rate": 0.0,
+      "average_duration_ms": 1434.2728666694409,
+      "p50_duration_ms": 1365.7303500003763,
+      "p95_duration_ms": 2282.961724990309,
+      "maximum_duration_ms": 2733.2546999969054
+    }
+  }
+}

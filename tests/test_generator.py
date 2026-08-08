@@ -20,6 +20,8 @@ class GeneratorTests(unittest.TestCase):
             GenerationConfig(temperature=2.1)
         with self.assertRaises(ValueError):
             GenerationConfig(max_tokens=0)
+        with self.assertRaises(ValueError):
+            UniversalLLMClient(request_timeout_seconds=0)
 
     def test_claude_system_prompt_is_sent_separately(self):
         messages_api = FakeClaudeMessages()

@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v1.7.0）
+# DocuMind - RAG 系统架构（v1.7.1）
 
 ## 1. 分层结构
 
@@ -138,7 +138,7 @@ v1.7 仅在评估编排中增加可选链路：
 → Top-K 评估报告
 ```
 
-原问题必须在改写列表首位；Query RRF 与 Hybrid RRF 分别保存，不能复用或覆盖 `fusion_score`。Cross-Encoder 只改变最终名次并写入 `rerank_score`，不会把其数值伪装成 Chroma distance。LLM 改写先生成与数据集 SHA-256 绑定的 artifact，之后的本地检索评估不访问 LLM；这使同一 artifact、语料和配置下的报告可复现。
+原问题必须在改写列表首位；Query RRF 与 Hybrid RRF 分别保存，不能复用或覆盖 `fusion_score`。Cross-Encoder 只改变最终名次并写入 `rerank_score`，不会把其数值伪装成 Chroma distance。LLM 改写先生成与 schema 版本、Prompt SHA-256、生成参数和数据集 SHA-256 绑定的 artifact，之后的本地检索评估不访问 LLM；这使同一 artifact、语料和配置下的报告可复现。四模式比较还会校验 Embedding、分块、阈值和 Hybrid 参数完全一致，并分别报告质量与平均/P50/P95/最大延迟。
 
 ## 5. 可观测性架构
 
@@ -192,15 +192,16 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 8. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。评估层和生命周期层都不反向依赖 Web UI；虽然本地 Ollama holdout 的 Reranker 门禁通过，样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。评估层和生命周期层都不反向依赖 Web UI；样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
 
 ```text
 evaluation.runner / production_runner
 ├── evaluation.datasets       # v1.4 / v1.6 JSONL 黄金与 holdout 用例
-├── evaluation.rewrite_artifacts # 带数据集指纹的 LLM 改写输入
+├── evaluation.rewrite_artifacts # 带 schema/Prompt/数据集指纹的 LLM 改写输入
 ├── evaluation.adapters       # Dense / BM25 / Hybrid / Rewrite / Rerank 边界
 ├── evaluation.metrics        # 纯函数检索/拒答指标
 ├── evaluation.reports        # JSON/Markdown 报告
+├── evaluation.comparison     # 四模式同配置质量/延迟矩阵
 └── evaluation.regression     # 基线比较和下降门禁
 ```
 

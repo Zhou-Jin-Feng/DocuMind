@@ -1,4 +1,4 @@
-# 项目结构（v1.7.0）
+# 项目结构（v1.7.1）
 
 ```text
 DocuMind/
@@ -123,10 +123,12 @@ DocuMind/
 | `evaluation/fingerprints.py` | 黄金数据集和评估文档语料的稳定 SHA-256 指纹 |
 | `evaluation/production.py` | Dense、BM25、Hybrid 和 v1.7 实验组件评估装配 |
 | `evaluation/production_runner.py` | 真实 Provider 基线、Rewrite、Rerank 实验 CLI |
+| `evaluation/comparison.py` | 四种增强模式的同配置校验、质量/延迟矩阵和基线差值 |
+| `evaluation/comparison_runner.py` | 生成 v1.7.1 四模式 JSON/Markdown 对照报告的 CLI |
 | `evaluation/rewrite_artifacts.py` | 严格 Rewrite artifact 生成、读取和数据集指纹校验 |
 | `evaluation/rewrite_runner.py` | 通过 LLM 生成可复现 Rewrite artifact 的 CLI |
-| `evaluation/runner.py` | JSONL 黄金评估集加载、分类汇总和确定性三模式执行 |
-| `evaluation/regression.py` | 指标最低值和允许下降幅度门禁 |
+| `evaluation/runner.py` | JSONL 黄金评估集加载、分类汇总、延迟分位数和确定性三模式执行 |
+| `evaluation/regression.py` | 报告输入兼容性、指标最低值和允许下降幅度门禁 |
 | `evaluation/regression_runner.py` | 报告兼容性校验和自动回归门禁 CLI |
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
 

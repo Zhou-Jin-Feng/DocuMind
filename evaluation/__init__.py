@@ -1,6 +1,7 @@
 """Offline RAG evaluation primitives and regression tooling."""
 
 from evaluation.adapters import FakeAnswerAdapter, FakeRetrievalAdapter, RetrieverAdapter
+from evaluation.comparison import EvaluationComparison, build_evaluation_comparison
 from evaluation.models import (
     AnswerResult,
     CaseEvaluation,
@@ -37,6 +38,7 @@ __all__ = [
     "AnswerResult",
     "CaseEvaluation",
     "EvaluationReport",
+    "EvaluationComparison",
     "EvaluationSnapshot",
     "EvaluationRunner",
     "FakeAnswerAdapter",
@@ -50,6 +52,7 @@ __all__ = [
     "InMemoryVectorStore",
     "IndexingSummary",
     "build_deterministic_retriever",
+    "build_evaluation_comparison",
     "build_deterministic_bm25_retriever",
     "build_deterministic_hybrid_retriever",
     "build_configured_retrieval_adapter",

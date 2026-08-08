@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+from hashlib import sha256
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -14,6 +16,27 @@ def _normalize_query(value: str) -> str:
     if not isinstance(value, str):
         raise TypeError("query rewrite 必须是字符串")
     return " ".join(value.split())
+
+
+def _required_exact_terms(query: str) -> tuple[str, ...]:
+    """Extract command/flag/identifier tokens that rewrites must preserve."""
+
+    normalized = _normalize_query(query)
+    terms: list[str] = []
+    for command in re.findall(
+        r"\b([A-Za-z][A-Za-z0-9_-]*)\s+(?=--[A-Za-z0-9])",
+        normalized,
+    ):
+        if command.casefold() not in {term.casefold() for term in terms}:
+            terms.append(command)
+    for token in re.findall(
+        r"--[A-Za-z0-9][A-Za-z0-9_-]*|"
+        r"\b[A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z0-9]+)+\b",
+        normalized,
+    ):
+        if token.casefold() not in {term.casefold() for term in terms}:
+            terms.append(token)
+    return tuple(terms)
 
 
 def _reject_duplicate_json_keys(
@@ -125,7 +148,17 @@ class LLMQueryRewriter:
     SYSTEM_PROMPT = (
         "You rewrite retrieval queries. Return exactly one JSON object with the key "
         '"queries" and a JSON array of strings. Do not return markdown or extra keys. '
-        "Each string must be a standalone search query that preserves the user's intent."
+        "Each string must be a unique standalone search query that preserves the "
+        "user's intent. Preserve command names, flags, identifiers, and quoted terms "
+        "verbatim. Do not introduce a product, framework, command, entity, or domain "
+        "that is absent from the original question. Never include the original "
+        "question in the array."
+    )
+    USER_PROMPT_TEMPLATE = (
+        "Create between 1 and {max_rewrites} unique alternative retrieval queries "
+        "for the question below. Do not repeat the original question.\n"
+        "{required_terms_instruction}\n"
+        "Original question:\n{original_query}"
     )
 
     def __init__(
@@ -152,6 +185,23 @@ class LLMQueryRewriter:
             max_tokens=max_tokens,
             stream=False,
         )
+
+    @property
+    def prompt_sha256(self) -> str:
+        canonical_prompt = json.dumps(
+            {
+                "system": self.SYSTEM_PROMPT,
+                "user_template": self.USER_PROMPT_TEMPLATE.format(
+                    max_rewrites=self.max_rewrites,
+                    required_terms_instruction="{required_terms_instruction}",
+                    original_query="{original_query}",
+                ),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return sha256(canonical_prompt.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _parse_response(response: str) -> tuple[str, ...]:
@@ -190,13 +240,21 @@ class LLMQueryRewriter:
         original = _normalize_query(query)
         if not original:
             raise ValueError("原始查询不能为空")
+        required_terms = _required_exact_terms(original)
+        required_terms_instruction = (
+            "Every rewrite must preserve these exact tokens: "
+            + ", ".join(required_terms)
+            if required_terms
+            else "No exact technical tokens are required."
+        )
         messages = [
             {"role": "system", "content": self.SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": (
-                    f"Create at most {self.max_rewrites} alternative retrieval queries "
-                    f"for this question:\n{original}"
+                "content": self.USER_PROMPT_TEMPLATE.format(
+                    max_rewrites=self.max_rewrites,
+                    required_terms_instruction=required_terms_instruction,
+                    original_query=original,
                 ),
             },
         ]
@@ -206,6 +264,15 @@ class LLMQueryRewriter:
             raise ValueError("Query Rewrite response exceeded max_rewrites")
         if any(candidate.casefold() == original.casefold() for candidate in candidates):
             raise ValueError("Query Rewrite response cannot repeat the original query")
+        for candidate in candidates:
+            missing_terms = [
+                term for term in required_terms if term.casefold() not in candidate.casefold()
+            ]
+            if missing_terms:
+                raise ValueError(
+                    "Query Rewrite response dropped required exact tokens: "
+                    + ", ".join(missing_terms)
+                )
         return QueryRewriteResult.from_candidates(
             original,
             candidates,

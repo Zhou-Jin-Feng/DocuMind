@@ -234,6 +234,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     rewrite_provider = None
     rewrite_model = None
     rewrite_map_sha256 = None
+    rewrite_artifact_version = None
+    rewrite_artifact_max_rewrites = None
+    rewrite_generation_max_tokens = None
+    rewrite_temperature = None
+    rewrite_prompt_sha256 = None
     reranker_library_version = None
     try:
         if args.retrieval_mode == "dense":
@@ -279,6 +284,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 rewrite_provider = artifact.provider
                 rewrite_model = artifact.model
                 rewrite_map_sha256 = file_sha256(args.rewrite_map)
+                rewrite_artifact_version = artifact.artifact_version
+                rewrite_artifact_max_rewrites = artifact.max_rewrites
+                rewrite_generation_max_tokens = artifact.max_tokens
+                rewrite_temperature = artifact.temperature
+                rewrite_prompt_sha256 = artifact.prompt_sha256
             else:
                 from app.core.generator import UniversalLLMClient
                 from app.core.query_rewriter import LLMQueryRewriter
@@ -294,6 +304,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 rewrite_provider = llm_client.provider
                 rewrite_model = llm_client.model
+                rewrite_generation_max_tokens = query_rewriter.config.max_tokens
+                rewrite_temperature = query_rewriter.config.temperature
+                rewrite_prompt_sha256 = query_rewriter.prompt_sha256
         if args.enhancement_mode in {"rerank", "rewrite-rerank"}:
             from app.core.reranker import CrossEncoderReranker
 
@@ -342,6 +355,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     else None
                 ),
                 "rewrite_map_sha256": rewrite_map_sha256,
+                "rewrite_artifact_version": rewrite_artifact_version,
+                "rewrite_artifact_max_rewrites": rewrite_artifact_max_rewrites,
+                "rewrite_generation_max_tokens": rewrite_generation_max_tokens,
+                "rewrite_temperature": rewrite_temperature,
+                "rewrite_prompt_sha256": rewrite_prompt_sha256,
                 "max_rewrites": (
                     args.max_rewrites
                     if args.enhancement_mode in {"rewrite", "rewrite-rerank"}

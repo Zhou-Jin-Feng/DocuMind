@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.7.0）
+# DocuMind - RAG 知识库问答系统（v1.7.1）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前开发版本：**v1.7 Query Rewrite + Cross-Encoder 实验版**。v1.6.1 的真实 Ollama 校准结果作为基线，新增严格 Query Rewrite artifact、多查询 RRF 融合和延迟加载 Cross-Encoder Reranker。Web 默认链路仍使用 Dense-only，不自动采用实验参数。
+> 当前开发版本：**v1.7.1 检索增强对照版**。基于同一份真实 Ollama holdout，已完成 baseline、Query Rewrite、Cross-Encoder Reranker 和组合模式的严格同配置对照。当前证据优先支持继续验证 Query Rewrite；Web 默认链路仍使用 Dense-only。
 
 ## 当前能力
 
@@ -23,6 +23,7 @@
 - 提供中文/英文标识符 BM25 检索，以及可配置权重、RRF 常数和候选深度的混合检索实验入口。
 - Dense 最大距离和 BM25 最低词法分数可独立校准，并写入评估报告元数据。
 - v1.7 评估链路始终保留原问题，按稳定 `chunk_id` 融合多条查询，并在扩大候选集后记录独立 `rerank_score`；原始 distance、词法和 RRF 分数不会被覆盖。
+- v1.7.1 固化 Rewrite artifact 的 schema/Prompt/生成参数指纹，增加断点续跑、延迟分位数、严格四模式比较，并按唯一文档 ID 计算 Precision@K。
 
 ## 版本迭代记录
 
@@ -38,6 +39,7 @@ README 保留面向仓库用户的公开版本摘要；当前架构边界见 [AR
 | v1.6 | Dense、BM25、Hybrid/RRF 检索质量对照 |
 | v1.6.1 | 真实 Ollama holdout、阈值/RRF 校准和质量门禁 |
 | v1.7 | 严格 Query Rewrite artifact、多查询 RRF 和 Cross-Encoder Reranker 评估实验 |
+| v1.7.1 | 可复现 Rewrite artifact、四模式同配置比较、延迟分位数和指标口径修正 |
 
 
 ## 项目结构
@@ -74,6 +76,8 @@ DocuMind/
 │   ├── datasets/                 # v1.4 与 v1.6 黄金数据集
 │   ├── baselines/
 │   ├── reports/
+│   ├── comparison.py             # 四模式同配置校验与质量/延迟矩阵
+│   ├── comparison_runner.py      # v1.7.1 四模式比较 CLI
 │   ├── rewrite_artifacts.py
 │   ├── rewrite_runner.py
 │   └── runner.py
@@ -241,12 +245,13 @@ python -m evaluation.production_runner `
 
 ### v1.7 Query Rewrite 与 Reranker 实验
 
-先生成与数据集 SHA-256 绑定的 Query Rewrite artifact，再运行本地检索评估。生成 artifact 会调用指定 LLM，检索评估阶段不再访问 LLM：
+先生成同时绑定 schema 版本、Prompt SHA-256、生成参数和数据集 SHA-256 的 Query Rewrite artifact，再运行本地检索评估。生成 artifact 会调用指定 LLM，检索评估阶段不再访问 LLM：
 
 ```powershell
 python -m evaluation.rewrite_runner `
   --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
   --provider deepseek --model deepseek-chat `
+  --max-rewrites 2 --max-tokens 256 `
   --output evaluation/datasets/v1_7/holdout_rewrites_deepseek.json
 
 python -m evaluation.production_runner `
@@ -272,6 +277,19 @@ python -m evaluation.production_runner `
 ```
 
 实验链路只用于评估，不会改变 Web 默认行为；使用 `evaluation.regression_runner` 对相同 holdout 执行门禁后，才考虑后续线上接入。
+
+v1.7.1 使用 `evaluation.comparison_runner` 对 `baseline`、`rewrite`、`rerank` 和 `rewrite-rerank` 四份报告执行严格同配置校验，并统一输出质量指标、平均/P50/P95/最大延迟及相对基线变化；不同 Embedding、分块、阈值或 Hybrid 参数的报告会被拒绝直接比较。
+
+本机最终 holdout 结果如下。四种模式的 Recall@3、文档级 Precision@3、no-answer 准确率和成功率分别均为 `1.0`、`0.3333`、`1.0` 和 `1.0`：
+
+| 模式 | MRR@3 | 平均耗时 | P50 | P95 |
+|---|---:|---:|---:|---:|
+| baseline | 0.9545 | 308.3 ms | 308.7 ms | 325.7 ms |
+| rewrite | 1.0000 | 890.2 ms | 878.5 ms | 961.4 ms |
+| rerank | 1.0000 | 1018.9 ms | 690.0 ms | 2462.0 ms |
+| rewrite-rerank | 1.0000 | 1742.6 ms | 1674.4 ms | 2608.7 ms |
+
+三种增强模式都修正了唯一一条排序误差，但没有质量差异。Rewrite 的尾延迟明显低于两个 Reranker 模式，因此是后续受控接入验证的首选；组合模式没有额外质量收益，不应启用。12 条 holdout 仍不足以支持直接修改 Web 默认链路。
 
 ## 测试与检查
 

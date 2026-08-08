@@ -35,14 +35,16 @@ No-answer cases use an empty `expected_document_ids` list and `should_answer: fa
 The runner reports:
 
 - `recall_at_k`: expected documents found in Top-K divided by expected documents;
-- `precision_at_k`: relevant retrieved documents divided by K;
+- `precision_at_k`: unique relevant document IDs in Top-K divided by K; multiple
+  chunks from the same document count once;
 - `mrr_at_k`: reciprocal rank of the first relevant document;
 - `top_k_hit_rate`: ratio of answerable cases with at least one expected document in Top-K;
 - `correct_document_avg_rank`: average rank of the first relevant document;
 - `no_answer_retrieval_accuracy`: ratio of no-answer cases that return no Top-K documents;
 - `refusal_accuracy`: agreement between `should_answer` and the answer adapter;
 - `keyword_coverage`: expected keyword coverage when an answer adapter returns text;
-- `successful_case_rate` and `average_duration_ms`.
+- `successful_case_rate`, `average_duration_ms`, `p50_duration_ms`,
+  `p95_duration_ms`, and `maximum_duration_ms`.
 
 No-answer cases are excluded from positive-target retrieval metrics because they have no relevant document ID. They are included in `no_answer_retrieval_accuracy`; with no distance threshold, a vector store will normally return an irrelevant nearest document and this metric will expose that behavior. They remain included in refusal accuracy when an answer adapter is configured.
 
@@ -159,13 +161,14 @@ v1.7 keeps the Web application unchanged and introduces two evaluation-only stag
 - Multi-query retrieval runs each query independently, deduplicates only by stable `metadata.chunk_id`, and uses a second RRF layer over ranks. It does not compare raw scores across queries.
 - Cross-Encoder reranking receives an expanded candidate set and writes `rerank_score` without replacing `distance`, `lexical_score`, Hybrid `fusion_score`, or Query RRF `query_fusion_score`.
 
-`evaluation.rewrite_runner` separates external LLM generation from retrieval evaluation. It creates a strict artifact containing the provider, model, maximum rewrite count, dataset SHA-256, and the alternatives for every question. `evaluation.production_runner --rewrite-map` rejects an artifact with a different dataset fingerprint or question set, so a later local run is deterministic with respect to its LLM inputs.
+`evaluation.rewrite_runner` separates external LLM generation from retrieval evaluation. It creates a strict, versioned artifact containing the provider, model, generation parameters, prompt SHA-256, dataset SHA-256, and the alternatives for every question. `evaluation.production_runner --rewrite-map` rejects an artifact with a different dataset fingerprint, question set, unsupported schema version, or a requested rewrite count above the artifact generation limit, so a later local run is deterministic with respect to its LLM inputs.
 
 ```powershell
 python -m evaluation.rewrite_runner `
   --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
   --provider deepseek --model deepseek-chat `
   --max-rewrites 2 `
+  --max-tokens 256 `
   --output evaluation/datasets/v1_7/holdout_rewrites_deepseek.json
 
 python -m evaluation.production_runner `
@@ -191,14 +194,49 @@ python -m evaluation.production_runner `
   --reranker-local-files-only
 ```
 
-The checked-in v1.7 rerank report uses local Ollama `qwen3-embedding`, `BAAI/bge-reranker-base` on CPU, the same 12-case holdout, and the calibrated Hybrid baseline:
+The original v1.7.0 rerank report uses local Ollama `qwen3-embedding`, `BAAI/bge-reranker-base` on CPU, the same 12-case holdout, and the calibrated Hybrid baseline:
 
 | Mode | Recall@3 | MRR@3 | No-answer Accuracy | Success | Avg Duration |
 |---|---:|---:|---:|---:|---:|
 | v1.6.1 calibrated Hybrid | 1.0000 | 0.9545 | 1.0000 | 1.0000 | 420.7 ms |
 | v1.7 calibrated Hybrid + Reranker | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 937.9 ms |
 
-The reranker fixes the observed ranking error but adds approximately 517.2 ms on this CPU. It is evidence for a constrained experiment only, not authorization to switch the Web default. Run the same holdout gate after creating a real Rewrite artifact, then compare `rewrite` and `rewrite-rerank` against this baseline before any online integration decision.
+The reranker fixed the observed ranking error but added approximately 517.2 ms on this CPU. This historical single-mode result motivated the complete v1.7.1 comparison below; it did not authorize a Web default change.
+
+v1.7.1 regenerates all four reports with latency percentiles. After the
+individual regression gates pass, create one strict comparison artifact. The
+comparison rejects missing modes, wrong `enhancement_mode` labels, or changes
+to the dataset, corpus, Embedding, chunking, retrieval, threshold, and Hybrid
+configuration:
+
+```powershell
+python -m evaluation.comparison_runner `
+  --baseline evaluation/reports/v1_7_1_ollama_holdout_hybrid_baseline.json `
+  --rewrite evaluation/reports/v1_7_1_ollama_holdout_hybrid_rewrite.json `
+  --rerank evaluation/reports/v1_7_1_ollama_holdout_hybrid_rerank.json `
+  --rewrite-rerank evaluation/reports/v1_7_1_ollama_holdout_hybrid_rewrite_rerank.json
+```
+
+The JSON comparison stores each mode's metrics and `mode - baseline` deltas.
+Quality and latency remain separate instead of being collapsed into one
+subjective score. P50/P95/max include lazy model loading, so the first-case
+cold-start cost remains visible.
+
+The final v1.7.1 run produced the following same-configuration results:
+
+| Mode | Recall@3 | Precision@3 | MRR@3 | No-answer | Avg ms | P50 ms | P95 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| baseline | 1.0000 | 0.3333 | 0.9545 | 1.0000 | 308.3 | 308.7 | 325.7 |
+| rewrite | 1.0000 | 0.3333 | 1.0000 | 1.0000 | 890.2 | 878.5 | 961.4 |
+| rerank | 1.0000 | 0.3333 | 1.0000 | 1.0000 | 1018.9 | 690.0 | 2462.0 |
+| rewrite-rerank | 1.0000 | 0.3333 | 1.0000 | 1.0000 | 1742.6 | 1674.4 | 2608.7 |
+
+All three enhanced modes fix the same single baseline ranking error and pass
+the regression gate. Rewrite is the preferred candidate for a later bounded
+integration experiment because it matches reranking quality with substantially
+lower P95 latency. The combined mode adds latency without measured quality gain
+and should remain disabled. The 12-case holdout is too small to change the Web
+default on its own.
 
 ## Regression Gate
 
@@ -228,7 +266,7 @@ Run the automatic CLI gate against two JSON reports:
 
 The default policy allows an absolute drop of `0.02` for Recall, Precision, MRR, and Top-K hit rate, allows no drop in no-answer retrieval accuracy, and requires `successful_case_rate=1.0`. Use repeated `--allowed-drop METRIC=VALUE` and `--minimum METRIC=VALUE` arguments to override or add rules. `--no-default-policy` disables the built-in rules.
 
-Exit codes are stable for local scripts and CI: `0` means pass, `1` means a quality regression, and `2` means invalid input or incompatible reports. Before checking metrics, the CLI requires matching dataset name, Top-K, case count, golden-dataset SHA-256, and document-corpus SHA-256. Embedding model, chunk settings, and score threshold may differ because those are the configurations being evaluated.
+Exit codes are stable for local scripts and CI: `0` means pass, `1` means a quality regression, and `2` means invalid input or incompatible reports. Before checking metrics, the CLI requires matching dataset name, Top-K, case count, golden-dataset SHA-256, document-corpus SHA-256, and every shared Embedding, chunking, threshold, retrieval, and Hybrid configuration field. Reports that intentionally change those inputs belong to a calibration comparison, not a regression gate. Duplicate JSON keys are rejected before comparison.
 
 `correct_document_avg_rank` is intentionally absent from the default policy because lower values are better; the current `allowed-drop` policy is only for metrics where larger values are better.
 

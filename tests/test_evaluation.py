@@ -11,6 +11,7 @@ from langchain_core.documents import Document
 
 from evaluation.adapters import FakeAnswerAdapter, FakeRetrievalAdapter, RetrieverAdapter
 from evaluation import EvaluationRunner as PublicEvaluationRunner
+from evaluation.comparison import build_evaluation_comparison
 from evaluation.integration import DeterministicEmbeddingClient, build_deterministic_retriever
 from evaluation.production import (
     build_indexed_retrieval_adapter,
@@ -21,7 +22,7 @@ from evaluation.production import (
 from evaluation.production_runner import _default_report_stem, main as production_main
 from evaluation.fingerprints import file_sha256, text_corpus_sha256
 from app.core.document_chunker import DocumentChunker
-from app.core.query_rewriter import MappingQueryRewriter
+from app.core.query_rewriter import MappingQueryRewriter, QueryRewriteResult
 from app.core.reranker import CrossEncoderReranker
 from app.core.retriever import Retriever
 from app.core.vector_store import VectorStore
@@ -36,6 +37,7 @@ from evaluation.models import AnswerResult, EvaluationReport, GoldenCase, Retrie
 from evaluation.regression import (
     EvaluationSnapshot,
     RegressionGate,
+    load_evaluation_snapshot,
     report_compatibility_issues,
 )
 from evaluation.regression_runner import main as regression_main
@@ -44,7 +46,7 @@ from evaluation.rewrite_artifacts import (
     build_rewrite_artifact,
     load_rewrite_artifact,
 )
-from evaluation.runner import EvaluationRunner, load_golden_dataset
+from evaluation.runner import EvaluationRunner, _percentile, load_golden_dataset
 
 
 class EvaluationTests(unittest.TestCase):
@@ -57,6 +59,10 @@ class EvaluationTests(unittest.TestCase):
             "metadata": {
                 "dataset_sha256": dataset_sha,
                 "documents_sha256": documents_sha,
+                "embedding_provider": "test",
+                "embedding_model": "test-model",
+                "embedding_dimension": 64,
+                "score_threshold": None,
             },
             "metrics": {
                 "recall_at_k": recall,
@@ -64,10 +70,54 @@ class EvaluationTests(unittest.TestCase):
             },
         }
 
+    @staticmethod
+    def _enhancement_snapshot_payload(mode, *, mrr=0.9, embedding_model="model"):
+        return {
+            "dataset_name": "ollama-hybrid-retrieval-baseline",
+            "top_k": 3,
+            "case_count": 12,
+            "metadata": {
+                "embedding_provider": "ollama",
+                "embedding_model": embedding_model,
+                "embedding_dimension": 4096,
+                "chunk_size": 500,
+                "chunk_overlap": 100,
+                "case_top_k_values": [3],
+                "score_threshold": 1.0,
+                "lexical_score_threshold": 12.2,
+                "dense_weight": 1.0,
+                "lexical_weight": 1.0,
+                "rrf_k": 60,
+                "candidate_multiplier": 5,
+                "retrieval_mode": "hybrid",
+                "enhancement_mode": mode,
+                "dataset_sha256": "dataset",
+                "documents_sha256": "documents",
+            },
+            "metrics": {
+                "recall_at_k": 1.0,
+                "mrr_at_k": mrr,
+                "no_answer_retrieval_accuracy": 1.0,
+                "successful_case_rate": 1.0,
+                "average_duration_ms": 100.0,
+                "p50_duration_ms": 90.0,
+                "p95_duration_ms": 150.0,
+                "maximum_duration_ms": 175.0,
+            },
+        }
+
     def test_public_runner_export_is_lazy_and_available(self):
         from evaluation.runner import EvaluationRunner
 
         self.assertIs(PublicEvaluationRunner, EvaluationRunner)
+
+    def test_latency_percentiles_use_linear_interpolation(self):
+        values = [10.0, 20.0, 30.0, 40.0]
+
+        self.assertEqual(_percentile(values, 0.5), 25.0)
+        self.assertAlmostEqual(_percentile(values, 0.95), 38.5)
+        with self.assertRaises(ValueError):
+            _percentile([], 0.5)
 
     def test_golden_case_rejects_unknown_fields_and_normalizes_lists(self):
         case = GoldenCase.from_dict(
@@ -114,6 +164,12 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(hit_at_k(expected, retrieved, 2), 1.0)
         self.assertEqual(first_relevant_rank(expected, retrieved, 2), 2.0)
         self.assertIsNone(recall_at_k([], retrieved, 2))
+
+    def test_precision_counts_relevant_document_only_once(self):
+        self.assertEqual(
+            precision_at_k(["doc"], ["doc", "doc", "other"], 3),
+            1 / 3,
+        )
 
     def test_no_answer_retrieval_accuracy_exposes_irrelevant_hits(self):
         from evaluation.metrics import no_answer_retrieval_accuracy
@@ -315,47 +371,74 @@ class EvaluationTests(unittest.TestCase):
             provider="deepseek",
             model="deepseek-chat",
             max_rewrites=2,
-            dataset_sha256="dataset-sha",
+            max_tokens=256,
+            temperature=0.0,
+            prompt_sha256="a" * 64,
+            dataset_sha256="b" * 64,
         )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "rewrites.json"
             path.write_text(artifact.to_json(), encoding="utf-8")
             loaded = load_rewrite_artifact(
                 path,
-                expected_dataset_sha256="dataset-sha",
+                expected_dataset_sha256="b" * 64,
                 expected_questions=["How does RRF work?"],
             )
             self.assertEqual(
                 loaded.to_rewriter().rewrite("How does RRF work?").queries,
                 ("How does RRF work?", "reciprocal rank fusion"),
             )
+            with self.assertRaisesRegex(ValueError, "生成上限"):
+                loaded.to_rewriter(max_rewrites=3)
+            with self.assertRaisesRegex(ValueError, "规范化后重复"):
+                load_rewrite_artifact(
+                    path,
+                    expected_dataset_sha256="b" * 64,
+                    expected_questions=["How does RRF work?", " How does RRF work? "],
+                )
             with self.assertRaisesRegex(ValueError, "SHA-256"):
                 load_rewrite_artifact(
                     path,
-                    expected_dataset_sha256="different",
+                    expected_dataset_sha256="c" * 64,
                     expected_questions=["How does RRF work?"],
                 )
             path.write_text(
                 '{"provider":"deepseek","model":"model","max_rewrites":1,'
-                '"dataset_sha256":"dataset-sha","rewrites":{},"rewrites":{}}',
+                f'"dataset_sha256":"{"b" * 64}","rewrites":{{}},"rewrites":{{}}}}',
                 encoding="utf-8",
             )
             with self.assertRaises(ValueError):
                 load_rewrite_artifact(
                     path,
-                    expected_dataset_sha256="dataset-sha",
+                    expected_dataset_sha256="b" * 64,
                     expected_questions=[],
                 )
         with self.assertRaises(ValueError):
             RewriteArtifact.from_dict(
                 {
+                    "artifact_version": 1,
                     "provider": "deepseek",
                     "model": "model",
                     "max_rewrites": 1,
-                    "dataset_sha256": "sha",
+                    "max_tokens": 256,
+                    "temperature": 0.0,
+                    "prompt_sha256": "a" * 64,
+                    "dataset_sha256": "b" * 64,
                     "rewrites": {},
                     "unexpected": True,
                 }
+            )
+        with self.assertRaises(ValueError):
+            RewriteArtifact(
+                artifact_version=True,
+                provider="deepseek",
+                model="model",
+                max_rewrites=2,
+                max_tokens=256,
+                temperature=0.0,
+                prompt_sha256="a" * 64,
+                dataset_sha256="b" * 64,
+                rewrites={},
             )
 
     def test_enhanced_adapter_records_query_fusion_and_rerank_scores(self):
@@ -528,6 +611,54 @@ class EvaluationTests(unittest.TestCase):
         issues = report_compatibility_issues(baseline, current)
         self.assertIn("metadata.documents_sha256 不一致", issues)
 
+        changed_model_payload = self._snapshot_payload()
+        changed_model_payload["metadata"]["embedding_model"] = "different"
+        changed_model = EvaluationSnapshot.from_dict(changed_model_payload)
+        issues = report_compatibility_issues(baseline, changed_model)
+        self.assertIn("metadata.embedding_model 不一致", issues)
+
+    def test_snapshot_loader_rejects_duplicate_json_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "report.json"
+            report.write_text(
+                '{"dataset_name":"a","dataset_name":"b","top_k":3,'
+                '"case_count":1,"metadata":{},"metrics":{}}',
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "重复字段"):
+                load_evaluation_snapshot(report)
+
+    def test_four_mode_comparison_requires_matching_configuration(self):
+        snapshots = {
+            mode: EvaluationSnapshot.from_dict(
+                self._enhancement_snapshot_payload(
+                    mode,
+                    mrr=1.0 if mode in {"rerank", "rewrite-rerank"} else 0.9,
+                )
+            )
+            for mode in ("baseline", "rewrite", "rerank", "rewrite-rerank")
+        }
+
+        comparison = build_evaluation_comparison(snapshots)
+
+        self.assertAlmostEqual(
+            comparison.deltas_from_baseline["rerank"]["mrr_at_k"],
+            0.1,
+        )
+        self.assertIn("precision_at_k", comparison.metrics_by_mode["baseline"])
+        self.assertIn("top_k_hit_rate", comparison.metrics_by_mode["baseline"])
+        self.assertIn("Quality And Latency", comparison.to_markdown())
+        incompatible = dict(snapshots)
+        incompatible["rewrite"] = EvaluationSnapshot.from_dict(
+            self._enhancement_snapshot_payload(
+                "rewrite",
+                embedding_model="different-model",
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "embedding_model"):
+            build_evaluation_comparison(incompatible)
+
     def test_regression_cli_uses_distinct_exit_codes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -579,34 +710,89 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(parsed["cases"][0]["case_id"], "case")
         self.assertEqual(parsed["cases"][0]["retrieved_distances"], [0.25])
         self.assertEqual(parsed["cases"][0]["retrieved_rerank_scores"], [None])
+        self.assertIn("p50_duration_ms", parsed["metrics"])
+        self.assertIn("p95_duration_ms", parsed["metrics"])
+        self.assertIn("maximum_duration_ms", parsed["metrics"])
         self.assertIn("Run Configuration", report.to_markdown())
 
 
     def test_rewrite_artifact_rejects_normalized_duplicates(self):
         with self.assertRaises(ValueError):
             RewriteArtifact(
+                artifact_version=1,
                 provider="deepseek",
                 model="model",
                 max_rewrites=2,
-                dataset_sha256="sha",
+                max_tokens=256,
+                temperature=0.0,
+                prompt_sha256="a" * 64,
+                dataset_sha256="b" * 64,
                 rewrites={"q": ["alternative"], " q ": ["other"]},
             )
         with self.assertRaises(ValueError):
             RewriteArtifact(
+                artifact_version=1,
                 provider="deepseek",
                 model="model",
                 max_rewrites=2,
-                dataset_sha256="sha",
+                max_tokens=256,
+                temperature=0.0,
+                prompt_sha256="a" * 64,
+                dataset_sha256="b" * 64,
                 rewrites={"q": ["alternative", " ALTERNATIVE "]},
             )
         with self.assertRaises(TypeError):
             RewriteArtifact(
+                artifact_version=1,
                 provider="deepseek",
                 model="model",
                 max_rewrites=2,
-                dataset_sha256="sha",
+                max_tokens=256,
+                temperature=0.0,
+                prompt_sha256="a" * 64,
+                dataset_sha256="b" * 64,
                 rewrites=[],
             )
+
+    def test_rewrite_artifact_generation_resumes_existing_cases(self):
+        cases = [
+            GoldenCase("one", "问题一", ("doc",)),
+            GoldenCase("two", "问题二", ("doc",)),
+        ]
+
+        class CountingRewriter:
+            def __init__(self):
+                self.calls = []
+
+            def rewrite(self, question):
+                self.calls.append(question)
+                return QueryRewriteResult.from_candidates(
+                    question,
+                    [question + " 改写"],
+                    max_rewrites=2,
+                )
+
+        rewriter = CountingRewriter()
+        progress = []
+        artifact = build_rewrite_artifact(
+            cases,
+            rewriter,
+            provider="deepseek",
+            model="deepseek-chat",
+            max_rewrites=2,
+            max_tokens=256,
+            temperature=0.0,
+            prompt_sha256="a" * 64,
+            dataset_sha256="b" * 64,
+            existing_rewrites={"问题一": ["问题一 已生成"]},
+            progress_callback=lambda current, completed, total: progress.append(
+                (len(current.rewrites), completed, total)
+            ),
+        )
+
+        self.assertEqual(rewriter.calls, ["问题二"])
+        self.assertEqual(progress, [(2, 2, 2)])
+        self.assertEqual(set(artifact.rewrites), {"问题一", "问题二"})
 
 
 if __name__ == "__main__":

@@ -293,8 +293,8 @@ class EvaluationReport:
                     "",
                     "## Metrics By Category",
                     "",
-                    "| Category | Cases | Recall@K | MRR@K | Hit Rate | No-answer Accuracy | Success | Avg ms |",
-                    "|---|---:|---:|---:|---:|---:|---:|---:|",
+                    "| Category | Cases | Recall@K | MRR@K | Hit Rate | No-answer Accuracy | Success | Avg ms | P50 ms | P95 ms |",
+                    "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
                 ]
             )
             for category, metrics in self.category_metrics.items():
@@ -308,7 +308,9 @@ class EvaluationReport:
                     f"{formatted('top_k_hit_rate')} | "
                     f"{formatted('no_answer_retrieval_accuracy')} | "
                     f"{formatted('successful_case_rate')} | "
-                    f"{formatted('average_duration_ms')} |"
+                    f"{formatted('average_duration_ms')} | "
+                    f"{formatted('p50_duration_ms')} | "
+                    f"{formatted('p95_duration_ms')} |"
                 )
         if self.split_metrics:
             lines.extend(
@@ -316,8 +318,8 @@ class EvaluationReport:
                     "",
                     "## Metrics By Split",
                     "",
-                    "| Split | Cases | Recall@K | MRR@K | Hit Rate | No-answer Accuracy | Success | Avg ms |",
-                    "|---|---:|---:|---:|---:|---:|---:|---:|",
+                    "| Split | Cases | Recall@K | MRR@K | Hit Rate | No-answer Accuracy | Success | Avg ms | P50 ms | P95 ms |",
+                    "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
                 ]
             )
             for split, metrics in self.split_metrics.items():
@@ -331,7 +333,9 @@ class EvaluationReport:
                     f"{formatted('top_k_hit_rate')} | "
                     f"{formatted('no_answer_retrieval_accuracy')} | "
                     f"{formatted('successful_case_rate')} | "
-                    f"{formatted('average_duration_ms')} |"
+                    f"{formatted('average_duration_ms')} | "
+                    f"{formatted('p50_duration_ms')} | "
+                    f"{formatted('p95_duration_ms')} |"
                 )
         lines.extend(
             [
