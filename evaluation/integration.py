@@ -47,7 +47,7 @@ class DeterministicEmbeddingClient:
 
 
 class InMemoryVectorStore:
-    """Chroma-compatible search surface backed by deterministic local records."""
+    """VectorStore-compatible search surface backed by deterministic local records."""
 
     def __init__(
         self,

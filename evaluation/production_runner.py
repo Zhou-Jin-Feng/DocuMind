@@ -147,7 +147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--collection-name",
         default="rag_evaluation",
-        help="Temporary or persistent Chroma collection name",
+        help="Milvus Collection used for this evaluation",
     )
     parser.add_argument(
         "--score-threshold",
@@ -199,9 +199,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--rerank-candidate-multiplier", type=int, default=5)
     parser.add_argument(
-        "--persist-directory",
-        default="./data/evaluation_chroma_db",
-        help="Chroma persistence directory",
+        "--milvus-uri",
+        default=settings.milvus_uri,
+        help="Milvus server URI",
+    )
+    parser.add_argument(
+        "--milvus-token",
+        default=settings.milvus_token,
+        help="Optional Milvus authentication token",
+    )
+    parser.add_argument(
+        "--milvus-db-name",
+        default=settings.milvus_db_name,
+        help="Milvus database name",
     )
     parser.add_argument(
         "--output-json",
@@ -246,7 +256,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 documents,
                 provider=provider,
                 collection_name=args.collection_name,
-                persist_directory=args.persist_directory,
+                milvus_uri=args.milvus_uri,
+                milvus_token=args.milvus_token,
+                milvus_db_name=args.milvus_db_name,
                 score_threshold=args.score_threshold,
             )
         elif args.retrieval_mode == "bm25":
@@ -259,7 +271,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 documents,
                 provider=provider,
                 collection_name=args.collection_name,
-                persist_directory=args.persist_directory,
+                milvus_uri=args.milvus_uri,
+                milvus_token=args.milvus_token,
+                milvus_db_name=args.milvus_db_name,
                 score_threshold=args.score_threshold,
                 rrf_k=args.rrf_k,
                 dense_weight=args.dense_weight,

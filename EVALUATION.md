@@ -50,7 +50,7 @@ No-answer cases are excluded from positive-target retrieval metrics because they
 
 ## Offline Demo
 
-Run the deterministic demo without Ollama, ChromaDB, network access, or an LLM:
+Run the deterministic demo without Ollama, Milvus, network access, or an LLM:
 
 ```powershell
 .\venv\Scripts\python.exe -m evaluation.runner `
@@ -83,7 +83,7 @@ The production baseline CLI accepts the same modes:
   --provider ollama
 ```
 
-BM25-only does not call an Embedding provider and rejects `--score-threshold`. Hybrid uses RRF ranks and never compares Chroma distance with BM25 scores directly.
+BM25-only does not call an Embedding provider and rejects `--score-threshold`. Hybrid uses RRF ranks and never compares Milvus L2 distance with BM25 scores directly.
 
 ### v1.6.1 Retrieval Calibration
 
@@ -131,17 +131,18 @@ These thresholds are calibrated evidence for this fixture corpus, not online def
 
 For a real baseline, replace the deterministic integration components with a real `RetrieverAdapter` backed by the intended Embedding model and vector collection. Keep the same document IDs and golden dataset when comparing changes.
 
-The reusable production wiring is exposed by `build_configured_retrieval_adapter()`. It uses the configured real Embedding provider, the production chunker, Chroma `VectorStore`, and the production `Retriever`. Calling it may contact Ollama or a cloud API and should be done deliberately when creating a baseline.
+The reusable production wiring is exposed by `build_configured_retrieval_adapter()`. It uses the configured real Embedding provider, the production chunker, Milvus `VectorStore`, and the production `Retriever`. Calling it may contact Milvus, Ollama, or a cloud API and should be done deliberately when creating a baseline.
 
 Create a real retrieval-only baseline with the CLI. The command does not call an LLM, so answer-generation metrics remain `N/A`:
 
 ```powershell
 .\venv\Scripts\python.exe -m evaluation.production_runner `
   --provider ollama `
-  --persist-directory .\data\evaluation_chroma_db
+  --milvus-uri http://127.0.0.1:19530 `
+  --collection-name rag_evaluation
 ```
 
-The CLI explicitly releases the Chroma adapter before exit. Use a separate collection and persistence directory from the application index.
+The CLI explicitly releases the Milvus adapter before exit. Use a separate Collection from the application index.
 
 ### Current Ollama Baseline
 

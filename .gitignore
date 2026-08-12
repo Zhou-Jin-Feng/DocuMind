@@ -30,6 +30,11 @@ data/uploads/
 data/document_registry.sqlite3
 data/evaluation_chroma_db*/
 
+# Milvus Standalone data is external to this repo. Keep local Milvus data out of Git
+# if a future manual installation places it under the workspace.
+data/milvus/
+volumes/milvus/
+
 # 忽略日志文件
 *.log
 logs/

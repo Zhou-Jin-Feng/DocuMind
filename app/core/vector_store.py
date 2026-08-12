@@ -1,17 +1,14 @@
-"""
-RAG 系统向量存储模块。
+"""Milvus-backed vector storage for the RAG system."""
 
-封装 ChromaDB 的持久化、幂等写入、检索和删除操作。
-"""
+from __future__ import annotations
 
 import hashlib
-import os
-from typing import Dict, List, Optional
+import json
+import re
+from typing import Any, Dict, Iterable, List, Optional
 
-import chromadb
-from chromadb.config import Settings
 from langchain_core.documents import Document
-from rich.table import Table
+from pymilvus import DataType, MilvusClient
 
 from app.utils.logger import get_logger
 
@@ -19,37 +16,60 @@ logger = get_logger(__name__)
 
 
 class VectorStore:
-    """ChromaDB 向量存储封装。"""
+    """Expose the application's vector-store contract on top of Milvus."""
+
+    _CONFIG_ID = "__rag_embedding_space__"
+    _RECORD_TYPE_FIELD = "record_type"
+    _CHUNK_RECORD_TYPE = "chunk"
+    _CONFIG_RECORD_TYPE = "config"
+    _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+    _DELETE_BATCH_SIZE = 500
+    _QUERY_BATCH_SIZE = 1000
+    _ID_MAX_BYTES = 512
+    _DOCUMENT_MAX_BYTES = 65535
 
     def __init__(
         self,
         collection_name: str = "rag_documents",
-        persist_directory: str = "./data/chroma_db",
+        uri: str = "http://127.0.0.1:19530",
+        token: Optional[str] = None,
+        db_name: str = "default",
     ):
-        if not collection_name.strip():
-            raise ValueError("collection_name 不能为空")
+        collection_name = collection_name.strip()
+        uri = uri.strip()
+        db_name = db_name.strip()
+        if not collection_name:
+            raise ValueError("collection_name cannot be empty")
+        if not uri:
+            raise ValueError("Milvus URI cannot be empty")
+        if not db_name:
+            raise ValueError("Milvus database name cannot be empty")
 
         self.collection_name = collection_name
-        self.persist_directory = persist_directory
-        os.makedirs(persist_directory, exist_ok=True)
-
-        self.client = chromadb.PersistentClient(
-            path=persist_directory,
-            settings=Settings(anonymized_telemetry=False),
+        self.uri = uri
+        self.db_name = db_name
+        client_kwargs: Dict[str, Any] = {"uri": uri, "db_name": db_name}
+        if token:
+            client_kwargs["token"] = token
+        self.client = MilvusClient(**client_kwargs)
+        self._embedding_dimension: Optional[int] = None
+        self._collection_ready = self.client.has_collection(
+            collection_name=self.collection_name
         )
-        self.collection = self.client.get_or_create_collection(
-            name=collection_name,
-            metadata={"description": "RAG系统文档向量存储"},
-        )
+        if self._collection_ready:
+            self.client.load_collection(collection_name=self.collection_name)
         logger.info(
-            f"向量数据库已就绪: collection={collection_name}, "
-            f"count={self.collection.count()}, path={persist_directory}"
+            "Milvus vector store ready: collection={}, exists={}, uri={}, database={}",
+            self.collection_name,
+            self._collection_ready,
+            self.uri,
+            self.db_name,
         )
 
     @staticmethod
     def _sanitize_metadata(metadata: Dict) -> Dict:
-        """将元数据转换为 Chroma 支持的标量类型并移除空值。"""
-        sanitized: Dict = {}
+        """Keep JSON-compatible scalar metadata and remove empty values."""
+        sanitized: Dict[str, str | int | float | bool] = {}
         for key, value in metadata.items():
             if value is None:
                 continue
@@ -61,11 +81,17 @@ class VectorStore:
 
     @staticmethod
     def _fallback_chunk_id(document: Document, index: int) -> str:
-        """兼容没有 chunk_id 的调用方，生成确定性 ID。"""
-        source = document.metadata.get("source_file") or document.metadata.get("source") or "unknown"
+        """Generate a deterministic ID for callers that omit chunk_id."""
+        source = (
+            document.metadata.get("source_file")
+            or document.metadata.get("source")
+            or "unknown"
+        )
         page = document.metadata.get("page_number") or document.metadata.get("page") or ""
         chunk_index = document.metadata.get("chunk_index", index)
-        payload = f"{source}\0{page}\0{chunk_index}\0{document.page_content}".encode("utf-8")
+        payload = f"{source}\0{page}\0{chunk_index}\0{document.page_content}".encode(
+            "utf-8"
+        )
         return hashlib.sha256(payload).hexdigest()
 
     @staticmethod
@@ -74,18 +100,207 @@ class VectorStore:
             return
         dimension = len(embeddings[0])
         if dimension == 0:
-            raise ValueError("Embedding 向量不能为空")
+            raise ValueError("Embedding vector cannot be empty")
         if any(len(embedding) != dimension for embedding in embeddings):
-            raise ValueError("同一批次的 Embedding 维度不一致")
+            raise ValueError("Embedding dimensions must match within one batch")
 
-    def _stored_embedding_dimension(self) -> int:
-        result = self.collection.get(limit=1, include=["embeddings"])
-        embeddings = result.get("embeddings")
-        if embeddings is None or len(embeddings) == 0:
-            raise RuntimeError(
-                "Collection is non-empty but its embedding dimension cannot be read"
+    @staticmethod
+    def _utf8_size(value: str) -> int:
+        return len(value.encode("utf-8"))
+
+    @classmethod
+    def _validate_id(cls, value: Any) -> str:
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError("Chunk ID cannot be empty")
+        if normalized == cls._CONFIG_ID:
+            raise ValueError(f"Chunk ID {normalized!r} is reserved for internal use")
+        size = cls._utf8_size(normalized)
+        if size > cls._ID_MAX_BYTES:
+            raise ValueError(
+                f"Chunk ID exceeds Milvus VARCHAR limit: {size} > {cls._ID_MAX_BYTES} UTF-8 bytes"
             )
-        return len(embeddings[0])
+        return normalized
+
+    @classmethod
+    def _validate_document(cls, value: str) -> None:
+        if not value.strip():
+            raise ValueError("Empty document chunks cannot be written")
+        size = cls._utf8_size(value)
+        if size > cls._DOCUMENT_MAX_BYTES:
+            raise ValueError(
+                "Document chunk exceeds Milvus VARCHAR limit: "
+                f"{size} > {cls._DOCUMENT_MAX_BYTES} UTF-8 bytes"
+            )
+
+    def _require_embedding_dimension(self) -> int:
+        if self._embedding_dimension is not None:
+            return self._embedding_dimension
+        record = self._config_record()
+        if record is None or "embedding_dimension" not in record:
+            raise RuntimeError(
+                "Call ensure_embedding_space before writing or searching vectors"
+            )
+        try:
+            dimension = int(record["embedding_dimension"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Milvus Collection has invalid embedding_dimension metadata"
+            ) from exc
+        if dimension <= 0:
+            raise ValueError("Milvus Collection embedding dimension must be positive")
+        self._embedding_dimension = dimension
+        return dimension
+
+    def _validate_vector_dimension(self, vector: List[float], *, operation: str) -> None:
+        expected = self._require_embedding_dimension()
+        actual = len(vector)
+        if actual != expected:
+            raise ValueError(
+                f"{operation} embedding dimension does not match the Milvus Collection: "
+                f"{actual} != {expected}"
+            )
+
+    @classmethod
+    def _literal(cls, value: Any) -> str:
+        if not isinstance(value, (str, int, float, bool)):
+            raise ValueError("Milvus metadata filters only support scalar values")
+        return json.dumps(value, ensure_ascii=False)
+
+    @classmethod
+    def _filter_expression(cls, where: Optional[Dict] = None) -> str:
+        expressions = [
+            f'{cls._RECORD_TYPE_FIELD} == {cls._literal(cls._CHUNK_RECORD_TYPE)}'
+        ]
+        for key, value in (where or {}).items():
+            normalized_key = str(key)
+            if not cls._IDENTIFIER_PATTERN.fullmatch(normalized_key):
+                raise ValueError(f"Invalid metadata filter field: {normalized_key!r}")
+            expressions.append(f"{normalized_key} == {cls._literal(value)}")
+        return " and ".join(expressions)
+
+    def _create_collection(
+        self,
+        provider: str,
+        model: str,
+        dimension: int,
+    ) -> None:
+        schema = MilvusClient.create_schema(
+            auto_id=False,
+            enable_dynamic_field=True,
+        )
+        schema.add_field(
+            field_name="id",
+            datatype=DataType.VARCHAR,
+            is_primary=True,
+            max_length=512,
+        )
+        schema.add_field(
+            field_name="vector",
+            datatype=DataType.FLOAT_VECTOR,
+            dim=dimension,
+        )
+        schema.add_field(
+            field_name="document",
+            datatype=DataType.VARCHAR,
+            max_length=65535,
+        )
+        schema.add_field(field_name="metadata", datatype=DataType.JSON)
+        schema.add_field(
+            field_name=self._RECORD_TYPE_FIELD,
+            datatype=DataType.VARCHAR,
+            max_length=16,
+        )
+
+        index_params = self.client.prepare_index_params()
+        index_params.add_index(
+            field_name="vector",
+            index_type="AUTOINDEX",
+            metric_type="L2",
+        )
+        self.client.create_collection(
+            collection_name=self.collection_name,
+            schema=schema,
+            index_params=index_params,
+            consistency_level="Strong",
+        )
+        self.client.insert(
+            collection_name=self.collection_name,
+            data=[
+                {
+                    "id": self._CONFIG_ID,
+                    "vector": [0.0] * dimension,
+                    "document": "",
+                    "metadata": {},
+                    self._RECORD_TYPE_FIELD: self._CONFIG_RECORD_TYPE,
+                    "embedding_provider": provider,
+                    "embedding_model": model,
+                    "embedding_dimension": dimension,
+                }
+            ],
+        )
+        self._flush()
+        self.client.load_collection(collection_name=self.collection_name)
+        self._collection_ready = True
+        self._embedding_dimension = dimension
+
+    def _flush(self) -> None:
+        self.client.flush(collection_name=self.collection_name)
+
+    def _config_record(self) -> Optional[Dict]:
+        if not self._collection_ready:
+            return None
+        rows = self.client.query(
+            collection_name=self.collection_name,
+            filter=f'id == {self._literal(self._CONFIG_ID)}',
+            output_fields=[
+                "embedding_provider",
+                "embedding_model",
+                "embedding_dimension",
+            ],
+            limit=1,
+        )
+        return dict(rows[0]) if rows else None
+
+    def _raw_count(self) -> int:
+        """Count every entity, including the internal config record."""
+        if not self._collection_ready:
+            return 0
+        rows = self.client.query(
+            collection_name=self.collection_name,
+            filter="",
+            output_fields=["count(*)"],
+        )
+        return int(rows[0].get("count(*)", 0)) if rows else 0
+
+    def _query_all(self, *, filter_expression: str, output_fields: List[str]) -> List[Dict]:
+        iterator_factory = getattr(self.client, "query_iterator", None)
+        if not callable(iterator_factory):
+            return list(
+                self.client.query(
+                    collection_name=self.collection_name,
+                    filter=filter_expression,
+                    output_fields=output_fields,
+                    limit=16384,
+                )
+            )
+
+        iterator = iterator_factory(
+            collection_name=self.collection_name,
+            batch_size=self._QUERY_BATCH_SIZE,
+            filter=filter_expression,
+            output_fields=output_fields,
+        )
+        rows: List[Dict] = []
+        try:
+            while True:
+                batch = iterator.next()
+                if not batch:
+                    break
+                rows.extend(batch)
+        finally:
+            iterator.close()
+        return rows
 
     def ensure_embedding_space(
         self,
@@ -93,7 +308,7 @@ class VectorStore:
         model: str,
         dimension: int,
     ) -> None:
-        """Reject reads or writes that would mix incompatible vector spaces."""
+        """Create or validate the Collection's embedding-space contract."""
         provider = str(provider).strip()
         model = str(model).strip()
         if not provider or not model:
@@ -101,43 +316,34 @@ class VectorStore:
         if dimension <= 0:
             raise ValueError("Embedding dimension must be positive")
 
+        if not self._collection_ready:
+            self._create_collection(provider, model, dimension)
+            return
+
+        record = self._config_record()
+        if record is None:
+            raise ValueError(
+                "Existing Milvus Collection has no embedding-space metadata; "
+                "use a new COLLECTION_NAME and rebuild the index"
+            )
+
         expected = {
             "embedding_provider": provider,
             "embedding_model": model,
             "embedding_dimension": dimension,
         }
-        metadata = dict(self.collection.metadata or {})
-        count = self.collection.count()
-        if count > 0:
-            actual_dimension = self._stored_embedding_dimension()
-            if actual_dimension != dimension:
+        for key, value in expected.items():
+            stored = record.get(key)
+            if str(stored) != str(value):
+                if self.count() == 0:
+                    self.delete_collection()
+                    self._create_collection(provider, model, dimension)
+                    return
                 raise ValueError(
                     "Embedding space is incompatible with the existing collection: "
-                    f"dimension {dimension} != {actual_dimension}"
+                    f"{key} {value!r} != {stored!r}"
                 )
-            for key, value in expected.items():
-                stored = metadata.get(key)
-                if stored is not None and str(stored) != str(value):
-                    raise ValueError(
-                        "Embedding space is incompatible with the existing collection: "
-                        f"{key} {value!r} != {stored!r}"
-                    )
-
-        stored_dimension = metadata.get("embedding_dimension")
-        if (
-            count == 0
-            and stored_dimension is not None
-            and int(stored_dimension) != dimension
-        ):
-            self.client.delete_collection(name=self.collection_name)
-            self.collection = self.client.get_or_create_collection(
-                name=self.collection_name,
-                metadata={**metadata, **expected},
-            )
-            return
-
-        if any(metadata.get(key) != value for key, value in expected.items()):
-            self.collection.modify(metadata={**metadata, **expected})
+        self._embedding_dimension = dimension
 
     def add_documents(
         self,
@@ -145,43 +351,61 @@ class VectorStore:
         embeddings: List[List[float]],
         ids: Optional[List[str]] = None,
     ) -> List[str]:
-        """幂等写入文档；相同 Chunk ID 会被更新而不是重复插入。"""
+        """Idempotently write document chunks using their stable IDs."""
         if len(documents) != len(embeddings):
             raise ValueError(
-                f"文档数量({len(documents)})与向量数量({len(embeddings)})不匹配"
+                f"Document count ({len(documents)}) does not match embedding count "
+                f"({len(embeddings)})"
             )
         if not documents:
             return []
         self._validate_embeddings(embeddings)
+        if not self._collection_ready:
+            raise RuntimeError("Call ensure_embedding_space before writing vectors")
+        self._validate_vector_dimension(embeddings[0], operation="Document")
 
         if ids is None:
             ids = [
-                str(document.metadata.get("chunk_id") or self._fallback_chunk_id(document, index))
+                str(
+                    document.metadata.get("chunk_id")
+                    or self._fallback_chunk_id(document, index)
+                )
                 for index, document in enumerate(documents)
             ]
         if len(ids) != len(documents):
-            raise ValueError("ID 数量必须与文档数量一致")
-        if len(set(ids)) != len(ids):
-            raise ValueError("同一批次中存在重复 Chunk ID")
+            raise ValueError("ID count must match document count")
+        normalized_ids = [self._validate_id(value) for value in ids]
+        if len(set(normalized_ids)) != len(normalized_ids):
+            raise ValueError("Duplicate chunk IDs exist in the same batch")
 
-        texts = [document.page_content for document in documents]
-        if any(not text.strip() for text in texts):
-            raise ValueError("不能写入空文档块")
-        metadatas = [self._sanitize_metadata(document.metadata) for document in documents]
+        rows: List[Dict] = []
+        for chunk_id, document, embedding in zip(
+            normalized_ids, documents, embeddings
+        ):
+            self._validate_document(document.page_content)
+            metadata = self._sanitize_metadata(document.metadata)
+            rows.append(
+                {
+                    **metadata,
+                    "id": chunk_id,
+                    "vector": embedding,
+                    "document": document.page_content,
+                    "metadata": metadata,
+                    self._RECORD_TYPE_FIELD: self._CHUNK_RECORD_TYPE,
+                }
+            )
 
         try:
-            self.collection.upsert(
-                ids=ids,
-                embeddings=embeddings,
-                documents=texts,
-                metadatas=metadatas,
-            )
+            self.client.upsert(collection_name=self.collection_name, data=rows)
+            self._flush()
             logger.info(
-                f"向量写入完成: upserted={len(documents)}, total={self.collection.count()}"
+                "Milvus vector write completed: upserted={}, total={}",
+                len(rows),
+                self.count(),
             )
-            return ids
+            return normalized_ids
         except Exception:
-            logger.exception("向量写入失败")
+            logger.exception("Milvus vector write failed")
             raise
 
     def search(
@@ -190,91 +414,123 @@ class VectorStore:
         n_results: int = 5,
         where: Optional[Dict] = None,
     ) -> Dict:
-        """执行向量距离检索，返回展开后的 Chroma 结果。"""
+        """Search with L2 distance and return the existing flattened result contract."""
         if not query_embedding:
-            raise ValueError("查询向量不能为空")
+            raise ValueError("Query embedding cannot be empty")
         if n_results <= 0:
-            raise ValueError("n_results 必须大于 0")
-
-        collection_count = self.collection.count()
-        if collection_count == 0:
+            raise ValueError("n_results must be positive")
+        if not self._collection_ready or self.count() == 0:
             return {"ids": [], "documents": [], "metadatas": [], "distances": []}
+        self._validate_vector_dimension(query_embedding, operation="Query")
 
         try:
-            results = self.collection.query(
-                query_embeddings=[query_embedding],
-                n_results=min(n_results, collection_count),
-                where=where,
+            results = self.client.search(
+                collection_name=self.collection_name,
+                data=[query_embedding],
+                anns_field="vector",
+                filter=self._filter_expression(where),
+                limit=min(n_results, self.count()),
+                output_fields=["document", "metadata"],
+                search_params={"metric_type": "L2", "params": {}},
             )
+            hits = results[0] if results else []
+            entities = [dict(hit.get("entity") or {}) for hit in hits]
             return {
-                "ids": results["ids"][0] if results.get("ids") else [],
-                "documents": results["documents"][0] if results.get("documents") else [],
-                "metadatas": results["metadatas"][0] if results.get("metadatas") else [],
-                "distances": results["distances"][0] if results.get("distances") else [],
+                "ids": [str(hit.get("id")) for hit in hits],
+                "documents": [str(entity.get("document") or "") for entity in entities],
+                "metadatas": [dict(entity.get("metadata") or {}) for entity in entities],
+                "distances": [float(hit.get("distance")) for hit in hits],
             }
         except Exception:
-            logger.exception("向量搜索失败")
+            logger.exception("Milvus vector search failed")
             raise
 
     def delete_by_ids(self, ids: List[str]) -> None:
-        """根据 Chunk ID 删除向量。"""
-        if not ids:
+        """Delete chunks by primary key."""
+        normalized = [str(value) for value in ids if str(value)]
+        if not normalized or not self._collection_ready:
             return
         try:
-            self.collection.delete(ids=ids)
-            logger.info(f"已删除 {len(ids)} 个文档块")
+            for offset in range(0, len(normalized), self._DELETE_BATCH_SIZE):
+                self.client.delete(
+                    collection_name=self.collection_name,
+                    ids=normalized[offset : offset + self._DELETE_BATCH_SIZE],
+                )
+            self._flush()
+            logger.info("Deleted {} document chunks from Milvus", len(normalized))
         except Exception:
-            logger.exception("按 ID 删除文档块失败")
+            logger.exception("Milvus chunk deletion by ID failed")
             raise
+
+    def _delete_by_filter(self, field_name: str, value: str) -> None:
+        if not value.strip():
+            raise ValueError(f"{field_name} cannot be empty")
+        if not self._collection_ready:
+            return
+        self.client.delete(
+            collection_name=self.collection_name,
+            filter=self._filter_expression({field_name: value}),
+        )
+        self._flush()
 
     def delete_by_document_id(self, document_id: str) -> None:
-        """删除某个文档对应的全部 Chunk。"""
-        if not document_id.strip():
-            raise ValueError("document_id 不能为空")
-        try:
-            self.collection.delete(where={"document_id": document_id})
-            logger.info(f"已删除文档: document_id={document_id}")
-        except Exception:
-            logger.exception("按 document_id 删除文档失败")
-            raise
+        self._delete_by_filter("document_id", document_id)
 
     def delete_by_index_id(self, index_id: str) -> None:
-        """Delete all chunks belonging to one managed index version."""
-        if not index_id.strip():
-            raise ValueError("index_id cannot be empty")
-        try:
-            self.collection.delete(where={"index_id": index_id})
-            logger.info(f"已删除索引版本: index_id={index_id}")
-        except Exception:
-            logger.exception("按 index_id 删除索引失败")
-            raise
+        self._delete_by_filter("index_id", index_id)
+
+    def count(self) -> int:
+        """Return the number of document chunks, excluding the config record."""
+        if not self._collection_ready:
+            return 0
+        rows = self.client.query(
+            collection_name=self.collection_name,
+            filter=self._filter_expression(),
+            output_fields=["count(*)"],
+        )
+        if not rows:
+            return 0
+        return int(rows[0].get("count(*)", 0))
 
     def count_by_index_id(self, index_id: str) -> int:
-        """Count chunks belonging to one managed index version."""
         if not index_id.strip():
             raise ValueError("index_id cannot be empty")
-        result = self.collection.get(where={"index_id": index_id}, include=[])
-        return len(result.get("ids") or [])
+        if not self._collection_ready:
+            return 0
+        rows = self.client.query(
+            collection_name=self.collection_name,
+            filter=self._filter_expression({"index_id": index_id}),
+            output_fields=["count(*)"],
+        )
+        return int(rows[0].get("count(*)", 0)) if rows else 0
 
     def list_ids_by_index_id(self, index_id: str) -> List[str]:
-        """Return chunk IDs belonging to one managed index version."""
         if not index_id.strip():
             raise ValueError("index_id cannot be empty")
-        result = self.collection.get(where={"index_id": index_id}, include=[])
-        return [str(value) for value in result.get("ids") or []]
+        if not self._collection_ready:
+            return []
+        rows = self._query_all(
+            filter_expression=self._filter_expression({"index_id": index_id}),
+            output_fields=["id"],
+        )
+        return [str(row["id"]) for row in rows]
 
     def list_index_ids(self) -> List[str]:
-        """Return distinct lifecycle index IDs stored in Chroma."""
         counts, _ = self.index_inventory()
         return sorted(counts)
 
     def index_inventory(self) -> tuple[Dict[str, int], int]:
-        """Return managed chunk counts and the legacy chunk count in one scan."""
-        result = self.collection.get(include=["metadatas"])
+        if not self._collection_ready:
+            return {}, 0
+        rows = self._query_all(
+            filter_expression=self._filter_expression(),
+            output_fields=["metadata"],
+        )
         counts: Dict[str, int] = {}
         legacy_count = 0
-        for metadata in result.get("metadatas") or []:
-            index_id = metadata.get("index_id") if metadata else None
+        for row in rows:
+            metadata = dict(row.get("metadata") or {})
+            index_id = metadata.get("index_id")
             if not index_id:
                 legacy_count += 1
                 continue
@@ -283,280 +539,56 @@ class VectorStore:
         return counts, legacy_count
 
     def count_legacy_chunks(self) -> int:
-        """Count v1.4 chunks without lifecycle metadata."""
         _, legacy_count = self.index_inventory()
         return legacy_count
 
     def close(self) -> None:
-        """Release Chroma resources held by short-lived callers and tests."""
         client = getattr(self, "client", None)
-        if client is not None and not getattr(client, "_closed", False):
-            client.close()
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
 
     def delete_collection(self) -> None:
-        """删除整个集合。"""
+        if not self._collection_ready:
+            return
         try:
-            self.client.delete_collection(name=self.collection_name)
-            logger.info(f"已删除集合: {self.collection_name}")
+            self.client.drop_collection(collection_name=self.collection_name)
+            self._collection_ready = False
+            self._embedding_dimension = None
+            logger.info("Dropped Milvus Collection: {}", self.collection_name)
         except Exception:
-            logger.exception("删除集合失败")
+            logger.exception("Dropping Milvus Collection failed")
             raise
 
     def get_collection_info(self) -> Dict:
-        """获取集合基本信息。"""
+        record = self._config_record() or {}
         return {
             "name": self.collection_name,
-            "count": self.collection.count(),
-            "metadata": self.collection.metadata or {},
+            "count": self.count(),
+            "metadata": {
+                key: record[key]
+                for key in (
+                    "embedding_provider",
+                    "embedding_model",
+                    "embedding_dimension",
+                )
+                if key in record
+            },
         }
 
     def peek_documents(self, limit: int = 5) -> Dict:
-        """查看前 N 个文档块。"""
         if limit <= 0:
-            raise ValueError("limit 必须大于 0")
-        try:
-            return self.collection.peek(limit=limit)
-        except Exception:
-            logger.exception("预览向量库内容失败")
-            raise
-
-def demo_basic_operations():
-    """
-    演示：向量数据库基本操作
-    """
-    logger.info("="*60)
-
-    # 步骤1：初始化向量存储
-    logger.info("\n步骤1: 初始化向量存储")
-    store = VectorStore(
-        collection_name="demo_collection",
-        persist_directory="./demo_chroma_db"
-    )
-
-    # 步骤2：准备测试数据
-    logger.info("\n步骤2: 准备测试数据")
-
-    test_documents = [
-        Document(
-            page_content="机器学习是人工智能的核心技术，通过算法让计算机从数据中学习。",
-        ),
-        Document(
-            page_content="深度学习使用多层神经网络，在图像识别和自然语言处理中表现出色。",
-        ),
-        Document(
-            page_content="RAG技术结合了检索和生成，让大语言模型能够访问外部知识库。",
-            metadata={"source": "RAG指南.pdf", "page": 1, "topic": "RAG"}
-        ),
-        Document(
-            page_content="向量数据库专门用于存储和检索高维向量，支持快速相似度搜索。",
-            metadata={"source": "向量数据库.pdf", "page": 1, "topic": "向量数据库"}
-        ),
-    ]
-
-    logger.info(f"准备了 {len(test_documents)} 个测试文档")
-
-    # 步骤3：生成向量（这里用模拟向量）
-    logger.info("\n步骤3: 生成向量（模拟）")
-
-    # 实际应用中应该用embedding_client.py生成真实向量
-    # 这里为了演示，生成随机向量
-    import random
-    test_embeddings = [
-        [random.random() for _ in range(1536)]
-        for _ in range(len(test_documents))
-    ]
-
-    logger.info(f"生成了 {len(test_embeddings)} 个向量（每个1536维）")
-
-    # 步骤4：添加到向量库
-    logger.info("\n步骤4: 添加文档到向量库")
-    doc_ids = store.add_documents(test_documents, test_embeddings)
-
-    logger.info(f"\n文档ID: {doc_ids[:2]}... (共{len(doc_ids)}个)")
-
-    # 步骤5：查看集合信息
-    logger.info("\n步骤5: 查看集合信息")
-    info = store.get_collection_info()
-
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("属性", width=20)
-    table.add_column("值", width=40)
-
-    table.add_row("集合名称", info['name'])
-    table.add_row("文档数量", str(info['count']))
-
-    logger.info(table)
-
-    # 步骤6：预览文档
-    logger.info("\n步骤6: 预览前3个文档\n")
-    peek_results = store.peek_documents(limit=3)
-
-    for i, (doc, meta) in enumerate(zip(peek_results['documents'], peek_results['metadatas']), 1):
-        logger.info(f"文档 {i}:")
-        logger.info(f"  内容: {doc[:50]}...")
-        logger.info(f"  来源: {meta.get('source', 'N/A')}")
-        logger.info(f"  主题: {meta.get('topic', 'N/A')}\n")
-
-    # 步骤7：相似度搜索
-    logger.info("\n步骤7: 执行相似度搜索")
-
-    # 用第一个文档的向量作为查询（实际应该用新问题的向量）
-    query_vector = test_embeddings[0]
-
-    logger.info("查询向量: 机器学习相关内容")
-    results = store.search(query_vector, n_results=3)
-
-    logger.info(f"\n找到 {len(results['documents'])} 个相关文档:\n")
-
-    for i, (doc, meta, dist) in enumerate(
-        zip(results['documents'], results['metadatas'], results['distances']), 1
-    ):
-        logger.info(f"结果 {i}: (相似度距离: {dist:.4f})")
-        logger.info(f"  内容: {doc[:60]}...")
-        logger.info(f"  来源: {meta.get('source', 'N/A')}\n")
-
-    # 步骤8：元数据过滤搜索
-    logger.info("\n步骤8: 带元数据过滤的搜索")
-
-    filtered_results = store.search(
-        query_vector,
-        n_results=3,
-    )
-
-    logger.info(f"\n找到 {len(filtered_results['documents'])} 个匹配文档:\n")
-
-    for i, (doc, meta) in enumerate(
-        zip(filtered_results['documents'], filtered_results['metadatas']), 1
-    ):
-        logger.info(f"结果 {i}:")
-        logger.info(f"  内容: {doc[:60]}...")
-        logger.info(f"  来源: {meta.get('source', 'N/A')}\n")
-
-    # 完成
-    logger.info("="*60)
-
-
-def demo_integration_with_real_embeddings():
-    """
-    演示：与真实嵌入模型集成
-    """
-    logger.info("="*60)
-
-    # 导入前面的模块
-    try:
-        from app.core.document_loader import UniversalDocumentLoader
-        from app.core.document_chunker import DocumentChunker
-        from app.core.embedding_client import UniversalEmbeddingClient
-    except ImportError as e:
-        logger.info(f"导入失败: {str(e)}")
-        logger.info("请确保前面课程的脚本都在同一目录")
-        return
-
-    # 步骤1：创建测试文档
-    logger.info("\n步骤1: 创建测试文档")
-
-    test_content = """
-向量数据库技术指南
-
-第一章：向量数据库简介
-向量数据库是专门用于存储和检索高维向量的数据库系统。它在RAG、推荐系统、图像搜索等场景中发挥重要作用。
-
-第二章：ChromaDB使用
-ChromaDB是一个轻量级的嵌入式向量数据库，支持持久化存储和快速检索。它特别适合中小型项目和学习场景。
-
-第三章：检索优化
-合理设置chunk_size和使用元数据过滤可以显著提升检索精度。建议根据具体场景进行实验调优。
-    """.strip()
-
-    test_file = "test_vector_store.txt"
-    with open(test_file, 'w', encoding='utf-8') as f:
-        f.write(test_content)
-
-    logger.info(f"已创建测试文档: {test_file}")
-
-    # 步骤2：加载文档
-    logger.info("\n步骤2: 加载文档")
-    loader = UniversalDocumentLoader()
-    documents = loader.load_document(test_file)
-
-    # 步骤3：分块
-    logger.info("\n步骤3: 文档分块")
-    chunker = DocumentChunker(chunk_size=200, chunk_overlap=50)
-    chunks = chunker.chunk_documents_recursive(documents)
-
-    logger.info(f"分块结果: {len(chunks)} 个块")
-
-    # 步骤4：向量化
-    logger.info("\n步骤4: 向量化文档块")
-
-    try:
-        # 尝试使用配置的嵌入模型
-        provider = os.getenv('DEFAULT_EMBEDDING_PROVIDER', 'openai')
-        logger.info(f"使用嵌入模型: {provider}")
-
-        embedding_client = UniversalEmbeddingClient(provider)
-
-        # 提取文本
-        texts = [chunk.page_content for chunk in chunks]
-
-        # 批量向量化
-        embeddings = embedding_client.embed_texts_batch(texts, show_progress=True)
-
-    except Exception as e:
-        logger.info(f"向量化失败: {str(e)}")
-        logger.info("使用模拟向量继续演示...")
-
-        # 使用模拟向量
-        import random
-        embeddings = [[random.random() for _ in range(1536)] for _ in chunks]
-
-    # 步骤5：存储到向量库
-    logger.info("\n步骤5: 存储到向量数据库")
-
-    store = VectorStore(
-        collection_name="integrated_demo",
-        persist_directory="./integrated_chroma_db"
-    )
-
-    doc_ids = store.add_documents(chunks, embeddings)
-
-    # 步骤6：测试检索
-    logger.info("\n步骤6: 测试检索功能")
-
-    test_query = "ChromaDB是什么？"
-    logger.info(f"\n查询问题: {test_query}")
-
-    try:
-        # 向量化查询
-        query_embedding = embedding_client.embed_text(test_query)
-    except:
-        # 使用模拟向量
-        query_embedding = embeddings[1]  # 用第2个块的向量
-
-    # 检索
-    results = store.search(query_embedding, n_results=2)
-
-    logger.info(f"\n检索到 {len(results['documents'])} 个相关片段:\n")
-
-    for i, (doc, meta, dist) in enumerate(
-        zip(results['documents'], results['metadatas'], results['distances']), 1
-    ):
-        logger.info(f"片段 {i}: (距离: {dist:.4f})")
-        logger.info(f"  {doc}\n")
-
-    logger.info("="*60)
-
-
-if __name__ == "__main__":
-    logger.info("\nRAG系统 - 向量数据库存储模块测试\n")
-
-    logger.info("选择演示模式:")
-    logger.info("1. 基本操作演示（增删改查）")
-    logger.info("2. 完整流程演示（文档→分块→向量化→存储）")
-
-    choice = input("\n请输入选项 (1/2): ").strip()
-
-    if choice == "1":
-        demo_basic_operations()
-    else:
-        demo_integration_with_real_embeddings()
+            raise ValueError("limit must be positive")
+        if not self._collection_ready:
+            return {"ids": [], "documents": [], "metadatas": []}
+        rows = self.client.query(
+            collection_name=self.collection_name,
+            filter=self._filter_expression(),
+            output_fields=["id", "document", "metadata"],
+            limit=limit,
+        )
+        return {
+            "ids": [str(row["id"]) for row in rows],
+            "documents": [str(row.get("document") or "") for row in rows],
+            "metadatas": [dict(row.get("metadata") or {}) for row in rows],
+        }

@@ -8,7 +8,7 @@
 
 - 支持 PDF、DOCX、TXT 文档；不支持旧版 `.doc`。
 - 文档和 Chunk 使用稳定 ID，相同内容重复上传是 no-op，内容更新会生成新版本并在构建成功后切换 active 索引。
-- SQLite 文档注册表保存源文件哈希、版本、索引清单、操作进度和错误状态；Chroma 只保存向量。
+- SQLite 文档注册表保存源文件哈希、版本、索引清单、操作进度和错误状态；Milvus Standalone 保存向量及检索元数据。
 - 提供 `list`、`audit`、`cleanup`、`rebuild` 生命周期 CLI，支持 `rebuild --dry-run`。
 - 检索结果明确使用 **distance（距离，越小越相关）**，并支持最大距离阈值。
 - PDF 页面统一显示为从 1 开始的页码。
@@ -52,7 +52,7 @@ DocuMind/
 │   │   ├── document_loader.py    # PDF/DOCX/TXT 加载与文档元数据
 │   │   ├── document_chunker.py   # 分块与稳定 Chunk ID
 │   │   ├── embedding_client.py   # 多 Provider Embedding
-│   │   ├── vector_store.py       # Chroma upsert/search/delete
+│   │   ├── vector_store.py       # Milvus Collection/upsert/search/delete
 │   │   ├── retriever.py          # Dense、BM25、RRF、多查询与重排编排
 │   │   ├── query_rewriter.py     # 严格 JSON Query Rewrite 与确定性映射
 │   │   ├── reranker.py           # 延迟加载 Cross-Encoder 重排
@@ -95,6 +95,7 @@ DocuMind/
 
 - Windows PowerShell（以下命令以 Windows 为例）
 - Python 3.11 或更高版本
+- 一个可访问的 Milvus Standalone 服务（默认 `http://127.0.0.1:19530`）
 - 至少配置一个 LLM Provider
 - 默认 Embedding 使用本地 Ollama，需要 Ollama 服务和对应模型
 
@@ -129,6 +130,8 @@ Copy-Item .env.example .env
 不要把真实 API Key 写入 `.env.example`，也不要提交 `.env`。
 
 ### 4. 准备 Provider
+
+本次迭代只接入 Milvus 客户端，不包含 Docker 编排。启动应用前需先准备 Milvus Standalone，并在 `.env` 中配置 `MILVUS_URI`；无认证的本地服务可将 `MILVUS_TOKEN` 留空。
 
 默认 Embedding Provider 是 Ollama：
 
@@ -166,7 +169,7 @@ python -m app.lifecycle rebuild --document-key <document_key>
 python -m app.lifecycle rebuild --document-key <document_key> --retry
 ```
 
-命令支持 `--json` 输出，便于脚本和后续任务系统接入。`audit` 同时检查 active 缺失与 Chunk 数不一致；`cleanup` 默认只处理注册表中的旧版本，并可恢复中断在 `deleting` 的清理。确认需要处理整个 Chroma Collection 中未注册的索引时再加 `--include-orphans`。
+命令支持 `--json` 输出，便于脚本和后续任务系统接入。`audit` 同时检查 active 缺失与 Chunk 数不一致；`cleanup` 默认只处理注册表中的旧版本，并可恢复中断在 `deleting` 的清理。确认需要处理整个 Milvus Collection 中未注册的索引时再加 `--include-orphans`。
 
 `rebuild --dry-run` 会校验持久化源文件哈希，并按当前 Chunk/Embedding 配置计算 planned `index_id` 和 `configuration_changed`；Provider/模型未变化时复用上次成功索引验证过的真实维度，源文件缺失或被篡改时直接报错。
 
@@ -179,7 +182,11 @@ python -m app.lifecycle rebuild --document-key <document_key> --retry
 | `CHUNK_SIZE` | `500` | Chunk 字符长度 |
 | `CHUNK_OVERLAP` | `100` | Chunk 重叠长度，必须小于 `CHUNK_SIZE` |
 | `RETRIEVAL_TOP_K` | `3` | 返回候选数量 |
-| `RETRIEVAL_SCORE_THRESHOLD` | 空 | Chroma 最大距离；越小越严格 |
+| `RETRIEVAL_SCORE_THRESHOLD` | 空 | Milvus L2 最大距离；越小越严格 |
+| `MILVUS_URI` | `http://127.0.0.1:19530` | Milvus Standalone 服务地址 |
+| `MILVUS_TOKEN` | 空 | 可选认证 Token |
+| `MILVUS_DB_NAME` | `default` | Milvus Database 名称 |
+| `COLLECTION_NAME` | `rag_documents` | Milvus Collection 名称 |
 | `LLM_TEMPERATURE` | `0.7` | 生成温度，范围 0–2 |
 | `LLM_MAX_TOKENS` | `1000` | 最大生成 Token 数 |
 | `MAX_UPLOAD_SIZE_MB` | `50` | 上传大小限制 |
@@ -211,7 +218,7 @@ ALLOWED_EXTENSIONS=[".pdf", ".docx", ".txt"]
 
 ## RAG 评估
 
-离线运行默认黄金评估集，不需要 Ollama、ChromaDB、网络或真实 LLM：
+离线运行默认黄金评估集，不需要 Ollama、Milvus、网络或真实 LLM：
 
 ```powershell
 python -m evaluation.runner `
@@ -303,7 +310,7 @@ python -m pip check
 
 ## 数据和索引
 
-- Chroma 默认目录：`data/chroma_db/`
+- 向量索引位于 `MILVUS_URI` 指向的 Milvus 服务中，默认 Collection 为 `rag_documents`
 - 文档注册表：`data/document_registry.sqlite3`
 - 上传源文件持久化目录：`data/uploads/`（按内容哈希命名，已加入 Git 忽略）
 - 日志目录：`logs/`
@@ -311,22 +318,21 @@ python -m pip check
 
 相同文件名且内容完全相同的文档会得到相同 `document_key`、`document_version_id`、`index_id` 和 `chunk_id`，健康索引的重复上传不会增加 Chunk。如果 active 向量缺失或数量不一致，重复上传会自动进入修复构建。内容更新会先构建新索引，成功后才切换 active；失败时旧 active 仍可检索。
 
-### 清空并重建本地索引
+### 清空并重建索引
 
-先停止 Web 服务，再执行：
+优先使用生命周期命令清理文档版本。如果需要从 Chroma 迁移或更换 Embedding 空间，请停止 Web 服务，设置一个新的 `COLLECTION_NAME`，删除生命周期注册表，再重新上传原始文档：
 
 ```powershell
-Remove-Item -Recurse -Force .\data\chroma_db
 Remove-Item -Force .\data\document_registry.sqlite3
 ```
 
-优先使用生命周期命令清理和重建。只有需要丢弃全部本地数据时才删除整个 Chroma 目录和 `data/document_registry.sqlite3`，再重新上传文档。
+旧 Chroma 向量不会自动迁移到 Milvus。确认旧 Milvus Collection 不再使用后，可通过 Milvus 管理工具删除；应用不会因删除 SQLite 注册表而自动删除远端 Collection。
 
 ## 已知限制
 
 - Web 对话历史目前只用于 UI 展示；v1.7 Query Rewrite 只在评估 CLI 中运行，尚未接入历史感知的线上问答。
 - v1.4 之前写入的旧向量没有 `index_id`，当前检索会兼容保留；`audit` 会报告 legacy Chunk，后续可安排显式迁移。
-- 首次接管无 Embedding 元数据的非空 v1.4 Collection 时，只能核对实际向量维度，并假定它由当前 Provider/模型生成；旧数据本身无法反推出模型身份。
+- 迁移前的 Chroma Collection 不受新适配器管理，需要在 Milvus 中使用新 Collection 全量重建。
 - 非空 Collection 禁止切换 Embedding Provider、模型或维度；当前版本不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
 - 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.0/v2.1。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
@@ -339,9 +345,10 @@ Remove-Item -Force .\data\document_registry.sqlite3
 检查：
 
 1. `.env` 中选定的 Provider 是否有 API Key；
-2. Ollama 是否正在运行，Embedding 模型是否已下载；
-3. `pip check` 是否通过；
-4. `logs/` 中是否有完整异常。
+2. `MILVUS_URI` 指向的 Standalone 服务是否正在运行且网络可达；
+3. Ollama 是否正在运行，Embedding 模型是否已下载；
+4. `pip check` 是否通过；
+5. `logs/` 中是否有完整异常。
 
 ### 上传后没有结果
 
@@ -351,4 +358,4 @@ Remove-Item -Force .\data\document_registry.sqlite3
 
 ### 更换 Embedding 模型后查询失败
 
-系统会在写入和查询前校验 Collection 保存的 Embedding Provider、模型、维度及实际向量维度，同维度的不同模型也会被拒绝，避免语义空间静默混用。停止服务后改用新的 `COLLECTION_NAME` 并全量重建；确认旧索引无需保留时，也可以同时清空 Chroma 和生命周期注册表后重新上传。
+系统会在写入和查询前校验 Collection 保存的 Embedding Provider、模型和维度，同维度的不同模型也会被拒绝，避免语义空间静默混用。停止服务后改用新的 `COLLECTION_NAME` 并全量重建；确认旧索引无需保留时，再通过 Milvus 管理工具删除旧 Collection。

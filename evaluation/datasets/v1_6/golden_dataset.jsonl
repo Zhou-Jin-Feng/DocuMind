@@ -1,5 +1,5 @@
 {"id":"exact-rf-001","category":"exact_term","question":"RRF 的分数公式是什么？","expected_document_ids":["retrieval-quality"],"expected_keywords":["1/(k+rank_i)","RRF"],"should_answer":true,"top_k":3}
-{"id":"exact-rf-002","category":"exact_term","question":"混合检索为什么不能直接比较 Chroma distance 和 BM25 分数？","expected_document_ids":["retrieval-quality"],"expected_keywords":["不同检索器","原始分数","RRF"],"should_answer":true,"top_k":3}
+{"id":"exact-rf-002","category":"exact_term","question":"混合检索为什么不能直接比较 Milvus L2 distance 和 BM25 分数？","expected_document_ids":["retrieval-quality"],"expected_keywords":["不同检索器","原始分数","RRF"],"should_answer":true,"top_k":3}
 {"id":"exact-life-001","category":"exact_term","question":"旧索引清理的状态顺序是什么？","expected_document_ids":["lifecycle-operations"],"expected_keywords":["deleting","deleted"],"should_answer":true,"top_k":3}
 {"id":"exact-life-002","category":"exact_term","question":"dry-run 会校验哪一种哈希？","expected_document_ids":["lifecycle-operations"],"expected_keywords":["SHA-256","source"],"should_answer":true,"top_k":3}
 {"id":"exact-eval-001","category":"exact_term","question":"回归报告需要哪些输入指纹才能比较？","expected_document_ids":["evaluation-gates"],"expected_keywords":["dataset_sha256","documents_sha256"],"should_answer":true,"top_k":3}

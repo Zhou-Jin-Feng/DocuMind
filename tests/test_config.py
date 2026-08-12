@@ -57,6 +57,20 @@ class SettingsTests(unittest.TestCase):
             "http://127.0.0.1:4318/v1/traces",
         )
 
+    def test_milvus_connection_defaults_and_normalization(self):
+        config = Settings(
+            _env_file=None,
+            milvus_uri="  http://milvus:19530  ",
+            milvus_token="   ",
+            milvus_db_name="  rag  ",
+        )
+        self.assertEqual(config.milvus_uri, "http://milvus:19530")
+        self.assertIsNone(config.milvus_token)
+        self.assertEqual(config.milvus_db_name, "rag")
+
+        with self.assertRaises(ValidationError):
+            Settings(_env_file=None, milvus_uri="   ")
+
 
     def test_empty_optional_value_in_env_template_is_ignored(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -12,7 +12,7 @@ flowchart TD
     LC --> LOAD["Document Loader"]
     LC --> CHUNK["Document Chunker"]
     LC --> EMB["Embedding Client"]
-    LC --> VS["VectorStore / Chroma"]
+    LC --> VS["VectorStore / Milvus"]
     UI --> RET["Retriever"]
     RET --> EMB
     RET --> VS
@@ -42,7 +42,7 @@ flowchart TD
 → 生成 index_id / 稳定 chunk_id
 → 批量 Embedding 和维度校验
 → Embedding 空间兼容校验
-→ Chroma upsert / Chunk ID 收敛
+→ Milvus upsert / Chunk ID 收敛
 → Chunk 数校验
 → Registry active 切换
 → 清理旧索引
@@ -80,7 +80,7 @@ rag.document.ingest
 source persist → claim → build → validate → activate → cleanup
 ```
 
-`audit` 一次扫描 Chroma，报告旧索引、孤儿索引、缺失 active、active Chunk 数不一致和 v1.4 legacy Chunk。旧索引清理先落 `deleting`，再删除向量并落 `deleted`；进程在任一步中断后都可由下一次 `cleanup` 收敛。
+`audit` 一次扫描 Milvus，报告旧索引、孤儿索引、缺失 active、active Chunk 数不一致和 v1.4 legacy Chunk。旧索引清理先落 `deleting`，再删除向量并落 `deleted`；进程在任一步中断后都可由下一次 `cleanup` 收敛。
 
 `rebuild --dry-run` 不初始化 Embedding Provider，也不写入向量或状态。它先校验内容寻址源文件的 SHA-256，再用当前解析、分块和静态 Embedding 配置计算 planned fingerprint / `index_id`；Provider/模型未变化时复用注册表中已验证的真实维度，避免 Ollama 静态默认维度造成误判。
 
@@ -93,7 +93,7 @@ Web 默认问答链路保持 Dense-only：
 ```text
 用户问题
 → Query Embedding
-→ Chroma 距离检索
+→ Milvus L2 距离检索
 → 最大距离阈值过滤
 → 构建带来源和页码的上下文
 → LLM 流式生成
@@ -125,7 +125,7 @@ Dense ranks ─┐
 BM25 ranks ──┘
 ```
 
-RRF 只使用名次，不直接比较 Chroma `distance` 与 BM25 原始分数。v1.6.1 使用 `dense_weight/(rrf_k+dense_rank) + lexical_weight/(rrf_k+lexical_rank)`，候选深度由 `candidate_multiplier` 控制；零权重通道不执行检索。BM25 可用 `lexical_score_threshold` 拒绝低分词法候选。结果分别保留 `distance`、`lexical_score`、`dense_rank`、`lexical_rank` 和 `fusion_score`，方便审计来源。词法候选没有向量距离时，UI 不显示伪造的距离值。
+RRF 只使用名次，不直接比较 Milvus L2 `distance` 与 BM25 原始分数。v1.6.1 使用 `dense_weight/(rrf_k+dense_rank) + lexical_weight/(rrf_k+lexical_rank)`，候选深度由 `candidate_multiplier` 控制；零权重通道不执行检索。BM25 可用 `lexical_score_threshold` 拒绝低分词法候选。结果分别保留 `distance`、`lexical_score`、`dense_rank`、`lexical_rank` 和 `fusion_score`，方便审计来源。词法候选没有向量距离时，UI 不显示伪造的距离值。
 
 v1.7 仅在评估编排中增加可选链路：
 
@@ -138,7 +138,7 @@ v1.7 仅在评估编排中增加可选链路：
 → Top-K 评估报告
 ```
 
-原问题必须在改写列表首位；Query RRF 与 Hybrid RRF 分别保存，不能复用或覆盖 `fusion_score`。Cross-Encoder 只改变最终名次并写入 `rerank_score`，不会把其数值伪装成 Chroma distance。LLM 改写先生成与 schema 版本、Prompt SHA-256、生成参数和数据集 SHA-256 绑定的 artifact，之后的本地检索评估不访问 LLM；这使同一 artifact、语料和配置下的报告可复现。四模式比较还会校验 Embedding、分块、阈值和 Hybrid 参数完全一致，并分别报告质量与平均/P50/P95/最大延迟。
+原问题必须在改写列表首位；Query RRF 与 Hybrid RRF 分别保存，不能复用或覆盖 `fusion_score`。Cross-Encoder 只改变最终名次并写入 `rerank_score`，不会把其数值伪装成 Milvus distance。LLM 改写先生成与 schema 版本、Prompt SHA-256、生成参数和数据集 SHA-256 绑定的 artifact，之后的本地检索评估不访问 LLM；这使同一 artifact、语料和配置下的报告可复现。四模式比较还会校验 Embedding、分块、阈值和 Hybrid 参数完全一致，并分别报告质量与平均/P50/P95/最大延迟。
 
 ## 5. 可观测性架构
 
@@ -173,7 +173,7 @@ v1.7 仅在评估编排中增加可选链路：
 
 - Provider 和 API 配置；
 - 分块、检索和生成参数；
-- Chroma 数据目录；
+- Milvus URI、Token 和 Database；
 - 上传限制；
 - Web 监听地址；
 - 日志格式、轮转和保留周期；

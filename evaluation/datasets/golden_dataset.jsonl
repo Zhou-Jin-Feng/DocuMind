@@ -2,7 +2,7 @@
 {"id":"stable-indexing","question":"为什么要使用稳定的 document_id 和 chunk_id？","expected_document_ids":["indexing-guide"],"expected_keywords":["稳定 ID","幂等","upsert","重复索引"],"should_answer":true,"top_k":3}
 {"id":"observability-request","question":"结构化日志如何关联一次请求？","expected_document_ids":["observability-guide"],"expected_keywords":["request_id","trace_id","结构化日志"],"should_answer":true,"top_k":3}
 {"id":"metrics-listening","question":"Metrics 默认监听在哪个地址？","expected_document_ids":["observability-guide"],"expected_keywords":["127.0.0.1:8000","Metrics"],"should_answer":true,"top_k":3}
-{"id":"distance-direction","question":"Chroma 的 distance 数值越大越相关吗？","expected_document_ids":["retrieval-guide"],"expected_keywords":["distance","越小越相关","阈值"],"should_answer":true,"top_k":3}
+{"id":"distance-direction","question":"Milvus 的 L2 distance 数值越大越相关吗？","expected_document_ids":["retrieval-guide"],"expected_keywords":["distance","越小越相关","阈值"],"should_answer":true,"top_k":3}
 {"id":"ollama-embedding","question":"本地 Embedding 使用什么服务和模型？","expected_document_ids":["deployment-guide"],"expected_keywords":["Ollama","qwen3-embedding","Embedding"],"should_answer":true,"top_k":3}
 {"id":"unrelated-stock","question":"明天股票会涨吗？","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}
 {"id":"unrelated-recipe","question":"如何制作巧克力蛋糕？","expected_document_ids":[],"expected_keywords":[],"should_answer":false,"top_k":3}

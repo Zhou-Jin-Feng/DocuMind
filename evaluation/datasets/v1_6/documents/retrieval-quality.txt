@@ -2,6 +2,6 @@ v1.6 检索质量实验文档。
 
 混合检索同时使用稠密向量检索和词法检索。稠密检索擅长同义表达和语义相近的问题，BM25 等词法方法擅长精确匹配产品名、错误码、配置项和缩写。候选集合可以使用 Reciprocal Rank Fusion（RRF）融合，避免直接比较不同检索器的原始分数。
 
-RRF 的基本形式是 score(d)=sum(1/(k+rank_i(d)))。其中 k 是平滑常数，rank_i 是文档在第 i 个检索器中的名次。RRF 只依赖排序位置，因此不要求 Chroma distance 与 BM25 分数处在同一数值空间。混合检索应先召回较大的候选集，再进行去重和可选的 Cross-Encoder Reranker。
+RRF 的基本形式是 score(d)=sum(1/(k+rank_i(d)))。其中 k 是平滑常数，rank_i 是文档在第 i 个检索器中的名次。RRF 只依赖排序位置，因此不要求 Milvus L2 distance 与 BM25 分数处在同一数值空间。混合检索应先召回较大的候选集，再进行去重和可选的 Cross-Encoder Reranker。
 
 v1.6 的实验顺序是 Dense-only 基线、BM25-only 对照、Dense+BM25 RRF，最后才评估 Reranker。每次改变检索器、融合常数、Top-K 或阈值，都必须运行同一份黄金评估集和回归门禁。

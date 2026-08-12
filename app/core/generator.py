@@ -350,30 +350,19 @@ def demo_rag_generation():
         logger.info("请确保前面课程的脚本都在同一目录")
         return
 
-    import os
-
-    # 步骤1：检查是否有已存在的知识库
+    # 步骤1：连接已有知识库
     logger.info("\n步骤1: 加载知识库")
-
-    kb_exists = os.path.exists("./retrieval_chroma_db")
-
-    if kb_exists:
-        logger.info("发现已有知识库，直接加载")
-
-        # 初始化embedding和vector store
-        provider = settings.default_embedding_provider
-        embedding_client = UniversalEmbeddingClient(provider)
-
-        vector_store = VectorStore(
-            collection_name="retrieval_demo",
-            persist_directory="./retrieval_chroma_db"
-        )
-
-    else:
-        logger.info("未找到知识库，正在创建...")
-
-        # 创建知识库（复用第6课的代码）
-        logger.info("请先运行 retriever.py 创建知识库")
+    provider = settings.default_embedding_provider
+    embedding_client = UniversalEmbeddingClient(provider)
+    vector_store = VectorStore(
+        collection_name="retrieval_demo",
+        uri=settings.milvus_uri,
+        token=settings.milvus_token,
+        db_name=settings.milvus_db_name,
+    )
+    if vector_store.count() == 0:
+        logger.info("Milvus Collection 中没有文档，请先运行 retriever.py 创建知识库")
+        vector_store.close()
         return
 
     # 步骤2：初始化检索器
@@ -392,6 +381,7 @@ def demo_rag_generation():
     except Exception as e:
         logger.exception("LLM初始化失败")
         logger.info("请检查.env中的LLM API配置")
+        vector_store.close()
         return
 
     # 步骤4：测试问答
@@ -487,6 +477,7 @@ def demo_rag_generation():
     # 完成
     logger.info("\n" + "="*70)
     logger.info("="*60)
+    vector_store.close()
 
 
 if __name__ == "__main__":

@@ -47,6 +47,9 @@ class FakeVectorStore:
         self.added.append((chunks, embeddings))
         return ["chunk-1", "chunk-2"]
 
+    def count(self):
+        return self.collection.count()
+
     def count_by_index_id(self, index_id):
         return 2
 

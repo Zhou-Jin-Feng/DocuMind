@@ -1,11 +1,10 @@
 import json
 import io
-import gc
-import shutil
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from langchain_core.documents import Document
 
@@ -46,6 +45,7 @@ from evaluation.rewrite_artifacts import (
     build_rewrite_artifact,
     load_rewrite_artifact,
 )
+from tests.fake_vector_store import FakeMilvusClient
 from evaluation.runner import EvaluationRunner, _percentile, load_golden_dataset
 
 
@@ -524,8 +524,12 @@ class EvaluationTests(unittest.TestCase):
         ).run([GoldenCase("no-answer", "q", (), should_answer=False)])
         self.assertEqual(report.metrics["no_answer_retrieval_accuracy"], 1.0)
 
-    def test_chroma_pipeline_reaches_runner_metrics_without_network(self):
-        directory = Path(tempfile.mkdtemp(prefix="rag-evaluation-chroma-"))
+    def test_milvus_pipeline_reaches_runner_metrics_without_network(self):
+        client_patcher = patch(
+            "app.core.vector_store.MilvusClient",
+            FakeMilvusClient,
+        )
+        client_patcher.start()
         store = None
         try:
             documents = [
@@ -544,7 +548,8 @@ class EvaluationTests(unittest.TestCase):
             embedder = DeterministicEmbeddingClient()
             store = VectorStore(
                 collection_name="evaluation_documents",
-                persist_directory=str(directory),
+                uri="http://milvus.test:19530",
+                db_name="unit_test",
             )
             adapter, summary = build_indexed_retrieval_adapter(
                 documents,
@@ -558,7 +563,7 @@ class EvaluationTests(unittest.TestCase):
             ).run(
                 [
                     GoldenCase(
-                        id="chroma-rag",
+                        id="milvus-rag",
                         question="RAG 如何使用向量数据库？",
                         expected_document_ids=("knowledge-base",),
                         should_answer=True,
@@ -579,8 +584,7 @@ class EvaluationTests(unittest.TestCase):
             if 'adapter' in locals() and adapter is not None:
                 adapter.close()
             store = None
-            gc.collect()
-            shutil.rmtree(directory, ignore_errors=True)
+            client_patcher.stop()
 
     def test_load_text_documents_uses_stable_fixture_ids(self):
         with tempfile.TemporaryDirectory() as directory:

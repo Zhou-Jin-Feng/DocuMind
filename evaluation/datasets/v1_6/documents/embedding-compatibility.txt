@@ -1,6 +1,6 @@
 Embedding 空间兼容性说明。
 
-一个 Chroma Collection 的向量空间由 embedding_provider、embedding_model 和 embedding_dimension 共同描述。即使两个模型的维度相同，语义空间也不兼容，不能把它们写进同一个非空 Collection。
+一个 Milvus Collection 的向量空间由 embedding_provider、embedding_model 和 embedding_dimension 共同描述。即使两个模型的维度相同，语义空间也不兼容，不能把它们写进同一个非空 Collection。
 
 写入和查询之前必须校验当前 Provider、模型、声明维度和实际存储维度。空 Collection 才允许切换向量空间；维度变化时需要重建空 Collection。v1.5 不提供跨 Embedding 空间的在线 shadow migration。
 

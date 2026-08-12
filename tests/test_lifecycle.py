@@ -19,6 +19,7 @@ from app.lifecycle.models import (
 )
 from app.lifecycle.registry import DocumentRegistry
 from app.lifecycle.service import DocumentLifecycleService
+from tests.fake_vector_store import FakeMilvusClient
 
 
 class FakeEmbeddingClient:
@@ -46,13 +47,19 @@ class FailingEmbeddingClient(FakeEmbeddingClient):
 
 class LifecycleTests(unittest.TestCase):
     def setUp(self):
+        self.client_patcher = patch(
+            "app.core.vector_store.MilvusClient",
+            FakeMilvusClient,
+        )
+        self.client_patcher.start()
         self.directory = Path(tempfile.mkdtemp(prefix="rag-lifecycle-"))
         self.source_path = self.directory / "guide.txt"
         self.source_path.write_text("第一版文档内容。" * 30, encoding="utf-8")
         self.registry = DocumentRegistry(str(self.directory / "registry.sqlite3"))
         self.vector_store = VectorStore(
             collection_name="lifecycle_documents",
-            persist_directory=str(self.directory / "chroma"),
+            uri="http://milvus.test:19530",
+            db_name="unit_test",
         )
 
     def tearDown(self):
@@ -60,6 +67,7 @@ class LifecycleTests(unittest.TestCase):
 
         self.vector_store.close()
         self.vector_store = None
+        self.client_patcher.stop()
         shutil.rmtree(self.directory, ignore_errors=True)
 
     def _service(

@@ -1,7 +1,7 @@
 """
 RAG 系统检索模块。
 
-明确区分 Chroma 距离和重排分数，并保留检索异常语义。
+明确区分 Milvus L2 距离和重排分数，并保留检索异常语义。
 """
 
 import hashlib
@@ -918,9 +918,16 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     # 创建向量库
     vector_store = VectorStore(
         collection_name="retrieval_demo",
-        persist_directory="./retrieval_chroma_db"
+        uri=settings.milvus_uri,
+        token=settings.milvus_token,
+        db_name=settings.milvus_db_name,
     )
-
+    embedding_config = getattr(embedding_client, "config", {}) or {}
+    vector_store.ensure_embedding_space(
+        getattr(embedding_client, "provider", "demo"),
+        str(embedding_config.get("model") or "simulated"),
+        len(embeddings[0]),
+    )
     vector_store.add_documents(chunks, embeddings)
 
     # 步骤4：初始化检索器
@@ -928,6 +935,7 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
 
     if embedding_client is None:
         logger.info("模拟模式，无法测试真实检索")
+        vector_store.close()
         return
 
     retriever = Retriever(vector_store, embedding_client)
@@ -976,6 +984,7 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     # 完成
     logger.info("\n" + "="*70)
     logger.info("="*60)
+    vector_store.close()
 
 
 if __name__ == "__main__":

@@ -51,12 +51,16 @@ class RAGWebApp:
         self.embedding_provider = settings.default_embedding_provider
         self.llm_provider = settings.default_llm_provider
         self.initialized = False
+        self.vector_store = None
+        self.lifecycle_service = None
 
         try:
             self.embedding_client = UniversalEmbeddingClient(self.embedding_provider)
             self.vector_store = VectorStore(
                 collection_name=settings.collection_name,
-                persist_directory=settings.chroma_persist_dir,
+                uri=settings.milvus_uri,
+                token=settings.milvus_token,
+                db_name=settings.milvus_db_name,
             )
             self.retriever = Retriever(self.vector_store, self.embedding_client)
             self.llm_client = UniversalLLMClient(provider=self.llm_provider)
@@ -81,6 +85,22 @@ class RAGWebApp:
             logger.info("RAG系统初始化完成")
         except Exception:
             logger.exception("RAG系统初始化失败")
+            self.close()
+
+    def close(self) -> None:
+        """Release the Milvus connection owned by this application instance."""
+        service = getattr(self, "lifecycle_service", None)
+        vector_store = getattr(self, "vector_store", None)
+        self.lifecycle_service = None
+        self.vector_store = None
+        if service is not None:
+            close_service = getattr(service, "close", None)
+            if callable(close_service):
+                close_service()
+            return
+        close_store = getattr(vector_store, "close", None)
+        if callable(close_store):
+            close_store()
 
     @staticmethod
     def _resolve_upload_path(file) -> Path:
@@ -613,6 +633,8 @@ def create_web_interface():
             fn=rag_app.clear_conversation,
             outputs=[chatbot, sources_display],
         )
+
+    demo.unload(rag_app.close)
 
     return demo, custom_css
 

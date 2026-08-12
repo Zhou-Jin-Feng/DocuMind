@@ -226,7 +226,7 @@ class DocumentLifecycleService:
                     index_id=index_id,
                     source_sha256=source_sha256,
                     chunk_count=expected_count,
-                    collection_count=self.vector_store.collection.count(),
+                    collection_count=self.vector_store.count(),
                     previous_index_id=claim.previous_index_id,
                 )
             logger.warning(
@@ -392,7 +392,7 @@ class DocumentLifecycleService:
                         index_id=previous_index_id,
                     )
 
-            collection_count = self.vector_store.collection.count()
+            collection_count = self.vector_store.count()
             logger.info(
                 "文档索引完成",
                 event="document_indexing_completed",

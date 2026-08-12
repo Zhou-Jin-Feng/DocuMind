@@ -1,5 +1,5 @@
 本地部署基线说明。
 
-默认 Web 服务监听 127.0.0.1:7860，Metrics 服务监听 127.0.0.1:8000。默认 Embedding 使用 Ollama qwen3-embedding，模型实际维度以运行时返回为准。Chroma 持久化目录、SQLite 注册表和内容寻址上传目录都应置于 Git 之外。
+默认 Web 服务监听 127.0.0.1:7860，Metrics 服务监听 127.0.0.1:8000。默认 Embedding 使用 Ollama qwen3-embedding，模型实际维度以运行时返回为准。Milvus 服务端数据、SQLite 注册表和内容寻址上传目录都应置于 Git 之外。
 
 运行离线评估不需要 Ollama、网络或真实 LLM。真实基线使用独立的评估 Collection 和 persist directory，不要覆盖应用生产索引。评估报告必须记录 Provider、模型、维度、分块配置和输入指纹。

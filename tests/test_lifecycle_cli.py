@@ -8,12 +8,6 @@ from app.lifecycle.cli import _build_service, main
 from app.lifecycle.models import IndexAuditReport, RebuildPlan
 
 
-class FakeCollection:
-    @staticmethod
-    def count():
-        return 3
-
-
 class FakeRegistry:
     @staticmethod
     def list_documents(**kwargs):
@@ -34,7 +28,7 @@ class FakeService:
     tenant_id = "default"
     collection_id = "rag_documents"
     registry = FakeRegistry()
-    vector_store = type("FakeStore", (), {"collection": FakeCollection()})()
+    vector_store = type("FakeStore", (), {"count": staticmethod(lambda: 3)})()
 
     @staticmethod
     def audit():

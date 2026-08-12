@@ -9,7 +9,7 @@
 | LangChain | `langchain-text-splitters` | 字符和递归分块 |
 | Embedding | `langchain-ollama` | 本地 Ollama Embedding |
 | Reranker | `sentence-transformers` | Cross-Encoder 候选重排；模型按需加载 |
-| Vector DB | `chromadb` | 持久化向量索引 |
+| Vector DB | `pymilvus` | 连接 Milvus Standalone 并管理向量索引 |
 | LLM | `openai` | OpenAI、DeepSeek、GLM 兼容客户端 |
 | LLM | `anthropic` | Claude 客户端 |
 | Documents | `pypdf` | PDF 文本提取 |

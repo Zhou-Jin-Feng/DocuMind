@@ -112,8 +112,16 @@ def build_indexed_retrieval_adapter(
     if any(len(embedding) != dimension for embedding in embeddings):
         raise ValueError("评估 Embedding 维度不一致")
 
-    vector_store.add_documents(chunks, embeddings)
     embedding_config = getattr(embedding_client, "config", {}) or {}
+    embedding_provider = str(getattr(embedding_client, "provider", "unknown"))
+    embedding_model = str(
+        embedding_config.get("model")
+        or getattr(embedding_client, "model_name", "unknown")
+    )
+    ensure_embedding_space = getattr(vector_store, "ensure_embedding_space", None)
+    if callable(ensure_embedding_space):
+        ensure_embedding_space(embedding_provider, embedding_model, dimension)
+    vector_store.add_documents(chunks, embeddings)
     return (
         RetrieverAdapter(
             Retriever(vector_store, embedding_client),
@@ -122,11 +130,8 @@ def build_indexed_retrieval_adapter(
         IndexingSummary(
             document_count=len(documents),
             chunk_count=len(chunks),
-            embedding_provider=str(getattr(embedding_client, "provider", "unknown")),
-            embedding_model=str(
-                embedding_config.get("model")
-                or getattr(embedding_client, "model_name", "unknown")
-            ),
+            embedding_provider=embedding_provider,
+            embedding_model=embedding_model,
             embedding_dimension=dimension,
             chunk_size=chunker.chunk_size,
             chunk_overlap=chunker.chunk_overlap,
@@ -218,7 +223,9 @@ def build_configured_retrieval_adapter(
     *,
     provider: str | None = None,
     collection_name: str = "rag_evaluation",
-    persist_directory: str = "./data/evaluation_chroma_db",
+    milvus_uri: str | None = None,
+    milvus_token: str | None = None,
+    milvus_db_name: str | None = None,
     score_threshold: float | None = None,
 ) -> tuple[RetrieverAdapter, IndexingSummary]:
     """Build a baseline adapter using the configured real Embedding provider."""
@@ -232,7 +239,9 @@ def build_configured_retrieval_adapter(
     )
     vector_store = VectorStore(
         collection_name=collection_name,
-        persist_directory=persist_directory,
+        uri=milvus_uri or settings.milvus_uri,
+        token=milvus_token if milvus_token is not None else settings.milvus_token,
+        db_name=milvus_db_name or settings.milvus_db_name,
     )
     return build_indexed_retrieval_adapter(
         documents,
@@ -247,7 +256,9 @@ def build_configured_hybrid_retrieval_adapter(
     *,
     provider: str | None = None,
     collection_name: str = "rag_evaluation_hybrid",
-    persist_directory: str = "./data/evaluation_hybrid_chroma_db",
+    milvus_uri: str | None = None,
+    milvus_token: str | None = None,
+    milvus_db_name: str | None = None,
     score_threshold: float | None = None,
     rrf_k: int = 60,
     dense_weight: float = 1.0,
@@ -261,7 +272,9 @@ def build_configured_hybrid_retrieval_adapter(
     )
     vector_store = VectorStore(
         collection_name=collection_name,
-        persist_directory=persist_directory,
+        uri=milvus_uri or settings.milvus_uri,
+        token=milvus_token if milvus_token is not None else settings.milvus_token,
+        db_name=milvus_db_name or settings.milvus_db_name,
     )
     return build_hybrid_indexed_retrieval_adapter(
         documents,

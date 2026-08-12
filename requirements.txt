@@ -11,7 +11,7 @@ langchain-openai
 langchain-ollama
 
 # --- 向量数据库 ---
-chromadb
+pymilvus
 
 # --- LLM API 客户端 ---
 openai

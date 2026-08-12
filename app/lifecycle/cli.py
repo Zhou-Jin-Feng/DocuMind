@@ -45,7 +45,9 @@ def _build_service(
         embedding_client=embedding_client,
         vector_store=VectorStore(
             collection_name=settings.collection_name,
-            persist_directory=settings.chroma_persist_dir,
+            uri=settings.milvus_uri,
+            token=settings.milvus_token,
+            db_name=settings.milvus_db_name,
         ),
         registry=DocumentRegistry(settings.document_registry_path),
         upload_dir=settings.upload_dir,
@@ -95,7 +97,7 @@ def _build_parser() -> argparse.ArgumentParser:
     list_parser = subparsers.add_parser("list", help="List registered documents and indexes")
     list_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
-    audit_parser = subparsers.add_parser("audit", help="Audit registry and Chroma state")
+    audit_parser = subparsers.add_parser("audit", help="Audit registry and Milvus state")
     audit_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     cleanup_parser = subparsers.add_parser("cleanup", help="Delete stale or orphaned chunks")
@@ -135,7 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = {
                 "documents": documents,
                 "indexes": indexes,
-                "vector_count": service.vector_store.collection.count(),
+                "vector_count": service.vector_store.count(),
             }
             if args.json:
                 _print_json(payload)

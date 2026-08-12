@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     llm_max_tokens: int = Field(default=1000, gt=0)
 
     # 向量数据库配置
-    chroma_persist_dir: str = "./data/chroma_db"
+    milvus_uri: str = "http://127.0.0.1:19530"
+    milvus_token: Optional[str] = None
+    milvus_db_name: str = "default"
     collection_name: str = "rag_documents"
     document_registry_path: str = "./data/document_registry.sqlite3"
     default_tenant_id: str = "default"
@@ -108,6 +110,23 @@ class Settings(BaseSettings):
             normalized = value.strip()
             return normalized or None
         return value
+
+    @field_validator("milvus_token", mode="before")
+    @classmethod
+    def normalize_optional_token(cls, value):
+        """Treat a blank token as unauthenticated Milvus access."""
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
+
+    @field_validator("milvus_uri", "milvus_db_name")
+    @classmethod
+    def validate_milvus_connection_value(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Milvus connection settings cannot be empty")
+        return normalized
 
     @field_validator("allowed_extensions")
     @classmethod

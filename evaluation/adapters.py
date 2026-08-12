@@ -90,7 +90,7 @@ class RetrieverAdapter:
         return documents
 
     def close(self) -> None:
-        """Release Chroma/client references before deleting a temporary baseline store."""
+        """Release retriever, Milvus, and reranker resources."""
 
         retriever = self.retriever
         self.retriever = None
@@ -117,10 +117,9 @@ class RetrieverAdapter:
             if hasattr(dense_retriever, "embedding_client"):
                 dense_retriever.embedding_client = None
             if vector_store is not None:
-                if hasattr(vector_store, "collection"):
-                    vector_store.collection = None
-                if hasattr(vector_store, "client"):
-                    vector_store.client = None
+                close_vector_store = getattr(vector_store, "close", None)
+                if callable(close_vector_store):
+                    close_vector_store()
             for wrapper in wrappers:
                 reranker = getattr(wrapper, "reranker", None)
                 close = getattr(reranker, "close", None)

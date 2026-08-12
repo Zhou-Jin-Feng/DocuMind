@@ -100,7 +100,7 @@ DocuMind/
 | `document_loader.py` | PDF/DOCX/TXT 加载、稳定文档 ID、页码元数据 |
 | `document_chunker.py` | 文档分块、稳定 Chunk ID、空块过滤 |
 | `embedding_client.py` | Ollama 和 API Embedding 统一调用 |
-| `vector_store.py` | Chroma 持久化、upsert、search、delete |
+| `vector_store.py` | Milvus Collection、upsert、search、delete 和 Embedding 空间校验 |
 | `retriever.py` | Dense 检索、BM25 中文/标识符分词、RRF、多查询融合、重排编排和结果分数契约 |
 | `query_rewriter.py` | 原问题保留、规范化去重、严格 JSON LLM 改写和确定性映射 |
 | `reranker.py` | 延迟加载 Cross-Encoder，扩大候选后赋予独立 `rerank_score` |
@@ -158,7 +158,7 @@ app.core.retriever
 
 以下目录不得提交到 Git：
 
-- `data/chroma_db/`
+- Milvus 服务端数据目录（不属于本仓库）
 - `data/uploads/`
 - `data/document_registry.sqlite3`
 - `logs/`
