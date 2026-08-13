@@ -2,6 +2,6 @@
 
 文档注册表保存 document_key、document_version_id、index_id、索引清单、active 状态和操作进度。相同内容且 active Chunk 完整时重复上传是 no-op。active 向量缺失或 Chunk 数量不一致时，重复上传会进入修复构建。
 
-旧索引清理遵循 deleting、删除 Milvus 向量、deleted 的顺序。进程在删除向量之后、注册表更新之前崩溃，下一次 cleanup 仍可以根据 deleting 状态收敛。audit 会报告 stale、orphan、missing active、active Chunk 数量不一致和 legacy Chunk。
+旧索引清理遵循 deleting、删除 Chroma 向量、deleted 的顺序。进程在删除向量之后、注册表更新之前崩溃，下一次 cleanup 仍可以根据 deleting 状态收敛。audit 会报告 stale、orphan、missing active、active Chunk 数量不一致和 legacy Chunk。
 
 rebuild --dry-run 会检查内容寻址源文件的 SHA-256，并根据当前解析器、分块器和 Embedding 清单计算 planned index_id。rebuild --retry 只回收指定文档下唯一的中断 indexing 目标。

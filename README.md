@@ -131,13 +131,38 @@ Copy-Item .env.example .env
 
 ### 4. 准备 Provider
 
-本次迭代只接入 Milvus 客户端，不包含 Docker 编排。启动应用前需先准备 Milvus Standalone，并在 `.env` 中配置 `MILVUS_URI`；无认证的本地服务可将 `MILVUS_TOKEN` 留空。
+本项目只将 Milvus Standalone 作为本地基础设施容器化；RAG 应用本身继续在 Windows Python 环境中运行。先启动 Standalone，再在 `.env` 中配置 `MILVUS_URI`；无认证的本地服务可将 `MILVUS_TOKEN` 留空。
+
+Windows 安装并启动 Docker Desktop（使用 WSL2 后端）后，在项目根目录执行：
+
+```powershell
+docker compose -f infra/milvus/compose.yaml up -d
+docker compose -f infra/milvus/compose.yaml ps
+Test-NetConnection 127.0.0.1 -Port 19530
+```
+
+`19530` 仅绑定到本机，供 Windows 中运行的 RAG 应用访问。Milvus、etcd 和 MinIO 的数据保存在 Docker 命名卷中，不会写入 Git 工作区。日常停止或恢复服务使用：
+
+```powershell
+docker compose -f infra/milvus/compose.yaml stop
+docker compose -f infra/milvus/compose.yaml start
+```
+
+需要移除容器但保留数据时使用 `docker compose -f infra/milvus/compose.yaml down`；只有确认要删除全部本地向量数据时才使用 `down -v`。
 
 默认 Embedding Provider 是 Ollama：
 
 ```powershell
 ollama serve
 ollama pull qwen3-embedding
+```
+
+验证真实 Milvus Standalone 的读写路径：
+
+```powershell
+$env:MILVUS_INTEGRATION_TEST="1"
+python -m unittest tests.test_milvus_integration -v
+Remove-Item Env:MILVUS_INTEGRATION_TEST
 ```
 
 然后在 `.env` 中为所选 LLM 填写 API Key。例如使用 OpenAI 时填写：

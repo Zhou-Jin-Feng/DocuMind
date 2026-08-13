@@ -262,17 +262,6 @@ class VectorStore:
         )
         return dict(rows[0]) if rows else None
 
-    def _raw_count(self) -> int:
-        """Count every entity, including the internal config record."""
-        if not self._collection_ready:
-            return 0
-        rows = self.client.query(
-            collection_name=self.collection_name,
-            filter="",
-            output_fields=["count(*)"],
-        )
-        return int(rows[0].get("count(*)", 0)) if rows else 0
-
     def _query_all(self, *, filter_expression: str, output_fields: List[str]) -> List[Dict]:
         iterator_factory = getattr(self.client, "query_iterator", None)
         if not callable(iterator_factory):
@@ -419,9 +408,12 @@ class VectorStore:
             raise ValueError("Query embedding cannot be empty")
         if n_results <= 0:
             raise ValueError("n_results must be positive")
-        if not self._collection_ready or self.count() == 0:
+        if not self._collection_ready:
             return {"ids": [], "documents": [], "metadatas": [], "distances": []}
         self._validate_vector_dimension(query_embedding, operation="Query")
+        chunk_count = self.count()
+        if chunk_count == 0:
+            return {"ids": [], "documents": [], "metadatas": [], "distances": []}
 
         try:
             results = self.client.search(
@@ -429,7 +421,7 @@ class VectorStore:
                 data=[query_embedding],
                 anns_field="vector",
                 filter=self._filter_expression(where),
-                limit=min(n_results, self.count()),
+                limit=min(n_results, chunk_count),
                 output_fields=["document", "metadata"],
                 search_params={"metric_type": "L2", "params": {}},
             )
@@ -447,7 +439,9 @@ class VectorStore:
 
     def delete_by_ids(self, ids: List[str]) -> None:
         """Delete chunks by primary key."""
-        normalized = [str(value) for value in ids if str(value)]
+        normalized = [
+            self._validate_id(value) for value in ids if str(value).strip()
+        ]
         if not normalized or not self._collection_ready:
             return
         try:

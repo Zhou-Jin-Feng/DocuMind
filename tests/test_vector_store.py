@@ -103,6 +103,27 @@ class VectorStoreTests(unittest.TestCase):
                 ids=["large-document"],
             )
 
+    def test_internal_config_record_cannot_be_deleted(self):
+        self.store.ensure_embedding_space("fake", "model-a", 2)
+
+        for reserved_id in (self.store._CONFIG_ID, f" {self.store._CONFIG_ID} "):
+            with self.subTest(reserved_id=reserved_id):
+                with self.assertRaisesRegex(ValueError, "reserved"):
+                    self.store.delete_by_ids([reserved_id])
+
+        self.assertIsNotNone(self.store._config_record())
+
+    def test_empty_collection_still_validates_query_dimension(self):
+        self.store.ensure_embedding_space("fake", "model-a", 2)
+
+        with self.assertRaisesRegex(ValueError, "Query embedding dimension"):
+            self.store.search([1.0, 0.0, 0.0])
+
+        self.assertEqual(
+            self.store.search([1.0, 0.0]),
+            {"ids": [], "documents": [], "metadatas": [], "distances": []},
+        )
+
     def test_fake_uses_milvus_squared_l2_distance(self):
         self.store.ensure_embedding_space("fake", "model-a", 2)
         self.store.add_documents(
