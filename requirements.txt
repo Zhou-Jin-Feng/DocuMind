@@ -28,7 +28,10 @@ tiktoken
 # --- Cross-Encoder 重排（v1.7 新增，运行时延迟加载模型）---
 sentence-transformers
 
-# --- Web 界面 ---
+# --- Web API 与兼容界面 ---
+fastapi
+uvicorn[standard]
+python-multipart
 gradio
 
 # --- 环境配置 ---

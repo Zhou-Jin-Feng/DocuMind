@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     server_port: int = Field(default=7860, ge=1, le=65535)
     share_gradio: bool = False
 
+    # FastAPI 与本地 React 开发服务。无认证时禁止使用通配 CORS。
+    api_host: str = "127.0.0.1"
+    api_port: int = Field(default=8001, ge=1, le=65535)
+    api_cors_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
+
     # 应用与日志配置
     service_name: str = "rag-web"
     app_env: str = "development"
@@ -141,6 +148,16 @@ class Settings(BaseSettings):
                 normalized.append(extension)
         if not normalized:
             raise ValueError("allowed_extensions 不能为空")
+        return normalized
+
+    @field_validator("api_cors_origins")
+    @classmethod
+    def normalize_cors_origins(cls, values: list[str]) -> list[str]:
+        normalized = list(dict.fromkeys(value.strip().rstrip("/") for value in values))
+        if not normalized or any(not value for value in normalized):
+            raise ValueError("api_cors_origins 不能为空")
+        if "*" in normalized:
+            raise ValueError("无认证模式不允许使用通配 CORS")
         return normalized
 
     @model_validator(mode="after")
