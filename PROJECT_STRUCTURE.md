@@ -1,4 +1,4 @@
-# 项目结构（v1.7.1）
+# 项目结构（v1.9）
 
 ```text
 DocuMind/
@@ -28,6 +28,23 @@ DocuMind/
 │   │   ├── models.py
 │   │   ├── registry.py
 │   │   └── service.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── rag_service.py
+│   │   └── document_service.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── main.py
+│   │   ├── dependencies.py
+│   │   ├── errors.py
+│   │   ├── schemas.py
+│   │   ├── sse.py
+│   │   └── routers/
+│   │       ├── health.py
+│   │       ├── system.py
+│   │       ├── documents.py
+│   │       └── chat.py
 │   └── utils/
 │       ├── __init__.py
 │       ├── logger.py
@@ -50,6 +67,8 @@ DocuMind/
 │   ├── test_evaluation.py
 │   ├── test_lifecycle.py
 │   ├── test_lifecycle_cli.py
+│   ├── test_services.py
+│   ├── test_api.py
 │   └── *.txt
 ├── evaluation/
 │   ├── __init__.py
@@ -76,6 +95,13 @@ DocuMind/
 │   │   └── v1_7/                # 经数据集指纹绑定的 Rewrite artifact
 │   ├── baselines/
 │   └── reports/
+├── frontend/
+│   ├── src/App.tsx
+│   ├── src/api.ts
+│   ├── src/types.ts
+│   ├── src/styles.css
+│   ├── vite.config.ts
+│   └── package.json
 ├── data/                  # 本地运行数据，Git 忽略
 ├── logs/                  # JSONL 日志，Git 忽略
 ├── .env                   # 本地密钥，Git 忽略
@@ -106,6 +132,14 @@ DocuMind/
 | `reranker.py` | 延迟加载 Cross-Encoder，扩大候选后赋予独立 `rerank_score` |
 | `generator.py` | OpenAI 兼容/Anthropic 消息适配和流式生成 |
 | `web_app.py` | 上传校验、生命周期服务调用、问答编排、根 Span、Metrics 服务和 UI |
+| `app/services/rag_service.py` | 将检索和生成编排为 `status/sources/token/done/error` 结构化事件 |
+| `app/services/document_service.py` | 将生命周期摄取和注册表查询转换为 API 可用模型 |
+| `app/api/main.py` | FastAPI 应用工厂、生命周期初始化、CORS、Request ID 和异常处理 |
+| `app/api/schemas.py` | 健康、配置、文档、上传和聊天请求/响应模型 |
+| `app/api/routers/*.py` | health、system、documents、chat HTTP 路由 |
+| `app/api/sse.py` | 将结构化 ChatEvent 编码为 SSE 帧 |
+| `frontend/src/App.tsx` | React 工作台状态、问答流、文档上传、来源和状态面板 |
+| `frontend/src/api.ts` | REST 请求、错误映射和 SSE 流解析 |
 | `app/lifecycle/models.py` | 文档、版本、索引清单、操作结果和审计报告模型 |
 | `app/lifecycle/registry.py` | SQLite 文档、索引、操作状态和 active 指针 |
 | `app/lifecycle/service.py` | 源文件持久化、同步构建、active 切换、清理、审计和重建 |
@@ -135,11 +169,17 @@ DocuMind/
 ## 依赖方向
 
 ```text
-web_app.py
-├── app.config
-├── app.core.*
-├── app.lifecycle.*
-└── app.observability.*
+frontend/src/api.ts
+    └── FastAPI /api/v1
+        ├── app.api.routers.*
+        ├── app.services.*
+        ├── app.config
+        ├── app.core.*
+        ├── app.lifecycle.*
+        └── app.observability.*
+
+python -m app.api
+    └── uvicorn → app.api.main:app
 
 app.lifecycle.service
 ├── app.core.document_loader
@@ -151,6 +191,8 @@ app.core.retriever
 ├── app.observability.metrics
 └── app.observability.tracing
 ```
+
+React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。`web_app.py` 仍保留为兼容入口。
 
 可观测性模块不得反向导入 Web UI 或具体 RAG 组件，避免循环依赖。
 

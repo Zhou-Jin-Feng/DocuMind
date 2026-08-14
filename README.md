@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.7.1）
+# DocuMind - RAG 知识库问答系统（v1.9）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前开发版本：**v1.7.1 检索增强对照版**。基于同一份真实 Ollama holdout，已完成 baseline、Query Rewrite、Cross-Encoder Reranker 和组合模式的严格同配置对照。当前证据优先支持继续验证 Query Rewrite；Web 默认链路仍使用 Dense-only。
+> 当前开发版本：**v1.9 前后端分离工作台**。RAG 核心继续使用 Milvus，新增 FastAPI API 层与 React/TypeScript 工作台，支持 SSE 流式问答、文档上传、引用来源和依赖就绪状态展示。Gradio 入口仍保留，便于兼容和回归。
 
 ## 当前能力
 
@@ -24,6 +24,8 @@
 - Dense 最大距离和 BM25 最低词法分数可独立校准，并写入评估报告元数据。
 - v1.7 评估链路始终保留原问题，按稳定 `chunk_id` 融合多条查询，并在扩大候选集后记录独立 `rerank_score`；原始 distance、词法和 RRF 分数不会被覆盖。
 - v1.7.1 固化 Rewrite artifact 的 schema/Prompt/生成参数指纹，增加断点续跑、延迟分位数、严格四模式比较，并按唯一文档 ID 计算 Precision@K。
+- v1.8 完成 Chroma 到 Milvus 的向量存储迁移，并保留 Embedding 空间、维度和 Collection 兼容性校验。
+- v1.9 搭建 FastAPI 后端与 React/TypeScript 前端：统一错误响应、健康检查、公开配置、文档接口、SSE 问答和前端服务状态反馈。
 
 ## 版本迭代记录
 
@@ -40,6 +42,8 @@ README 保留面向仓库用户的公开版本摘要；当前架构边界见 [AR
 | v1.6.1 | 真实 Ollama holdout、阈值/RRF 校准和质量门禁 |
 | v1.7 | 严格 Query Rewrite artifact、多查询 RRF 和 Cross-Encoder Reranker 评估实验 |
 | v1.7.1 | 可复现 Rewrite artifact、四模式同配置比较、延迟分位数和指标口径修正 |
+| v1.8 | Chroma 到 Milvus 的向量数据迁移与运行时兼容性校验 |
+| v1.9 | FastAPI 后端基础、React 工作台、SSE 问答与前后端联调测试 |
 
 
 ## 项目结构
@@ -68,6 +72,14 @@ DocuMind/
 │   │   ├── service.py            # 同步构建、切换、清理和重建
 │   │   ├── cli.py                # list/audit/cleanup/rebuild CLI
 │   │   └── __main__.py           # python -m app.lifecycle
+│   ├── services/
+│   │   ├── rag_service.py        # 检索、生成与结构化流式事件
+│   │   └── document_service.py   # 上传、生命周期摄取和文档列表
+│   ├── api/
+│   │   ├── main.py               # FastAPI 应用工厂和 ASGI 入口
+│   │   ├── schemas.py            # API 请求/响应模型
+│   │   ├── sse.py                # SSE 事件编码
+│   │   └── routers/              # health/system/documents/chat 路由
 │   └── utils/
 │       ├── logger.py             # 日志兼容入口
 │       └── monitoring.py         # 生成器安全的耗时工具
@@ -81,6 +93,11 @@ DocuMind/
 │   ├── rewrite_artifacts.py
 │   ├── rewrite_runner.py
 │   └── runner.py
+├── frontend/                     # React + TypeScript + Vite 工作台
+│   ├── src/App.tsx               # 问答、上传、引用和服务状态界面
+│   ├── src/api.ts                # REST/SSE 客户端
+│   ├── src/types.ts              # 前端 API 类型
+│   └── package.json              # 前端脚本与依赖
 ├── data/                         # 运行数据（Git 忽略）
 ├── logs/                         # 日志（Git 忽略）
 ├── .env.example                 # 无密钥配置模板
@@ -88,7 +105,7 @@ DocuMind/
 ├── requirements-dev.txt
 ├── OBSERVABILITY.md              # 日志、指标、追踪指南
 ├── EVALUATION.md                 # v1.4-v1.7 评估、报告和回归门禁指南
-└── web_app.py                    # Gradio 入口
+└── web_app.py                    # Gradio 兼容入口
 ```
 
 ## 环境要求
@@ -172,7 +189,42 @@ DEFAULT_LLM_PROVIDER=openai
 OPENAI_API_KEY=your-api-key
 ```
 
-### 5. 启动 Web 应用
+### 5. 启动 FastAPI 后端与 React 工作台（v1.9 默认链路）
+
+终端一启动 API：
+
+```powershell
+python -m app.api
+```
+
+默认 API 地址为 `http://127.0.0.1:8001`，Swagger 文档为 `http://127.0.0.1:8001/docs`。另开一个终端启动前端：
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+默认工作台地址为 `http://127.0.0.1:5173`。前端默认请求 `http://127.0.0.1:8001`；跨主机或端口时可在 `frontend/.env.local` 设置 `VITE_API_BASE_URL`。
+
+主要 API：
+
+- `GET /api/v1/health/live`：进程存活检查；
+- `GET /api/v1/health/ready`：Milvus、Embedding、LLM 和注册表就绪检查；
+- `GET /api/v1/system/config`：返回前端所需的非敏感配置；
+- `GET/POST /api/v1/documents`：文档列表与上传摄取；
+- `POST /api/v1/chat/stream`：返回 `status`、`sources`、`token`、`done/error` SSE 事件。
+
+前端验证命令：
+
+```powershell
+cd frontend
+npm test
+npm run typecheck
+npm run build
+```
+
+### 6. 启动 Gradio 兼容入口
 
 ```powershell
 python web_app.py
@@ -180,7 +232,7 @@ python web_app.py
 
 默认访问地址：`http://127.0.0.1:7860`。
 
-### 6. 生命周期运维命令
+### 7. 生命周期运维命令
 
 生命周期命令不需要启动 Web 服务。`list`、`audit`、`cleanup` 和 `rebuild --dry-run` 不会连接 Embedding Provider；实际重建才会初始化当前配置的 Provider。
 
@@ -333,6 +385,8 @@ python -m compileall -q app evaluation web_app.py tests
 python -m pip check
 ```
 
+v1.9 另有前端测试、类型检查和生产构建，命令见上方“启动 FastAPI 后端与 React 工作台”。完整回归不需要真实 Milvus；`tests.test_milvus_integration` 仅在显式设置 `MILVUS_INTEGRATION_TEST=1` 时连接本机服务。
+
 ## 数据和索引
 
 - 向量索引位于 `MILVUS_URI` 指向的 Milvus 服务中，默认 Collection 为 `rag_documents`
@@ -355,13 +409,14 @@ Remove-Item -Force .\data\document_registry.sqlite3
 
 ## 已知限制
 
-- Web 对话历史目前只用于 UI 展示；v1.7 Query Rewrite 只在评估 CLI 中运行，尚未接入历史感知的线上问答。
+- React 工作台当前是本地单用户界面；Web 对话历史只用于 UI 展示，v1.7 Query Rewrite 只在评估 CLI 中运行，尚未接入历史感知的线上问答。
+- FastAPI 与 React 已完成基础联调，但还没有认证、异步任务队列、正式部署配置或 API 版本兼容策略。
 - v1.4 之前写入的旧向量没有 `index_id`，当前检索会兼容保留；`audit` 会报告 legacy Chunk，后续可安排显式迁移。
 - 迁移前的 Chroma Collection 不受新适配器管理，需要在 Milvus 中使用新 Collection 全量重建。
 - 非空 Collection 禁止切换 Embedding Provider、模型或维度；当前版本不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
 - 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.0/v2.1。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
-- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.7。
+- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.9。
 
 ## 常见问题
 

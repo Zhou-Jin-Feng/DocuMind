@@ -87,7 +87,7 @@ interface StreamCallbacks {
   onEvent: (event: ChatEvent) => void;
 }
 
-function parseSSEBlock(block: string): ChatEvent | null {
+export function parseSSEBlock(block: string): ChatEvent | null {
   let eventType = "";
   const dataLines: string[] = [];
   for (const rawLine of block.split("\n")) {

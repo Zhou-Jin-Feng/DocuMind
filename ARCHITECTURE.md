@@ -1,19 +1,24 @@
-# DocuMind - RAG 系统架构（v1.7.1）
+# DocuMind - RAG 系统架构（v1.9）
 
 ## 1. 分层结构
 
 ```mermaid
 flowchart TD
-    UI["web_app.py / Gradio"] --> CFG["app.config / Settings"]
+    GRADIO["web_app.py / Gradio 兼容入口"] --> CFG["app.config / Settings"]
+    FRONTEND["frontend / React + Vite"] --> API["FastAPI /api/v1"]
+    API --> CFG
+    API --> SERVICE["app.services"]
     CLI["app.lifecycle CLI"] --> REG["DocumentRegistry / SQLite"]
     CLI --> VS
-    UI --> LC["DocumentLifecycleService"]
+    GRADIO --> LC["DocumentLifecycleService"]
+    SERVICE --> LC
     LC --> REG
     LC --> LOAD["Document Loader"]
     LC --> CHUNK["Document Chunker"]
     LC --> EMB["Embedding Client"]
     LC --> VS["VectorStore / Milvus"]
-    UI --> RET["Retriever"]
+    GRADIO --> RET["Retriever"]
+    SERVICE --> RET
     RET --> EMB
     RET --> VS
     EVAL["evaluation runner"] --> RET
@@ -21,9 +26,11 @@ flowchart TD
     EVAL --> HYB["HybridRetriever / RRF"]
     HYB --> RET
     HYB --> LEX
-    UI --> GEN["RAGGenerator"]
+    GRADIO --> GEN["RAGGenerator"]
+    SERVICE --> GEN
     GEN --> LLM["UniversalLLMClient"]
-    UI --> OBS["app.observability"]
+    API --> OBS["app.observability"]
+    GRADIO --> OBS
     RET --> OBS
     OBS --> LOG["JSONL Logs"]
     OBS --> MET["Prometheus Metrics"]
@@ -31,6 +38,8 @@ flowchart TD
 ```
 
 `app/core` 保持业务能力，`app/observability` 提供横切能力。业务层只调用稳定封装，不直接依赖 Prometheus 注册表、OpenTelemetry 全局 Provider 或日志文件实现。
+
+v1.9 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。
 
 ## 2. 文档索引流程
 
@@ -86,7 +95,20 @@ source persist → claim → build → validate → activate → cleanup
 
 `rebuild --retry` 会在指定文档下寻找唯一的 `indexing` 目标。它既能恢复 active 索引的中断重建，也能恢复尚未切换 active 的新版本；没有目标或存在多个目标时拒绝猜测，配置已变化时要求恢复原配置或执行新的普通重建。
 
-## 4. 问答流程
+## 4. API 与前端流程
+
+```text
+React 工作台
+→ GET /health/ready + GET /system/config
+→ GET /documents
+→ POST /documents（multipart 上传）
+→ POST /chat/stream
+→ status → sources → token* → done/error
+```
+
+每个响应带 `X-Request-ID`；SSE 事件的数据是公开 API schema，不包含 Prompt、凭据或内部堆栈。API 默认仅允许 `.env` 中列出的本地 CORS 来源。
+
+## 5. 问答流程
 
 Web 默认问答链路保持 Dense-only：
 
@@ -140,34 +162,34 @@ v1.7 仅在评估编排中增加可选链路：
 
 原问题必须在改写列表首位；Query RRF 与 Hybrid RRF 分别保存，不能复用或覆盖 `fusion_score`。Cross-Encoder 只改变最终名次并写入 `rerank_score`，不会把其数值伪装成 Milvus distance。LLM 改写先生成与 schema 版本、Prompt SHA-256、生成参数和数据集 SHA-256 绑定的 artifact，之后的本地检索评估不访问 LLM；这使同一 artifact、语料和配置下的报告可复现。四模式比较还会校验 Embedding、分块、阈值和 Hybrid 参数完全一致，并分别报告质量与平均/P50/P95/最大延迟。
 
-## 5. 可观测性架构
+## 6. 可观测性架构
 
-### 5.1 请求上下文
+### 6.1 请求上下文
 
 `contextvars` 保存 `request_id` 和 `trace_id`，支持同步生成器完整生命周期、嵌套恢复和异常清理。Tracing 开启后，当前 Span 的真实 Trace ID 会临时覆盖备用 Trace ID，使日志与 Trace 可关联。
 
-### 5.2 日志
+### 6.2 日志
 
 - 应用入口显式调用 `setup_logger()`；模块导入不创建文件。
 - 控制台默认文本，文件默认 JSONL。
 - 统一事件名、操作名、状态、数字耗时和异常类型。
 - 日志 Patcher 负责字段补全和凭据脱敏。
 
-### 5.3 Metrics
+### 6.3 Metrics
 
 - `configure_metrics()` 只配置内存注册表。
 - `start_metrics_server()` 只由 Web 主入口显式调用。
 - 标签限制为 `provider`、`operation`、`status`、`error_type`。
 - 关闭后所有操作 no-op，不监听端口。
 
-### 5.4 Tracing
+### 6.4 Tracing
 
 - 使用应用私有 `TracerProvider`，不覆盖 OpenTelemetry 全局 Provider。
 - 默认关闭；没有 OTLP endpoint 时不创建网络 Exporter。
 - Span 异常只记录 `error.type` 和 ERROR 状态，不发送默认异常事件。
 - Span 属性过滤问题、Prompt、文档正文、文件名、凭据及高基数请求标识。
 
-## 6. 配置边界
+## 7. 配置边界
 
 `app/config.py` 使用 Pydantic Settings 管理：
 
@@ -182,7 +204,7 @@ v1.7 仅在评估编排中增加可选链路：
 
 Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直接监听公网地址。
 
-## 7. 异常语义
+## 8. 异常语义
 
 - 检索基础设施异常继续向上传播，不伪装成“没有结果”；
 - Generator 层不把 Provider 错误转换为成功文本；
@@ -190,9 +212,9 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 - 流式生成异常不会重复追加用户消息；
 - 子 Span 自动标记错误；被 Web 层捕获的异常会显式标记根 Span。
 
-## 8. 当前边界
+## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。评估层和生命周期层都不反向依赖 Web UI；样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9 增加 FastAPI/React 适配层，评估层和生命周期层仍不反向依赖具体 Web UI；样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
 
 ```text
 evaluation.runner / production_runner
@@ -207,7 +229,7 @@ evaluation.runner / production_runner
 
 当前仍不包含：
 
-- Docker/Compose 和可观测性后端容器；
+- RAG 应用本身的 Docker/Compose 部署和可观测性后端容器（Milvus Standalone 的基础设施 Compose 已提供）；
 - 历史感知检索，以及 Query Rewrite / Reranker 的 Web 默认接入；
 - Celery/Redis 异步摄取；
 - 认证、多租户、限流和生产高可用。
