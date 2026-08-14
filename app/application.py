@@ -113,14 +113,31 @@ class RAGApplication:
         vector_store = self.vector_store
         self.lifecycle_service = None
         self.vector_store = None
-        if lifecycle_service is not None:
-            close_service = getattr(lifecycle_service, "close", None)
-            if callable(close_service):
-                close_service()
-        elif vector_store is not None:
-            close_store = getattr(vector_store, "close", None)
-            if callable(close_store):
-                close_store()
+        try:
+            if lifecycle_service is not None:
+                close_service = getattr(lifecycle_service, "close", None)
+                if callable(close_service):
+                    close_service()
+            elif vector_store is not None:
+                close_store = getattr(vector_store, "close", None)
+                if callable(close_store):
+                    close_store()
+        except Exception as exc:
+            logger.warning(
+                "释放 RAG 应用资源时发生异常",
+                event="application_resource_cleanup_failed",
+                operation="application.close",
+                status="error",
+                error_type=type(exc).__name__,
+            )
+        finally:
+            self.embedding_client = None
+            self.retriever = None
+            self.llm_client = None
+            self.rag_generator = None
+            self.doc_loader = None
+            self.chunker = None
+            self.registry = None
 
     def close(self) -> None:
         with self._lock:

@@ -51,6 +51,9 @@ const INITIAL_ASSISTANT_MESSAGE: ChatMessage = {
   sources: [],
 };
 
+const QUERY_RETRY_COUNT = 2;
+const QUERY_REFRESH_INTERVAL = 30_000;
+
 function formatBytes(value?: number | null): string {
   if (!value) return "--";
   if (value < 1024) return `${value} B`;
@@ -141,18 +144,20 @@ function App() {
   const readiness = useQuery({
     queryKey: ["readiness"],
     queryFn: getReadiness,
-    retry: false,
-    refetchInterval: 30_000,
+    retry: QUERY_RETRY_COUNT,
+    refetchInterval: QUERY_REFRESH_INTERVAL,
   });
   const config = useQuery({
     queryKey: ["public-config"],
     queryFn: getPublicConfig,
-    retry: false,
+    retry: QUERY_RETRY_COUNT,
+    refetchInterval: QUERY_REFRESH_INTERVAL,
   });
   const documents = useQuery({
     queryKey: ["documents"],
     queryFn: getDocuments,
-    retry: false,
+    retry: QUERY_RETRY_COUNT,
+    refetchInterval: QUERY_REFRESH_INTERVAL,
   });
   const upload = useMutation({
     mutationFn: uploadDocument,

@@ -43,10 +43,14 @@ export interface DocumentListResponse {
 
 export interface IngestionResponse {
   status: string;
+  operation_id: string;
   document_key: string;
+  document_version_id: string;
+  source_sha256: string;
   index_id: string;
   chunk_count: number;
   collection_count: number;
+  previous_index_id?: string | null;
   cleanup_pending: boolean;
 }
 

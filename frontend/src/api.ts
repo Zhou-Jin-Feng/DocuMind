@@ -131,23 +131,27 @@ export async function streamChat(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
-    const blocks = buffer.split("\n\n");
-    buffer = blocks.pop() || "";
-    for (const block of blocks) {
-      const event = parseSSEBlock(block);
-      if (event) {
-        callbacks.onEvent(event);
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
+      const blocks = buffer.split("\n\n");
+      buffer = blocks.pop() || "";
+      for (const block of blocks) {
+        const event = parseSSEBlock(block);
+        if (event) {
+          callbacks.onEvent(event);
+        }
+      }
+      if (done) {
+        const event = parseSSEBlock(buffer);
+        if (event) {
+          callbacks.onEvent(event);
+        }
+        return;
       }
     }
-    if (done) {
-      const event = parseSSEBlock(buffer);
-      if (event) {
-        callbacks.onEvent(event);
-      }
-      return;
-    }
+  } finally {
+    reader.releaseLock();
   }
 }
