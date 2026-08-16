@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v1.9）
+# DocuMind - RAG 系统架构（v1.9.1）
 
 ## 1. 分层结构
 
@@ -16,7 +16,10 @@ flowchart TD
     LC --> LOAD["Document Loader"]
     LC --> CHUNK["Document Chunker"]
     LC --> EMB["Embedding Client"]
-    LC --> VS["VectorStore / Milvus"]
+    LC --> VS["VectorStore / pymilvus"]
+    VS --> MILVUS["Milvus Standalone"]
+    MILVUS --> ETCD["etcd / 元数据"]
+    MILVUS --> MINIO["MinIO / 对象存储"]
     GRADIO --> RET["Retriever"]
     SERVICE --> RET
     RET --> EMB
@@ -39,7 +42,7 @@ flowchart TD
 
 `app/core` 保持业务能力，`app/observability` 提供横切能力。业务层只调用稳定封装，不直接依赖 Prometheus 注册表、OpenTelemetry 全局 Provider 或日志文件实现。
 
-v1.9 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。
+v1.9.1 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。
 
 ## 2. 文档索引流程
 
@@ -91,6 +94,18 @@ source persist → claim → build → validate → activate → cleanup
 
 `audit` 一次扫描 Milvus，报告旧索引、孤儿索引、缺失 active、active Chunk 数不一致和 v1.4 legacy Chunk。旧索引清理先落 `deleting`，再删除向量并落 `deleted`；进程在任一步中断后都可由下一次 `cleanup` 收敛。
 
+API 删除采用可重试的顺序：
+
+```text
+校验文档当前状态
+→ Registry 撤销 active 并把索引标记为 deleting
+→ 按 index_id 删除 Milvus 向量
+→ 删除注册表中的索引、版本和文档记录
+→ 仅删除不再被其他版本引用的内容寻址源文件
+```
+
+若进程在向量清理前后中断，再次删除同一文档会继续收敛，不会把半删除索引重新暴露为 active。重新索引则复用已校验的持久化源文件，走完整 `claim → build → validate → activate → cleanup` 流程。
+
 `rebuild --dry-run` 不初始化 Embedding Provider，也不写入向量或状态。它先校验内容寻址源文件的 SHA-256，再用当前解析、分块和静态 Embedding 配置计算 planned fingerprint / `index_id`；Provider/模型未变化时复用注册表中已验证的真实维度，避免 Ollama 静态默认维度造成误判。
 
 `rebuild --retry` 会在指定文档下寻找唯一的 `indexing` 目标。它既能恢复 active 索引的中断重建，也能恢复尚未切换 active 的新版本；没有目标或存在多个目标时拒绝猜测，配置已变化时要求恢复原配置或执行新的普通重建。
@@ -99,14 +114,21 @@ source persist → claim → build → validate → activate → cleanup
 
 ```text
 React 工作台
-→ GET /health/ready + GET /system/config
-→ GET /documents
-→ POST /documents（multipart 上传）
-→ POST /chat/stream
+→ GET /api/v1/health/ready + GET /api/v1/system/config
+→ GET /api/v1/documents
+→ POST /api/v1/documents（multipart 上传）
+→ GET /api/v1/documents/{document_key}
+→ POST /api/v1/documents/{document_key}/reindex
+→ DELETE /api/v1/documents/{document_key}
+→ POST /api/v1/chat/stream
 → status → sources → token* → done/error
 ```
 
 每个响应带 `X-Request-ID`；SSE 事件的数据是公开 API schema，不包含 Prompt、凭据或内部堆栈。API 默认仅允许 `.env` 中列出的本地 CORS 来源。
+
+`/health/live` 只确认 API 进程存活；`/health/ready` 执行有超时上限的 Milvus RPC 和 Ollama Embedding 探测，检查 SQLite 注册表已初始化，并验证 LLM 客户端配置。LLM readiness 不发送真实生成请求，避免健康检查消耗外部 API 配额。依赖未就绪时返回 HTTP 503 和分组件状态，React 以轮询方式自动恢复。
+
+文件上传通过 XHR 暴露真实传输百分比；请求体传输完成后，前端进入“解析、切分与向量化”的不确定时长阶段。对话历史只保存在浏览器 `localStorage`，最多保留有限数量的本地会话，不进入后端 RAG 上下文。移动端引用来源使用底部抽屉，关闭后不改变当前回答和来源数据。
 
 ## 5. 问答流程
 
@@ -214,7 +236,7 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9 增加 FastAPI/React 适配层，评估层和生命周期层仍不反向依赖具体 Web UI；样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归，评估层和生命周期层仍不反向依赖具体 Web UI；样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
 
 ```text
 evaluation.runner / production_runner
@@ -229,7 +251,7 @@ evaluation.runner / production_runner
 
 当前仍不包含：
 
-- RAG 应用本身的 Docker/Compose 部署和可观测性后端容器（Milvus Standalone 的基础设施 Compose 已提供）；
+- RAG 应用本身的 Docker/Compose 部署和可观测性后端容器（Milvus Standalone、etcd、MinIO 的基础设施 Compose 已提供）；
 - 历史感知检索，以及 Query Rewrite / Reranker 的 Web 默认接入；
 - Celery/Redis 异步摄取；
 - 认证、多租户、限流和生产高可用。

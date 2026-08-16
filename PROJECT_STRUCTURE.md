@@ -1,4 +1,4 @@
-# 项目结构（v1.9）
+# 项目结构（v1.9.1）
 
 ```text
 DocuMind/
@@ -67,6 +67,8 @@ DocuMind/
 │   ├── test_evaluation.py
 │   ├── test_lifecycle.py
 │   ├── test_lifecycle_cli.py
+│   ├── test_application.py
+│   ├── test_milvus_integration.py
 │   ├── test_services.py
 │   ├── test_api.py
 │   └── *.txt
@@ -77,6 +79,8 @@ DocuMind/
 │   ├── fingerprints.py
 │   ├── production.py
 │   ├── production_runner.py
+│   ├── comparison.py
+│   ├── comparison_runner.py
 │   ├── rewrite_artifacts.py
 │   ├── rewrite_runner.py
 │   ├── metrics.py
@@ -96,12 +100,23 @@ DocuMind/
 │   ├── baselines/
 │   └── reports/
 ├── frontend/
-│   ├── src/App.tsx
-│   ├── src/api.ts
-│   ├── src/types.ts
-│   ├── src/styles.css
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── api.ts
+│   │   ├── api.test.ts
+│   │   ├── conversations.ts
+│   │   ├── conversations.test.ts
+│   │   ├── types.ts
+│   │   └── styles.css
+│   ├── e2e/
+│   │   ├── mock-api.mjs
+│   │   └── workbench.spec.ts
+│   ├── playwright.config.ts
 │   ├── vite.config.ts
 │   └── package.json
+├── infra/
+│   └── milvus/
+│       └── compose.yaml
 ├── data/                  # 本地运行数据，Git 忽略
 ├── logs/                  # JSONL 日志，Git 忽略
 ├── .env                   # 本地密钥，Git 忽略
@@ -115,6 +130,7 @@ DocuMind/
 ├── OBSERVABILITY.md
 ├── EVALUATION.md
 ├── PROJECT_STRUCTURE.md
+├── VERSION_HISTORY.md
 └── web_app.py
 ```
 
@@ -133,13 +149,17 @@ DocuMind/
 | `generator.py` | OpenAI 兼容/Anthropic 消息适配和流式生成 |
 | `web_app.py` | 上传校验、生命周期服务调用、问答编排、根 Span、Metrics 服务和 UI |
 | `app/services/rag_service.py` | 将检索和生成编排为 `status/sources/token/done/error` 结构化事件 |
-| `app/services/document_service.py` | 将生命周期摄取和注册表查询转换为 API 可用模型 |
+| `app/services/document_service.py` | 文档摄取、列表、详情、重建和可恢复删除编排 |
 | `app/api/main.py` | FastAPI 应用工厂、生命周期初始化、CORS、Request ID 和异常处理 |
-| `app/api/schemas.py` | 健康、配置、文档、上传和聊天请求/响应模型 |
+| `app/api/schemas.py` | 健康、配置、文档详情/删除、上传和聊天请求/响应模型 |
 | `app/api/routers/*.py` | health、system、documents、chat HTTP 路由 |
 | `app/api/sse.py` | 将结构化 ChatEvent 编码为 SSE 帧 |
-| `frontend/src/App.tsx` | React 工作台状态、问答流、文档上传、来源和状态面板 |
-| `frontend/src/api.ts` | REST 请求、错误映射和 SSE 流解析 |
+| `frontend/src/App.tsx` | React 工作台状态、问答流、文档管理、上传阶段、来源抽屉和本地历史 |
+| `frontend/src/api.ts` | REST/XHR 请求、上传进度、错误映射和 SSE 流解析 |
+| `frontend/src/conversations.ts` | 对话标题、数量限制、`localStorage` 读取/校验/持久化 |
+| `frontend/e2e/mock-api.mjs` | 可控状态的本地 HTTP API，用于无真实 Provider 的浏览器回归 |
+| `frontend/e2e/workbench.spec.ts` | 服务恢复、上传、文档管理、流式问答、停止生成和历史管理 E2E |
+| `infra/milvus/compose.yaml` | Milvus Standalone、etcd、MinIO、健康检查和本地持久卷 |
 | `app/lifecycle/models.py` | 文档、版本、索引清单、操作结果和审计报告模型 |
 | `app/lifecycle/registry.py` | SQLite 文档、索引、操作状态和 active 指针 |
 | `app/lifecycle/service.py` | 源文件持久化、同步构建、active 切换、清理、审计和重建 |
@@ -192,7 +212,7 @@ app.core.retriever
 └── app.observability.tracing
 ```
 
-React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。`web_app.py` 仍保留为兼容入口。
+React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。浏览器对话历史通过 `frontend/src/conversations.ts` 独立保存，不进入 API。`web_app.py` 仍保留为兼容入口。
 
 可观测性模块不得反向导入 Web UI 或具体 RAG 组件，避免循环依赖。
 

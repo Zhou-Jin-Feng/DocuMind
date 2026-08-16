@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.9）
+# DocuMind - RAG 知识库问答系统（v1.9.1）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前开发版本：**v1.9 前后端分离工作台**。RAG 核心继续使用 Milvus，新增 FastAPI API 层与 React/TypeScript 工作台，支持 SSE 流式问答、文档上传、引用来源和依赖就绪状态展示。Gradio 入口仍保留，便于兼容和回归。
+> 当前开发版本：**v1.9.1 前后端分离工作台**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史。Gradio 入口仅作为兼容与回归入口保留。
 
 ## 当前能力
 
@@ -26,10 +26,11 @@
 - v1.7.1 固化 Rewrite artifact 的 schema/Prompt/生成参数指纹，增加断点续跑、延迟分位数、严格四模式比较，并按唯一文档 ID 计算 Precision@K。
 - v1.8 完成 Chroma 到 Milvus 的向量存储迁移，并保留 Embedding 空间、维度和 Collection 兼容性校验。
 - v1.9 搭建 FastAPI 后端与 React/TypeScript 前端：统一错误响应、健康检查、公开配置、文档接口、SSE 问答和前端服务状态反馈。
+- v1.9.1 完成真实 RAG 闭环、Milvus/Ollama 探活、前端 E2E、文档详情/重建/删除、上传进度和本地对话历史。
 
 ## 版本迭代记录
 
-README 保留面向仓库用户的公开版本摘要；当前架构边界见 [ARCHITECTURE.md](ARCHITECTURE.md)，评估指标、报告和质量门禁见 [EVALUATION.md](EVALUATION.md)。版本的详细设计路线和本地提交级历史分别记录在被 `.gitignore` 忽略的 `RAG系统工程化优化与版本演进指南.md` 与 `VERSION_HISTORY.md` 中，因此不会随仓库提交到 GitHub。
+README 保留面向仓库用户的公开版本摘要；当前架构边界见 [ARCHITECTURE.md](ARCHITECTURE.md)，评估指标、报告和质量门禁见 [EVALUATION.md](EVALUATION.md)，逐版本和逐提交说明见 [VERSION_HISTORY.md](VERSION_HISTORY.md)。本地设计草稿仍由 `.gitignore` 排除。
 
 | 版本 | 迭代内容 |
 |---|---|
@@ -44,6 +45,7 @@ README 保留面向仓库用户的公开版本摘要；当前架构边界见 [AR
 | v1.7.1 | 可复现 Rewrite artifact、四模式同配置比较、延迟分位数和指标口径修正 |
 | v1.8 | Chroma 到 Milvus 的向量数据迁移与运行时兼容性校验 |
 | v1.9 | FastAPI 后端基础、React 工作台、SSE 问答与前后端联调测试 |
+| v1.9.1 | 真实服务探活、RAG 闭环、浏览器 E2E、文档管理与工作台交互完善 |
 
 
 ## 项目结构
@@ -94,10 +96,13 @@ DocuMind/
 │   ├── rewrite_runner.py
 │   └── runner.py
 ├── frontend/                     # React + TypeScript + Vite 工作台
-│   ├── src/App.tsx               # 问答、上传、引用和服务状态界面
+│   ├── src/App.tsx               # 问答、文档管理、引用和服务状态界面
 │   ├── src/api.ts                # REST/SSE 客户端
+│   ├── src/conversations.ts      # 本地对话历史与持久化边界
 │   ├── src/types.ts              # 前端 API 类型
+│   ├── e2e/                      # Playwright 浏览器链路与 Mock API
 │   └── package.json              # 前端脚本与依赖
+├── infra/milvus/compose.yaml     # Milvus Standalone 基础设施
 ├── data/                         # 运行数据（Git 忽略）
 ├── logs/                         # 日志（Git 忽略）
 ├── .env.example                 # 无密钥配置模板
@@ -189,7 +194,7 @@ DEFAULT_LLM_PROVIDER=openai
 OPENAI_API_KEY=your-api-key
 ```
 
-### 5. 启动 FastAPI 后端与 React 工作台（v1.9 默认链路）
+### 5. 启动 FastAPI 后端与 React 工作台（v1.9.1 默认链路）
 
 终端一启动 API：
 
@@ -212,8 +217,27 @@ npm run dev
 - `GET /api/v1/health/live`：进程存活检查；
 - `GET /api/v1/health/ready`：Milvus、Embedding、LLM 和注册表就绪检查；
 - `GET /api/v1/system/config`：返回前端所需的非敏感配置；
-- `GET/POST /api/v1/documents`：文档列表与上传摄取；
+- `GET /api/v1/documents`：文档列表；
+- `POST /api/v1/documents`：multipart 文档上传与同步索引；
+- `GET /api/v1/documents/{document_key}`：文档详情、活动版本和索引历史；
+- `POST /api/v1/documents/{document_key}/reindex`：基于持久化源文件重新建立索引；
+- `DELETE /api/v1/documents/{document_key}`：删除注册表记录、Milvus 向量和无引用源文件；
 - `POST /api/v1/chat/stream`：返回 `status`、`sources`、`token`、`done/error` SSE 事件。
+
+上传示例：
+
+```powershell
+curl.exe -X POST "http://127.0.0.1:8001/api/v1/documents" `
+  -F "file=@.\tests\knowledge_base.txt"
+```
+
+流式问答示例：
+
+```powershell
+curl.exe -N -X POST "http://127.0.0.1:8001/api/v1/chat/stream" `
+  -H "Content-Type: application/json" `
+  -d '{"question":"文档主要介绍了什么？"}'
+```
 
 前端验证命令：
 
@@ -222,6 +246,7 @@ cd frontend
 npm test
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
 
 ### 6. 启动 Gradio 兼容入口
@@ -380,12 +405,13 @@ v1.7.1 使用 `evaluation.comparison_runner` 对 `baseline`、`rewrite`、`reran
 项目测试使用标准库 `unittest`，不依赖 pytest 也可运行：
 
 ```powershell
+python -m pytest -q
 python -m unittest discover -s tests -p "test_*.py" -v
 python -m compileall -q app evaluation web_app.py tests
 python -m pip check
 ```
 
-v1.9 另有前端测试、类型检查和生产构建，命令见上方“启动 FastAPI 后端与 React 工作台”。完整回归不需要真实 Milvus；`tests.test_milvus_integration` 仅在显式设置 `MILVUS_INTEGRATION_TEST=1` 时连接本机服务。
+v1.9.1 最终本地回归结果为：Python `178 passed, 1 skipped`，前端 Vitest `5 passed`，Playwright `6 passed`，TypeScript 类型检查和生产构建通过。完整自动回归不需要真实 Milvus；`tests.test_milvus_integration` 仅在显式设置 `MILVUS_INTEGRATION_TEST=1` 时连接本机服务。
 
 ## 数据和索引
 
@@ -399,24 +425,24 @@ v1.9 另有前端测试、类型检查和生产构建，命令见上方“启动
 
 ### 清空并重建索引
 
-优先使用生命周期命令清理文档版本。如果需要从 Chroma 迁移或更换 Embedding 空间，请停止 Web 服务，设置一个新的 `COLLECTION_NAME`，删除生命周期注册表，再重新上传原始文档：
+优先使用生命周期命令清理文档版本。如果需要更换 Embedding 空间，请停止 Web 服务，设置一个新的 `COLLECTION_NAME`，删除生命周期注册表，再重新上传原始文档：
 
 ```powershell
 Remove-Item -Force .\data\document_registry.sqlite3
 ```
 
-旧 Chroma 向量不会自动迁移到 Milvus。确认旧 Milvus Collection 不再使用后，可通过 Milvus 管理工具删除；应用不会因删除 SQLite 注册表而自动删除远端 Collection。
+v1.8 采用“新 Collection 全量重建”完成 Chroma 到 Milvus 的迁移，不读取旧 Chroma 二进制库。确认旧 Milvus Collection 不再使用后，可通过 Milvus 管理工具删除；应用不会因删除 SQLite 注册表而自动删除远端 Collection。
 
 ## 已知限制
 
-- React 工作台当前是本地单用户界面；Web 对话历史只用于 UI 展示，v1.7 Query Rewrite 只在评估 CLI 中运行，尚未接入历史感知的线上问答。
-- FastAPI 与 React 已完成基础联调，但还没有认证、异步任务队列、正式部署配置或 API 版本兼容策略。
+- React 工作台当前是本地单用户界面；对话历史保存在浏览器 `localStorage`，不会进入后端，也不会参与历史感知检索。
+- FastAPI 与 React 已完成真实闭环和浏览器回归，但还没有认证、异步任务队列、正式应用部署配置或 API 兼容策略。
 - v1.4 之前写入的旧向量没有 `index_id`，当前检索会兼容保留；`audit` 会报告 legacy Chunk，后续可安排显式迁移。
 - 迁移前的 Chroma Collection 不受新适配器管理，需要在 Milvus 中使用新 Collection 全量重建。
 - 非空 Collection 禁止切换 Embedding Provider、模型或维度；当前版本不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
 - 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.0/v2.1。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
-- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.9。
+- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.9.1。
 
 ## 常见问题
 
