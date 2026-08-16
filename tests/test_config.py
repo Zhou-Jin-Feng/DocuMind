@@ -31,6 +31,16 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(Settings.model_fields["server_host"].default, "127.0.0.1")
         self.assertEqual(Settings.model_fields["metrics_host"].default, "127.0.0.1")
 
+    def test_readiness_probe_timeout_is_bounded(self):
+        self.assertEqual(
+            Settings.model_fields["readiness_probe_timeout_seconds"].default,
+            2.0,
+        )
+        with self.assertRaises(ValidationError):
+            Settings(_env_file=None, readiness_probe_timeout_seconds=0)
+        with self.assertRaises(ValidationError):
+            Settings(_env_file=None, readiness_probe_timeout_seconds=31)
+
     def test_log_formats_are_normalized_and_validated(self):
         config = Settings(
             _env_file=None,

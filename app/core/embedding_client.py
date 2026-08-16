@@ -3,10 +3,13 @@ RAG系统 - 向量化与嵌入模块
 支持多个API提供商的统一嵌入接口（含本地Ollama）
 """
 
+import json
 import time
 from copy import deepcopy
+from math import isfinite
 from typing import List, Optional
 from urllib.parse import urlparse
+from urllib.request import ProxyHandler, Request, build_opener
 from openai import OpenAI
 from app.config import settings
 from app.utils.logger import get_logger
@@ -28,6 +31,8 @@ class UniversalEmbeddingClient:
     统一嵌入客户端
     支持OpenAI、DeepSeek、智谱GLM的嵌入API，以及本地Ollama
     """
+
+    _HEALTH_CACHE_SECONDS = 30.0
 
     # 模型配置
     MODELS = {
@@ -100,6 +105,7 @@ class UniversalEmbeddingClient:
             provider: API提供商 (openai/openai-large/deepseek/glm/ollama)
         """
         self.provider = provider
+        self._ollama_health_expires_at = 0.0
 
         self.config = self.configuration_for(provider)
         self.type = self.config.get('type', 'api')
@@ -153,6 +159,7 @@ class UniversalEmbeddingClient:
 
         base_url = settings.ollama_base_url
         model_name = self.config['model']
+        self.base_url = base_url
 
         try:
             parsed_host = urlparse(base_url).hostname
@@ -171,6 +178,9 @@ class UniversalEmbeddingClient:
             try:
                 test_vector = self._embed_ollama_query("test")
                 self.config['dimensions'] = len(test_vector)
+                self._ollama_health_expires_at = (
+                    time.monotonic() + self._HEALTH_CACHE_SECONDS
+                )
                 logger.info(f"  实际向量维度: {len(test_vector)}")
             except Exception as exc:
                 # Ollama 首次加载模型时可能短暂返回 502；保留与模型匹配的
@@ -188,6 +198,130 @@ class UniversalEmbeddingClient:
                 f"请确保 Ollama 正在运行 (ollama serve)\n"
                 f"并已下载模型: ollama pull {model_name}"
             )
+
+    @staticmethod
+    def _ollama_model_available(
+        configured_model: str,
+        installed_models: List[str],
+    ) -> bool:
+        """判断 Ollama 模型列表是否包含配置模型。"""
+        configured = configured_model.strip()
+        if not configured:
+            return False
+        if ":" in configured:
+            return configured in installed_models
+        return (
+            configured in installed_models
+            or f"{configured}:latest" in installed_models
+        )
+
+    @staticmethod
+    def _ollama_opener(base_url: str):
+        parsed_host = urlparse(base_url).hostname
+        return (
+            build_opener(ProxyHandler({}))
+            if parsed_host in {"localhost", "127.0.0.1", "::1"}
+            else build_opener()
+        )
+
+    @staticmethod
+    def _read_ollama_json(opener, request: Request, timeout_seconds: float) -> dict:
+        with opener.open(request, timeout=timeout_seconds) as response:
+            status_code = getattr(response, "status", None)
+            if status_code is None:
+                status_code = response.getcode()
+            if status_code != 200:
+                raise ConnectionError(f"Ollama health probe returned HTTP {status_code}")
+            try:
+                payload = json.load(response)
+            except (UnicodeDecodeError, ValueError) as exc:
+                raise ConnectionError(
+                    "Ollama health probe returned invalid JSON"
+                ) from exc
+        if not isinstance(payload, dict):
+            raise ConnectionError("Ollama health probe returned an invalid payload")
+        return payload
+
+    def health_check(self, *, timeout_seconds: float = 2.0) -> bool:
+        """检查 Embedding 提供商是否可用于当前配置。"""
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout_seconds 必须是正数")
+
+        # 云端 Embedding 不主动发送 API 请求；客户端成功创建即表示配置完整。
+        if self.type != "local":
+            return getattr(self, "client", None) is not None
+
+        if time.monotonic() < getattr(self, "_ollama_health_expires_at", 0.0):
+            return True
+
+        base_url = str(
+            getattr(self, "base_url", settings.ollama_base_url)
+        ).rstrip("/")
+        opener = self._ollama_opener(base_url)
+        tags_request = Request(
+            f"{base_url}/api/tags",
+            headers={"Accept": "application/json"},
+        )
+        payload = self._read_ollama_json(
+            opener,
+            tags_request,
+            float(timeout_seconds),
+        )
+        models = payload.get("models") if isinstance(payload, dict) else None
+        if not isinstance(models, list):
+            raise ConnectionError("Ollama health probe returned an invalid model list")
+        installed_models = [
+            str(item.get("name") or item.get("model") or "")
+            for item in models
+            if isinstance(item, dict)
+        ]
+        configured_model = str(self.config.get("model") or "")
+        if not self._ollama_model_available(configured_model, installed_models):
+            raise ConnectionError(
+                f"Ollama embedding model is not installed: {configured_model}"
+            )
+
+        embed_request = Request(
+            f"{base_url}/api/embed",
+            data=json.dumps(
+                {"model": configured_model, "input": "readiness"},
+                ensure_ascii=False,
+            ).encode("utf-8"),
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        embed_payload = self._read_ollama_json(
+            opener,
+            embed_request,
+            float(timeout_seconds),
+        )
+        embeddings = embed_payload.get("embeddings")
+        if (
+            not isinstance(embeddings, list)
+            or not embeddings
+            or not isinstance(embeddings[0], list)
+            or not embeddings[0]
+        ):
+            raise ConnectionError("Ollama embedding probe returned no vector")
+        expected_dimension = int(self.config.get("dimensions") or 0)
+        actual_dimension = len(embeddings[0])
+        if expected_dimension > 0 and actual_dimension != expected_dimension:
+            raise ConnectionError(
+                "Ollama embedding probe dimension mismatch: "
+                f"{actual_dimension} != {expected_dimension}"
+            )
+        self._ollama_health_expires_at = (
+            time.monotonic() + self._HEALTH_CACHE_SECONDS
+        )
+        return True
 
     def _initialize_api_client(self) -> OpenAI:
         """初始化云端API客户端"""

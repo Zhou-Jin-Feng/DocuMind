@@ -6,6 +6,77 @@ from app.config import Settings
 
 
 class ApplicationTests(unittest.TestCase):
+    def _ready_application(self):
+        application = RAGApplication(
+            Settings(
+                _env_file=None,
+                metrics_enabled=False,
+                readiness_probe_timeout_seconds=0.5,
+            )
+        )
+        application.initialized = True
+        application.embedding_client = Mock()
+        application.embedding_client.health_check.return_value = True
+        application.vector_store = Mock()
+        application.vector_store.client.list_collections.return_value = []
+        application.llm_client = Mock(
+            provider="openai",
+            model="gpt-test",
+            client=Mock(),
+        )
+        application.registry = object()
+        return application
+
+    def test_readiness_probes_milvus_and_embedding(self):
+        application = self._ready_application()
+
+        report = application.readiness()
+
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["status"], "ready")
+        application.vector_store.client.list_collections.assert_called_once_with(
+            timeout=0.5
+        )
+        application.embedding_client.health_check.assert_called_once_with(
+            timeout_seconds=0.5
+        )
+
+    def test_readiness_marks_unreachable_embedding_as_degraded(self):
+        application = self._ready_application()
+        application.embedding_client.health_check.side_effect = ConnectionError(
+            "Ollama unavailable"
+        )
+
+        report = application.readiness()
+
+        self.assertFalse(report["ready"])
+        self.assertEqual(report["status"], "degraded")
+        self.assertEqual(report["components"]["embedding"], "unavailable")
+        self.assertEqual(report["error_type"], "dependency_unavailable")
+
+    def test_readiness_marks_unreachable_milvus_as_degraded_without_retry(self):
+        application = self._ready_application()
+        application.vector_store.client.list_collections.side_effect = ConnectionError(
+            "Milvus unavailable"
+        )
+
+        report = application.readiness()
+
+        self.assertFalse(report["ready"])
+        self.assertEqual(report["components"]["milvus"], "unavailable")
+        self.assertEqual(report["error_type"], "dependency_unavailable")
+        application.vector_store.client.list_collections.assert_called_once_with(
+            timeout=0.5
+        )
+
+    def test_llm_readiness_does_not_call_generation_api(self):
+        application = self._ready_application()
+        llm_client = application.llm_client.client
+
+        application.readiness()
+
+        self.assertEqual(llm_client.mock_calls, [])
+
     def test_failed_initialization_clears_partial_components(self):
         vector_store = Mock()
         application = RAGApplication(

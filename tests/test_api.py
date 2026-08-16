@@ -116,6 +116,30 @@ class APITests(unittest.TestCase):
         self.assertEqual(ready.status_code, 200)
         self.assertTrue(ready.json()["ready"])
 
+    def test_readiness_returns_503_when_dependency_is_unavailable(self):
+        original_readiness = self.application.readiness
+        self.application.readiness = lambda: {
+            "status": "degraded",
+            "ready": False,
+            "components": {
+                "application": "ready",
+                "milvus": "unavailable",
+                "embedding": "ready",
+                "llm": "ready",
+                "registry": "ready",
+            },
+            "error_type": "dependency_unavailable",
+        }
+        try:
+            response = self.client.get("/api/v1/health/ready")
+        finally:
+            self.application.readiness = original_readiness
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertFalse(response.json()["ready"])
+        self.assertEqual(response.json()["error_type"], "dependency_unavailable")
+
     def test_documents_are_structured(self):
         response = self.client.get("/api/v1/documents")
         self.assertEqual(response.status_code, 200)

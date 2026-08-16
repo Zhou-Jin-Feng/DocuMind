@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     api_cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
+    readiness_probe_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 
     # 应用与日志配置
     service_name: str = "rag-web"

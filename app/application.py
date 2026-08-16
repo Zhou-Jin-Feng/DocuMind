@@ -146,26 +146,86 @@ class RAGApplication:
             self.rag_service = None
             self.document_service = None
 
+    def _readiness_timeout(self) -> float:
+        return float(self.settings.readiness_probe_timeout_seconds)
+
+    def _check_milvus(self) -> bool:
+        """通过真实 RPC 检查 Milvus，而不是只判断客户端对象是否存在。"""
+        client = getattr(self.vector_store, "client", None)
+        list_collections = getattr(client, "list_collections", None)
+        if not callable(list_collections):
+            return False
+        list_collections(timeout=self._readiness_timeout())
+        return True
+
+    def _check_embedding(self) -> bool:
+        """执行 Embedding 客户端的真实探活检查。"""
+        health_check = getattr(self.embedding_client, "health_check", None)
+        if not callable(health_check):
+            return False
+        return bool(health_check(timeout_seconds=self._readiness_timeout()))
+
+    def _check_llm_configuration(self) -> bool:
+        """只验证 LLM 客户端和配置，不主动调用远程生成 API。"""
+        client = self.llm_client
+        return bool(
+            client
+            and getattr(client, "provider", None)
+            and getattr(client, "model", None)
+            and getattr(client, "client", None)
+        )
+
     def readiness(self) -> dict[str, Any]:
         components = {
             "application": "ready" if self.initialized else "unavailable",
             "milvus": "unknown",
-            "embedding": "ready" if self.embedding_client else "unavailable",
-            "llm": "ready" if self.llm_client else "unavailable",
+            "embedding": "unavailable",
+            "llm": "ready" if self._check_llm_configuration() else "unavailable",
             "registry": "ready" if self.registry else "unavailable",
         }
+        failures: list[str] = []
         if self.initialized and self.vector_store is not None:
             try:
-                self.vector_store.client.list_collections()
-                components["milvus"] = "ready"
-            except Exception:
+                if self._check_milvus():
+                    components["milvus"] = "ready"
+                else:
+                    components["milvus"] = "unavailable"
+                    failures.append("milvus")
+            except Exception as exc:
                 components["milvus"] = "unavailable"
+                failures.append("milvus")
+                logger.warning(
+                    "Milvus readiness probe failed",
+                    event="dependency_readiness_failed",
+                    component="milvus",
+                    error_type=type(exc).__name__,
+                )
+        if self.initialized and self.embedding_client is not None:
+            try:
+                if self._check_embedding():
+                    components["embedding"] = "ready"
+                else:
+                    failures.append("embedding")
+            except Exception as exc:
+                failures.append("embedding")
+                logger.warning(
+                    "Embedding readiness probe failed",
+                    event="dependency_readiness_failed",
+                    component="embedding",
+                    error_type=type(exc).__name__,
+                )
+        for name, value in components.items():
+            if value == "unavailable" and name not in failures and name != "application":
+                failures.append(name)
         ready = self.initialized and all(
             value == "ready" for value in components.values()
         )
+        error_type = self.startup_error_type
+        if not ready and error_type is None and failures:
+            error_type = "dependency_unavailable"
         return {
             "status": "ready" if ready else "degraded",
             "ready": ready,
             "components": components,
-            "error_type": None if ready else self.startup_error_type,
+            "error_type": error_type,
         }
