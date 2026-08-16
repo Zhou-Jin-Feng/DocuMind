@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # Ollama 本地模型
     ollama_base_url: str = "http://localhost:11434"
     ollama_embedding_model: str = "qwen3-embedding"
+    # 可选的显式维度；留空时使用模型默认值并优先运行时探测。
+    ollama_embedding_dimensions: Optional[int] = Field(default=None, gt=0)
 
     # 默认提供商
     default_embedding_provider: str = "ollama"

@@ -6,6 +6,7 @@ RAG系统 - 向量化与嵌入模块
 import time
 from copy import deepcopy
 from typing import List, Optional
+from urllib.parse import urlparse
 from openai import OpenAI
 from app.config import settings
 from app.utils.logger import get_logger
@@ -57,7 +58,8 @@ class UniversalEmbeddingClient:
         # ===== 新增 Ollama 支持 =====
         'ollama': {
             'model': 'qwen3-embedding',
-            'dimensions': 1024,  # 实际维度由模型决定，这里给默认值
+            # qwen3-embedding 的默认向量维度为 4096。运行时仍会优先使用探测值。
+            'dimensions': 4096,
             'max_batch_size': 50,  # Ollama 批处理能力有限
             'type': 'local'
         },
@@ -69,7 +71,7 @@ class UniversalEmbeddingClient:
         },
         'ollama-qwen': {
             'model': 'qwen3-embedding',
-            'dimensions': 1024,
+            'dimensions': 4096,
             'max_batch_size': 50,
             'type': 'local'
         }
@@ -86,6 +88,8 @@ class UniversalEmbeddingClient:
         config = deepcopy(cls.MODELS[provider])
         if provider == "ollama":
             config["model"] = settings.ollama_embedding_model
+            if settings.ollama_embedding_dimensions is not None:
+                config["dimensions"] = settings.ollama_embedding_dimensions
         return config
 
     def __init__(self, provider: str = 'ollama'):
@@ -111,6 +115,34 @@ class UniversalEmbeddingClient:
         logger.info(f"  模型: {self.config['model']}")
         logger.info(f"  向量维度: {self.config['dimensions']}")
 
+    def _embed_ollama_query(
+        self,
+        text: str,
+        *,
+        max_retries: int = 3,
+    ) -> List[float]:
+        """Embed one text with bounded retries for transient Ollama failures."""
+        if max_retries <= 0:
+            raise ValueError("max_retries 必须大于 0")
+
+        for attempt in range(max_retries):
+            try:
+                return self.ollama_client.embed_query(text)
+            except Exception as exc:
+                if attempt == max_retries - 1:
+                    raise
+                wait_time = 0.5 * (2**attempt)
+                logger.warning(
+                    "Ollama 向量化暂时失败，将重试",
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    wait_seconds=wait_time,
+                    error_type=type(exc).__name__,
+                )
+                time.sleep(wait_time)
+
+        raise RuntimeError("Ollama embedding retry loop exited unexpectedly")
+
     def _initialize_ollama(self):
         """初始化 Ollama 本地客户端"""
         if not OLLAMA_AVAILABLE:
@@ -123,18 +155,32 @@ class UniversalEmbeddingClient:
         model_name = self.config['model']
 
         try:
+            parsed_host = urlparse(base_url).hostname
+            client_kwargs = (
+                {"trust_env": False}
+                if parsed_host in {"localhost", "127.0.0.1", "::1"}
+                else {}
+            )
             self.ollama_client = OllamaEmbeddings(
                 model=model_name,
-                base_url=base_url
+                base_url=base_url,
+                client_kwargs=client_kwargs,
             )
 
             # 尝试获取实际维度
             try:
-                test_vector = self.ollama_client.embed_query("test")
+                test_vector = self._embed_ollama_query("test")
                 self.config['dimensions'] = len(test_vector)
                 logger.info(f"  实际向量维度: {len(test_vector)}")
-            except Exception:
-                logger.warning("无法探测 Ollama 向量维度，将使用配置中的默认值")
+            except Exception as exc:
+                # Ollama 首次加载模型时可能短暂返回 502；保留与模型匹配的
+                # fallback，避免把 qwen3-embedding 错记为 1024 维并污染索引。
+                logger.warning(
+                    "无法探测 Ollama 向量维度，将使用配置中的 fallback",
+                    model=model_name,
+                    fallback_dimension=self.config["dimensions"],
+                    error_type=type(exc).__name__,
+                )
 
         except Exception as e:
             raise ConnectionError(
@@ -188,7 +234,7 @@ class UniversalEmbeddingClient:
         # 本地 Ollama
         if self.type == 'local':
             try:
-                return self.ollama_client.embed_query(text)
+                return self._embed_ollama_query(text)
             except Exception:
                 logger.exception("Ollama 单文本向量化失败")
                 raise
@@ -278,7 +324,10 @@ class UniversalEmbeddingClient:
                     try:
                         batch_embeddings = []
                         for text in batch_texts:
-                            embedding = self.ollama_client.embed_query(text)
+                            embedding = self._embed_ollama_query(
+                                text,
+                                max_retries=max_retries,
+                            )
                             batch_embeddings.append(embedding)
 
                         all_embeddings.extend(batch_embeddings)
