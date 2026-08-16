@@ -24,11 +24,14 @@ class EmbeddingClientTests(unittest.TestCase):
             self.client.embed_texts_batch(["文本"], batch_size=0, show_progress=False)
 
     def test_ollama_configuration_has_model_compatible_fallback_dimension(self):
-        with patch.object(
-            settings,
-            "ollama_embedding_model",
-            "qwen3-embedding",
-        ), patch.object(settings, "ollama_embedding_dimensions", None):
+        with (
+            patch.object(
+                settings,
+                "ollama_embedding_model",
+                "qwen3-embedding",
+            ),
+            patch.object(settings, "ollama_embedding_dimensions", None),
+        ):
             config = UniversalEmbeddingClient.configuration_for("ollama")
 
         self.assertEqual(config["model"], "qwen3-embedding")
@@ -73,9 +76,7 @@ class EmbeddingClientTests(unittest.TestCase):
         self.client.type = "local"
         self.client.base_url = "http://127.0.0.1:11434"
         self.client.config = {"model": "qwen3-embedding", "dimensions": 3}
-        tags_response = BytesIO(
-            b'{"models":[{"name":"qwen3-embedding:latest"}]}'
-        )
+        tags_response = BytesIO(b'{"models":[{"name":"qwen3-embedding:latest"}]}')
         tags_response.status = 200
         tags_response.__enter__ = Mock(return_value=tags_response)
         tags_response.__exit__ = Mock(return_value=False)
@@ -130,9 +131,10 @@ class EmbeddingClientTests(unittest.TestCase):
         self.client.type = "local"
         self.client._ollama_health_expires_at = 100.0
 
-        with patch("app.core.embedding_client.time.monotonic", return_value=99.0), patch(
-            "app.core.embedding_client.build_opener"
-        ) as build_opener:
+        with (
+            patch("app.core.embedding_client.time.monotonic", return_value=99.0),
+            patch("app.core.embedding_client.build_opener") as build_opener,
+        ):
             self.assertTrue(self.client.health_check(timeout_seconds=1))
 
         build_opener.assert_not_called()
@@ -176,9 +178,7 @@ class EmbeddingClientTests(unittest.TestCase):
         self.client.type = "local"
         self.client.base_url = "http://127.0.0.1:11434"
         self.client.config = {"model": "qwen3-embedding", "dimensions": 3}
-        tags_response = BytesIO(
-            b'{"models":[{"name":"qwen3-embedding:latest"}]}'
-        )
+        tags_response = BytesIO(b'{"models":[{"name":"qwen3-embedding:latest"}]}')
         tags_response.status = 200
         tags_response.__enter__ = Mock(return_value=tags_response)
         tags_response.__exit__ = Mock(return_value=False)

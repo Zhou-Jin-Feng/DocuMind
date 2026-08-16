@@ -97,9 +97,13 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(first.status, "indexed")
         self.assertEqual(duplicate.status, "noop")
         self.assertEqual(duplicate.index_id, first.index_id)
-        self.assertEqual(self.vector_store.count_by_index_id(first.index_id), first.chunk_count)
+        self.assertEqual(
+            self.vector_store.count_by_index_id(first.index_id), first.chunk_count
+        )
 
-        self.source_path.write_text("第二版文档内容，已经发生变化。" * 30, encoding="utf-8")
+        self.source_path.write_text(
+            "第二版文档内容，已经发生变化。" * 30, encoding="utf-8"
+        )
         second = service.ingest(self.source_path)
 
         self.assertEqual(second.status, "indexed")
@@ -125,7 +129,9 @@ class LifecycleTests(unittest.TestCase):
 
         document = self.registry.get_document(first.document_key)
         self.assertEqual(document["active_index_id"], first.index_id)
-        self.assertEqual(self.vector_store.count_by_index_id(first.index_id), first.chunk_count)
+        self.assertEqual(
+            self.vector_store.count_by_index_id(first.index_id), first.chunk_count
+        )
 
     def test_active_metadata_predicate_hides_superseded_managed_chunks(self):
         service = self._service()
@@ -147,7 +153,9 @@ class LifecycleTests(unittest.TestCase):
         self.assertIsInstance(plan, RebuildPlan)
         self.assertEqual(plan.current_index_id, first.index_id)
         self.assertEqual(plan.planned_index_id, first.index_id)
-        self.assertEqual(self.vector_store.count_by_index_id(first.index_id), first.chunk_count)
+        self.assertEqual(
+            self.vector_store.count_by_index_id(first.index_id), first.chunk_count
+        )
         self.assertEqual(
             self.registry.get_index(first.index_id)["status"],
             LifecycleStatus.ACTIVE.value,
@@ -168,7 +176,9 @@ class LifecycleTests(unittest.TestCase):
             self.registry.get_index(first.index_id)["status"],
             LifecycleStatus.ACTIVE.value,
         )
-        self.assertEqual(self.vector_store.count_by_index_id(first.index_id), first.chunk_count)
+        self.assertEqual(
+            self.vector_store.count_by_index_id(first.index_id), first.chunk_count
+        )
         detail = DocumentService(
             lifecycle_service=service,
             registry=self.registry,
@@ -316,7 +326,9 @@ class LifecycleTests(unittest.TestCase):
 
         self.assertEqual(cleaned.orphan_index_ids, ())
         self.assertEqual(self.vector_store.count_by_index_id("orphan-index"), 0)
-        self.assertEqual(self.vector_store.count_by_index_id(first.index_id), first.chunk_count)
+        self.assertEqual(
+            self.vector_store.count_by_index_id(first.index_id), first.chunk_count
+        )
 
     def test_cleanup_recovers_when_vectors_were_deleted_before_status_update(self):
         service = self._service()
@@ -397,9 +409,7 @@ class LifecycleTests(unittest.TestCase):
     def test_rebuild_plan_uses_current_configuration(self):
         first = self._service().ingest(self.source_path)
 
-        plan = self._service(chunk_size=70).plan_rebuild_document(
-            first.document_key
-        )
+        plan = self._service(chunk_size=70).plan_rebuild_document(first.document_key)
 
         self.assertTrue(plan.configuration_changed)
         self.assertEqual(plan.reason, "configuration_changed")

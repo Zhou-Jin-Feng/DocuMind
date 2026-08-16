@@ -19,6 +19,7 @@ from rich.table import Table
 # 尝试导入 Ollama（如果可用）
 try:
     from langchain_ollama import OllamaEmbeddings
+
     OLLAMA_AVAILABLE = True
 except ImportError:
     OLLAMA_AVAILABLE = False
@@ -36,50 +37,50 @@ class UniversalEmbeddingClient:
 
     # 模型配置
     MODELS = {
-        'openai': {
-            'model': 'text-embedding-3-small',
-            'dimensions': 1536,
-            'max_batch_size': 100,
-            'type': 'api'  # 标记类型
+        "openai": {
+            "model": "text-embedding-3-small",
+            "dimensions": 1536,
+            "max_batch_size": 100,
+            "type": "api",  # 标记类型
         },
-        'openai-large': {
-            'model': 'text-embedding-3-large',
-            'dimensions': 3072,
-            'max_batch_size': 100,
-            'type': 'api'
+        "openai-large": {
+            "model": "text-embedding-3-large",
+            "dimensions": 3072,
+            "max_batch_size": 100,
+            "type": "api",
         },
-        'deepseek': {
-            'model': 'deepseek-embedding',
-            'dimensions': 1536,
-            'max_batch_size': 100,
-            'type': 'api'
+        "deepseek": {
+            "model": "deepseek-embedding",
+            "dimensions": 1536,
+            "max_batch_size": 100,
+            "type": "api",
         },
-        'glm': {
-            'model': 'embedding-2',
-            'dimensions': 1024,
-            'max_batch_size': 100,
-            'type': 'api'
+        "glm": {
+            "model": "embedding-2",
+            "dimensions": 1024,
+            "max_batch_size": 100,
+            "type": "api",
         },
         # ===== 新增 Ollama 支持 =====
-        'ollama': {
-            'model': 'qwen3-embedding',
+        "ollama": {
+            "model": "qwen3-embedding",
             # qwen3-embedding 的默认向量维度为 4096。运行时仍会优先使用探测值。
-            'dimensions': 4096,
-            'max_batch_size': 50,  # Ollama 批处理能力有限
-            'type': 'local'
+            "dimensions": 4096,
+            "max_batch_size": 50,  # Ollama 批处理能力有限
+            "type": "local",
         },
-        'ollama-nomic': {
-            'model': 'nomic-embed-text',
-            'dimensions': 768,
-            'max_batch_size': 50,
-            'type': 'local'
+        "ollama-nomic": {
+            "model": "nomic-embed-text",
+            "dimensions": 768,
+            "max_batch_size": 50,
+            "type": "local",
         },
-        'ollama-qwen': {
-            'model': 'qwen3-embedding',
-            'dimensions': 4096,
-            'max_batch_size': 50,
-            'type': 'local'
-        }
+        "ollama-qwen": {
+            "model": "qwen3-embedding",
+            "dimensions": 4096,
+            "max_batch_size": 50,
+            "type": "local",
+        },
     }
 
     @classmethod
@@ -97,7 +98,7 @@ class UniversalEmbeddingClient:
                 config["dimensions"] = settings.ollama_embedding_dimensions
         return config
 
-    def __init__(self, provider: str = 'ollama'):
+    def __init__(self, provider: str = "ollama"):
         """
         初始化嵌入客户端
 
@@ -108,10 +109,10 @@ class UniversalEmbeddingClient:
         self._ollama_health_expires_at = 0.0
 
         self.config = self.configuration_for(provider)
-        self.type = self.config.get('type', 'api')
+        self.type = self.config.get("type", "api")
 
         # 根据类型初始化客户端
-        if self.type == 'local':
+        if self.type == "local":
             self._initialize_ollama()
         else:
             self._initialize_api_client()
@@ -158,7 +159,7 @@ class UniversalEmbeddingClient:
             )
 
         base_url = settings.ollama_base_url
-        model_name = self.config['model']
+        model_name = self.config["model"]
         self.base_url = base_url
 
         try:
@@ -177,7 +178,7 @@ class UniversalEmbeddingClient:
             # 尝试获取实际维度
             try:
                 test_vector = self._embed_ollama_query("test")
-                self.config['dimensions'] = len(test_vector)
+                self.config["dimensions"] = len(test_vector)
                 self._ollama_health_expires_at = (
                     time.monotonic() + self._HEALTH_CACHE_SECONDS
                 )
@@ -211,8 +212,7 @@ class UniversalEmbeddingClient:
         if ":" in configured:
             return configured in installed_models
         return (
-            configured in installed_models
-            or f"{configured}:latest" in installed_models
+            configured in installed_models or f"{configured}:latest" in installed_models
         )
 
     @staticmethod
@@ -231,7 +231,9 @@ class UniversalEmbeddingClient:
             if status_code is None:
                 status_code = response.getcode()
             if status_code != 200:
-                raise ConnectionError(f"Ollama health probe returned HTTP {status_code}")
+                raise ConnectionError(
+                    f"Ollama health probe returned HTTP {status_code}"
+                )
             try:
                 payload = json.load(response)
             except (UnicodeDecodeError, ValueError) as exc:
@@ -259,9 +261,7 @@ class UniversalEmbeddingClient:
         if time.monotonic() < getattr(self, "_ollama_health_expires_at", 0.0):
             return True
 
-        base_url = str(
-            getattr(self, "base_url", settings.ollama_base_url)
-        ).rstrip("/")
+        base_url = str(getattr(self, "base_url", settings.ollama_base_url)).rstrip("/")
         opener = self._ollama_opener(base_url)
         tags_request = Request(
             f"{base_url}/api/tags",
@@ -318,14 +318,12 @@ class UniversalEmbeddingClient:
                 "Ollama embedding probe dimension mismatch: "
                 f"{actual_dimension} != {expected_dimension}"
             )
-        self._ollama_health_expires_at = (
-            time.monotonic() + self._HEALTH_CACHE_SECONDS
-        )
+        self._ollama_health_expires_at = time.monotonic() + self._HEALTH_CACHE_SECONDS
         return True
 
     def _initialize_api_client(self) -> OpenAI:
         """初始化云端API客户端"""
-        if self.provider.startswith('openai'):
+        if self.provider.startswith("openai"):
             api_key = settings.openai_api_key
             base_url = settings.openai_base_url
 
@@ -334,7 +332,7 @@ class UniversalEmbeddingClient:
 
             self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-        elif self.provider == 'deepseek':
+        elif self.provider == "deepseek":
             api_key = settings.deepseek_api_key
             base_url = settings.deepseek_base_url
 
@@ -343,7 +341,7 @@ class UniversalEmbeddingClient:
 
             self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-        elif self.provider == 'glm':
+        elif self.provider == "glm":
             api_key = settings.glm_api_key
             base_url = settings.glm_base_url
 
@@ -366,7 +364,7 @@ class UniversalEmbeddingClient:
             raise ValueError("输入文本不能为空")
 
         # 本地 Ollama
-        if self.type == 'local':
+        if self.type == "local":
             try:
                 return self._embed_ollama_query(text)
             except Exception:
@@ -376,8 +374,7 @@ class UniversalEmbeddingClient:
         # 云端 API
         try:
             response = self.client.embeddings.create(
-                model=self.config['model'],
-                input=text
+                model=self.config["model"], input=text
             )
             return response.data[0].embedding
         except Exception:
@@ -389,7 +386,7 @@ class UniversalEmbeddingClient:
         texts: List[str],
         batch_size: Optional[int] = None,
         show_progress: bool = True,
-        max_retries: int = 3
+        max_retries: int = 3,
     ) -> List[List[float]]:
         """
         批量向量化文本（推荐使用）
@@ -420,7 +417,7 @@ class UniversalEmbeddingClient:
 
         # 设置批处理大小
         if batch_size is None:
-            batch_size = self.config['max_batch_size']
+            batch_size = self.config["max_batch_size"]
         if batch_size <= 0:
             raise ValueError("batch_size 必须大于 0")
 
@@ -439,22 +436,20 @@ class UniversalEmbeddingClient:
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%")
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         ) as progress:
 
             task = progress.add_task(
-                "向量化进度...",
-                total=len(texts),
-                visible=show_progress
+                "向量化进度...", total=len(texts), visible=show_progress
             )
 
             # 分批处理
             for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i:i + batch_size]
+                batch_texts = texts[i : i + batch_size]
                 batch_num = i // batch_size + 1
 
                 # 本地 Ollama 处理
-                if self.type == 'local':
+                if self.type == "local":
                     try:
                         batch_embeddings = []
                         for text in batch_texts:
@@ -476,8 +471,7 @@ class UniversalEmbeddingClient:
                     for attempt in range(max_retries):
                         try:
                             response = self.client.embeddings.create(
-                                model=self.config['model'],
-                                input=batch_texts
+                                model=self.config["model"], input=batch_texts
                             )
 
                             # 提取向量
@@ -493,7 +487,7 @@ class UniversalEmbeddingClient:
 
                         except Exception as e:
                             if attempt < max_retries - 1:
-                                wait_time = 2 ** attempt  # 指数退避
+                                wait_time = 2**attempt  # 指数退避
                                 logger.info(
                                     f"批次 {batch_num} 失败，{wait_time}秒后重试... "
                                     f"({attempt + 1}/{max_retries})"
@@ -507,7 +501,7 @@ class UniversalEmbeddingClient:
 
                 # 限流保护
                 if i + batch_size < len(texts):
-                    time.sleep(0.1 if self.type == 'api' else 0.05)
+                    time.sleep(0.1 if self.type == "api" else 0.05)
 
         logger.info(f"\n批量向量化完成！总共 {len(all_embeddings)} 个向量")
 
@@ -515,13 +509,13 @@ class UniversalEmbeddingClient:
 
     def get_embedding_dimension(self) -> int:
         """获取当前模型的向量维度"""
-        return self.config['dimensions']
+        return self.config["dimensions"]
 
     def test_embedding(self):
         """
         测试嵌入功能
         """
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         test_texts = [
             "人工智能是计算机科学的一个分支",
@@ -547,11 +541,11 @@ class UniversalEmbeddingClient:
         table.add_column("前5个值", width=40)
 
         for text, embedding in zip(test_texts, embeddings):
-            preview = ', '.join([f"{v:.4f}" for v in embedding[:5]])
+            preview = ", ".join([f"{v:.4f}" for v in embedding[:5]])
             table.add_row(
                 text[:25] + "..." if len(text) > 25 else text,
                 str(len(embedding)),
-                preview
+                preview,
             )
 
         logger.info(table)
@@ -597,7 +591,7 @@ def demo_compare_providers():
     """
     演示：对比不同提供商的嵌入效果
     """
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     test_text = "检索增强生成技术结合了信息检索和文本生成"
 
@@ -606,7 +600,7 @@ def demo_compare_providers():
     # 检测可用的提供商
     available_providers = []
 
-    providers_to_test = ['ollama', 'openai', 'deepseek', 'glm']
+    providers_to_test = ["ollama", "openai", "deepseek", "glm"]
 
     for provider in providers_to_test:
         try:
@@ -620,7 +614,7 @@ def demo_compare_providers():
         logger.info("\n没有可用的提供商，请检查配置")
         return
 
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
 
     # 对比测试
     results = []
@@ -633,18 +627,20 @@ def demo_compare_providers():
             embedding = client.embed_text(test_text)
             elapsed_time = time.time() - start_time
 
-            results.append({
-                'provider': provider,
-                'type': '本地' if client.type == 'local' else '云端',
-                'dimensions': len(embedding),
-                'time': elapsed_time,
-                'preview': embedding[:5]
-            })
+            results.append(
+                {
+                    "provider": provider,
+                    "type": "本地" if client.type == "local" else "云端",
+                    "dimensions": len(embedding),
+                    "time": elapsed_time,
+                    "preview": embedding[:5],
+                }
+            )
         except Exception as e:
             logger.error(f"测试失败: {str(e)}")
 
     # 展示对比表格
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("\n性能对比:\n")
 
     table = Table(show_header=True, header_style="bold magenta")
@@ -655,13 +651,13 @@ def demo_compare_providers():
     table.add_column("向量预览(前5值)", width=40)
 
     for result in results:
-        preview = ', '.join([f"{v:.3f}" for v in result['preview']])
+        preview = ", ".join([f"{v:.3f}" for v in result["preview"]])
         table.add_row(
-            result['provider'],
-            result['type'],
-            str(result['dimensions']),
+            result["provider"],
+            result["type"],
+            str(result["dimensions"]),
             f"{result['time']:.3f}",
-            preview
+            preview,
         )
 
     logger.info(table)
@@ -685,21 +681,16 @@ if __name__ == "__main__":
 
         provider_choice = input("\n请输入选项 (1/2/3/4): ").strip()
 
-        provider_map = {
-            '1': 'ollama',
-            '2': 'openai',
-            '3': 'deepseek',
-            '4': 'glm'
-        }
+        provider_map = {"1": "ollama", "2": "openai", "3": "deepseek", "4": "glm"}
 
-        provider = provider_map.get(provider_choice, 'ollama')
+        provider = provider_map.get(provider_choice, "ollama")
 
         try:
             client = UniversalEmbeddingClient(provider)
             client.test_embedding()
         except Exception as e:
             logger.exception("测试失败")
-            if provider == 'ollama':
+            if provider == "ollama":
                 logger.info("提示: 请确保 Ollama 正在运行并已下载模型")
                 logger.info("  1. 启动: ollama serve")
                 logger.info("  2. 下载模型: ollama pull qwen3-embedding")

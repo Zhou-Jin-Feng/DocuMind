@@ -49,7 +49,9 @@ class SourceReference:
             lexical_score=getattr(result, "lexical_score", None),
             fusion_score=getattr(result, "fusion_score", None),
             rerank_score=getattr(result, "rerank_score", None),
-            chunk_id=str(metadata.get("chunk_id")) if metadata.get("chunk_id") else None,
+            chunk_id=(
+                str(metadata.get("chunk_id")) if metadata.get("chunk_id") else None
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -126,10 +128,13 @@ class RAGService:
         if not normalized_question:
             raise ValueError("question cannot be empty")
 
-        with request_context(request_id=request_id), trace_span(
-            "rag.query",
-            attributes={"query.length": len(normalized_question)},
-        ) as root_span:
+        with (
+            request_context(request_id=request_id),
+            trace_span(
+                "rag.query",
+                attributes={"query.length": len(normalized_question)},
+            ) as root_span,
+        ):
             metrics = self.metrics_getter()
             total_started = perf_counter()
             llm_provider = self.settings.default_llm_provider
@@ -254,9 +259,7 @@ class RAGService:
                     raise RuntimeError("LLM stream returned no text")
 
                 generation_duration = perf_counter() - generation_started
-                metrics.observe_llm_total(
-                    llm_provider, "success", generation_duration
-                )
+                metrics.observe_llm_total(llm_provider, "success", generation_duration)
                 logger.info(
                     "LLM 回答生成完成",
                     event="generation_completed",

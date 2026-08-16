@@ -407,6 +407,7 @@ v1.7.1 使用 `evaluation.comparison_runner` 对 `baseline`、`rewrite`、`reran
 ```powershell
 python -m pytest -q
 python -m unittest discover -s tests -p "test_*.py" -v
+python -m black --check app evaluation tests web_app.py
 python -m compileall -q app evaluation web_app.py tests
 python -m pip check
 ```

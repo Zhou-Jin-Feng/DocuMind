@@ -113,17 +113,16 @@ class TracingTests(unittest.TestCase):
         exporter_cls.assert_not_called()
 
     def test_endpoint_uses_otlp_exporter_with_batch_processor(self):
-        with patch("app.observability.tracing.OTLPSpanExporter") as exporter_cls, patch(
-            "app.observability.tracing.BatchSpanProcessor"
-        ) as processor_cls:
+        with (
+            patch("app.observability.tracing.OTLPSpanExporter") as exporter_cls,
+            patch("app.observability.tracing.BatchSpanProcessor") as processor_cls,
+        ):
             configure_tracing(
                 True,
                 endpoint="http://127.0.0.1:4318/v1/traces",
             )
 
-        exporter_cls.assert_called_once_with(
-            endpoint="http://127.0.0.1:4318/v1/traces"
-        )
+        exporter_cls.assert_called_once_with(endpoint="http://127.0.0.1:4318/v1/traces")
         processor_cls.assert_called_once_with(exporter_cls.return_value)
 
     def test_in_memory_exporter_receives_parent_child_spans(self):
@@ -229,7 +228,6 @@ class TracingTests(unittest.TestCase):
         with trace_span("rag.query"):
             pass
         self.assertEqual(len(second_exporter.get_finished_spans()), 1)
-
 
     def test_real_query_pipeline_emits_expected_span_tree(self):
         exporter = InMemorySpanExporter()

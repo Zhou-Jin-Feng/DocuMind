@@ -43,7 +43,9 @@ class CrossEncoderRerankerTests(unittest.TestCase):
         results = reranker.rerank("q", candidates, top_k=2)
 
         self.assertTrue(reranker.is_loaded)
-        self.assertEqual([result.metadata["chunk_id"] for result in results], ["b", "c"])
+        self.assertEqual(
+            [result.metadata["chunk_id"] for result in results], ["b", "c"]
+        )
         self.assertEqual([result.rank for result in results], [1, 2])
         self.assertEqual(results[0].distance, 0.2)
         self.assertEqual(results[0].lexical_score, 3.0)

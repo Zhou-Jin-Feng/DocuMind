@@ -16,7 +16,9 @@ def _expected_set(expected_document_ids: Sequence[str]) -> set[str]:
 
 def _retrieved_ids(retrieved_document_ids: Sequence[str], k: int) -> list[str]:
     _validate_k(k)
-    return [item.strip() for item in retrieved_document_ids[:k] if item and item.strip()]
+    return [
+        item.strip() for item in retrieved_document_ids[:k] if item and item.strip()
+    ]
 
 
 def recall_at_k(
@@ -115,15 +117,21 @@ def no_answer_retrieval_accuracy(
 def refusal_accuracy(expected_should_answer: bool, actual_answered: bool) -> float:
     """Return 1 when an answer adapter follows the case's answerability label."""
 
-    if not isinstance(expected_should_answer, bool) or not isinstance(actual_answered, bool):
+    if not isinstance(expected_should_answer, bool) or not isinstance(
+        actual_answered, bool
+    ):
         raise TypeError("拒答评估输入必须是布尔值")
     return float(expected_should_answer == actual_answered)
 
 
-def keyword_coverage(expected_keywords: Sequence[str], answer_text: str) -> float | None:
+def keyword_coverage(
+    expected_keywords: Sequence[str], answer_text: str
+) -> float | None:
     """Return case-insensitive expected-keyword coverage in an answer."""
 
-    keywords = [item.strip().casefold() for item in expected_keywords if item and item.strip()]
+    keywords = [
+        item.strip().casefold() for item in expected_keywords if item and item.strip()
+    ]
     if not keywords:
         return None
     normalized_answer = (answer_text or "").casefold()

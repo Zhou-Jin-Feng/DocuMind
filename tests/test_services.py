@@ -73,7 +73,9 @@ class RAGServiceTests(unittest.TestCase):
 
         events = list(service.stream_answer("没有资料的问题"))
 
-        self.assertEqual([event.type for event in events], ["status", "sources", "done"])
+        self.assertEqual(
+            [event.type for event in events], ["status", "sources", "done"]
+        )
         self.assertEqual(events[-1].data["status"], "no_context")
 
     def test_partial_generation_emits_public_interruption_error(self):

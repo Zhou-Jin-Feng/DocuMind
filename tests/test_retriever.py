@@ -96,11 +96,19 @@ class RetrieverTests(unittest.TestCase):
             [
                 Document(
                     page_content="生命周期 dry_run 会校验 SHA_256 source hash",
-                    metadata={"chunk_id": "active", "document_id": "lifecycle", "active": True},
+                    metadata={
+                        "chunk_id": "active",
+                        "document_id": "lifecycle",
+                        "active": True,
+                    },
                 ),
                 Document(
                     page_content="普通天气预报和气温说明",
-                    metadata={"chunk_id": "weather", "document_id": "weather", "active": True},
+                    metadata={
+                        "chunk_id": "weather",
+                        "document_id": "weather",
+                        "active": True,
+                    },
                 ),
             ]
         )
@@ -111,7 +119,9 @@ class RetrieverTests(unittest.TestCase):
             result_predicate=lambda metadata: metadata.get("active") is True,
         )
 
-        self.assertEqual([result.metadata["chunk_id"] for result in results], ["active"])
+        self.assertEqual(
+            [result.metadata["chunk_id"] for result in results], ["active"]
+        )
         self.assertIsNone(results[0].distance)
         self.assertGreaterEqual(results[0].lexical_score, 0)
         self.assertEqual(results[0].lexical_rank, 1)
@@ -151,8 +161,12 @@ class RetrieverTests(unittest.TestCase):
 
         lexical = BM25Retriever(
             [
-                Document(page_content="shared RRF exact", metadata={"chunk_id": "shared"}),
-                Document(page_content="lexical RRF exact", metadata={"chunk_id": "lexical"}),
+                Document(
+                    page_content="shared RRF exact", metadata={"chunk_id": "shared"}
+                ),
+                Document(
+                    page_content="lexical RRF exact", metadata={"chunk_id": "lexical"}
+                ),
             ]
         )
         hybrid = HybridRetriever(Dense(), lexical, rrf_k=60)
@@ -160,16 +174,16 @@ class RetrieverTests(unittest.TestCase):
         results = hybrid.retrieve_semantic("RRF exact", top_k=3)
 
         self.assertEqual(len({result.metadata["chunk_id"] for result in results}), 3)
-        shared = next(result for result in results if result.metadata["chunk_id"] == "shared")
+        shared = next(
+            result for result in results if result.metadata["chunk_id"] == "shared"
+        )
         self.assertEqual(shared.dense_rank, 2)
         self.assertEqual(shared.lexical_rank, 1)
         self.assertIsNotNone(shared.distance)
         self.assertIsNotNone(shared.lexical_score)
         self.assertAlmostEqual(shared.fusion_score, 1 / 62 + 1 / 61)
         lexical_only = next(
-            result
-            for result in results
-            if result.metadata["chunk_id"] == "lexical"
+            result for result in results if result.metadata["chunk_id"] == "lexical"
         )
         self.assertIsNone(lexical_only.distance)
 
@@ -191,7 +205,9 @@ class RetrieverTests(unittest.TestCase):
         lexical = BM25Retriever(
             [
                 Document(page_content="shared exact", metadata={"chunk_id": "shared"}),
-                Document(page_content="lexical exact", metadata={"chunk_id": "lexical"}),
+                Document(
+                    page_content="lexical exact", metadata={"chunk_id": "lexical"}
+                ),
             ]
         )
         hybrid = HybridRetriever(
@@ -206,7 +222,9 @@ class RetrieverTests(unittest.TestCase):
         results = hybrid.retrieve_hybrid("exact", top_k=2)
 
         self.assertEqual(dense.calls[0][1]["top_k"], 8)
-        shared = next(result for result in results if result.metadata["chunk_id"] == "shared")
+        shared = next(
+            result for result in results if result.metadata["chunk_id"] == "shared"
+        )
         self.assertAlmostEqual(shared.fusion_score, 2 / 11 + 3 / 11)
 
     def test_bm25_lexical_score_threshold_filters_low_score_hits(self):

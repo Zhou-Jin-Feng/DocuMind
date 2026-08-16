@@ -52,7 +52,9 @@ def _default_report_stem(
         if candidate_multiplier != 5:
             calibration.append(f"cand_{candidate_multiplier}")
     if lexical_score_threshold is not None:
-        label = format(lexical_score_threshold, "g").replace("-", "minus").replace(".", "_")
+        label = (
+            format(lexical_score_threshold, "g").replace("-", "minus").replace(".", "_")
+        )
         calibration.append(f"lex_{label}")
     if calibration:
         stem = f"{stem}_{'_'.join(calibration)}"
@@ -76,7 +78,9 @@ def _validate_calibration_args(
     for name in ("score_threshold", "lexical_score_threshold"):
         value = getattr(args, name)
         if value is not None and (not isfinite(value) or value < 0):
-            parser.error(f"--{name.replace('_', '-')} must be a non-negative finite number")
+            parser.error(
+                f"--{name.replace('_', '-')} must be a non-negative finite number"
+            )
     if args.retrieval_mode == "dense":
         if args.lexical_score_threshold is not None:
             parser.error("--lexical-score-threshold only applies to BM25 or Hybrid")
@@ -96,7 +100,9 @@ def _validate_calibration_args(
     for name in ("dense_weight", "lexical_weight"):
         value = getattr(args, name)
         if not isfinite(value) or value < 0:
-            parser.error(f"--{name.replace('_', '-')} must be a non-negative finite number")
+            parser.error(
+                f"--{name.replace('_', '-')} must be a non-negative finite number"
+            )
     if args.dense_weight == 0 and args.lexical_weight == 0:
         parser.error("--dense-weight and --lexical-weight cannot both be zero")
 
@@ -292,9 +298,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     expected_dataset_sha256=dataset_sha256,
                     expected_questions=[case.question for case in cases],
                 )
-                query_rewriter = artifact.to_rewriter(
-                    max_rewrites=args.max_rewrites
-                )
+                query_rewriter = artifact.to_rewriter(max_rewrites=args.max_rewrites)
                 rewrite_provider = artifact.provider
                 rewrite_model = artifact.model
                 rewrite_map_sha256 = file_sha256(args.rewrite_map)
@@ -364,9 +368,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "rewrite_provider": rewrite_provider,
                 "rewrite_model": rewrite_model,
                 "rewrite_map_path": (
-                    Path(args.rewrite_map).as_posix()
-                    if args.rewrite_map
-                    else None
+                    Path(args.rewrite_map).as_posix() if args.rewrite_map else None
                 ),
                 "rewrite_map_sha256": rewrite_map_sha256,
                 "rewrite_artifact_version": rewrite_artifact_version,
@@ -444,9 +446,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         enhancement_mode=args.enhancement_mode,
     )
     json_path = Path(args.output_json or output_dir / f"{report_stem}.json")
-    markdown_path = Path(
-        args.output_markdown or output_dir / f"{report_stem}.md"
-    )
+    markdown_path = Path(args.output_markdown or output_dir / f"{report_stem}.md")
     write_json_report(report, json_path)
     write_markdown_report(report, markdown_path)
     print(f"indexing_summary={summary}")

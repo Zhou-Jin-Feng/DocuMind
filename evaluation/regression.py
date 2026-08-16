@@ -214,10 +214,14 @@ class RegressionGate:
 
             if current_value is not None and not isfinite(current_value):
                 failures.append(
-                    RegressionFailure(name, baseline_value, current_value, "当前值不是有限数字")
+                    RegressionFailure(
+                        name, baseline_value, current_value, "当前值不是有限数字"
+                    )
                 )
                 continue
-            if minimum is not None and (current_value is None or current_value < minimum):
+            if minimum is not None and (
+                current_value is None or current_value < minimum
+            ):
                 failures.append(
                     RegressionFailure(
                         name,

@@ -12,7 +12,6 @@ from typing import Any
 from app.core.query_rewriter import MappingQueryRewriter, QueryRewriter
 from evaluation.models import GoldenCase
 
-
 ARTIFACT_VERSION = 1
 
 
@@ -74,9 +73,11 @@ class RewriteArtifact:
             "dataset_sha256",
             _validate_sha256(self.dataset_sha256, "dataset_sha256"),
         )
-        if not isinstance(self.max_rewrites, int) or isinstance(
-            self.max_rewrites, bool
-        ) or self.max_rewrites <= 0:
+        if (
+            not isinstance(self.max_rewrites, int)
+            or isinstance(self.max_rewrites, bool)
+            or self.max_rewrites <= 0
+        ):
             raise ValueError("RewriteArtifact.max_rewrites 必须是正整数")
         if (
             not isinstance(self.max_tokens, int)
@@ -102,7 +103,9 @@ class RewriteArtifact:
             normalized_question = " ".join(question.split())
             question_key = normalized_question.casefold()
             if question_key in seen_questions:
-                raise ValueError("RewriteArtifact questions must be unique after normalization")
+                raise ValueError(
+                    "RewriteArtifact questions must be unique after normalization"
+                )
             seen_questions.add(question_key)
             if not isinstance(rewrites, (list, tuple)):
                 raise TypeError("RewriteArtifact 改写必须是字符串数组")
@@ -114,7 +117,9 @@ class RewriteArtifact:
                 normalized_rewrite = " ".join(rewrite.split())
                 rewrite_key = normalized_rewrite.casefold()
                 if rewrite_key == question_key:
-                    raise ValueError("RewriteArtifact rewrites cannot repeat the original question")
+                    raise ValueError(
+                        "RewriteArtifact rewrites cannot repeat the original question"
+                    )
                 if rewrite_key in seen_rewrites:
                     raise ValueError("RewriteArtifact rewrites must be unique")
                 seen_rewrites.add(rewrite_key)
@@ -168,8 +173,7 @@ class RewriteArtifact:
             "prompt_sha256": self.prompt_sha256,
             "dataset_sha256": self.dataset_sha256,
             "rewrites": {
-                question: list(rewrites)
-                for question, rewrites in self.rewrites.items()
+                question: list(rewrites) for question, rewrites in self.rewrites.items()
             },
         }
 
@@ -227,9 +231,7 @@ def build_rewrite_artifact(
     expected_questions = {question for _, question in normalized_cases}
     unknown_questions = sorted(set(checkpoint.rewrites) - expected_questions)
     if unknown_questions:
-        raise ValueError(
-            f"Rewrite checkpoint 包含未知问题: {unknown_questions}"
-        )
+        raise ValueError(f"Rewrite checkpoint 包含未知问题: {unknown_questions}")
     rewrites = dict(checkpoint.rewrites)
     total = len(normalized_cases)
     for case, normalized_question in normalized_cases:
@@ -265,7 +267,9 @@ def load_rewrite_artifact(
     artifact = load_rewrite_artifact_file(path)
     if artifact.dataset_sha256 != expected_dataset_sha256:
         raise ValueError("Rewrite artifact 与评估数据集 SHA-256 不匹配")
-    normalized_expected = [" ".join(question.split()) for question in expected_questions]
+    normalized_expected = [
+        " ".join(question.split()) for question in expected_questions
+    ]
     normalized_expected_keys = [question.casefold() for question in normalized_expected]
     if len(normalized_expected_keys) != len(set(normalized_expected_keys)):
         raise ValueError("评估问题规范化后重复，无法加载 Rewrite artifact")

@@ -81,13 +81,13 @@ class SettingsTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Settings(_env_file=None, milvus_uri="   ")
 
-
     def test_empty_optional_value_in_env_template_is_ignored(self):
         with tempfile.TemporaryDirectory() as directory:
             env_path = Path(directory) / ".env"
             env_path.write_text("RETRIEVAL_SCORE_THRESHOLD=\n", encoding="utf-8")
             config = Settings(_env_file=env_path)
         self.assertIsNone(config.retrieval_score_threshold)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -67,7 +67,11 @@ class UniversalDocumentLoader:
         file_name = Path(file_path).name
         for document in documents:
             raw_page = document.metadata.get("page")
-            page_number = raw_page + 1 if file_ext == ".pdf" and isinstance(raw_page, int) else None
+            page_number = (
+                raw_page + 1
+                if file_ext == ".pdf" and isinstance(raw_page, int)
+                else None
+            )
 
             # 不将 Gradio 临时文件的绝对路径写入向量库。
             document.metadata["source"] = file_name
@@ -158,7 +162,8 @@ class UniversalDocumentLoader:
             raise NotADirectoryError(f"不是有效的目录: {dir_path}")
 
         supported_files = sorted(
-            path for path in directory.iterdir()
+            path
+            for path in directory.iterdir()
             if path.is_file() and path.suffix.lower() in self.LOADERS
         )
         if not supported_files:
@@ -186,7 +191,9 @@ class UniversalDocumentLoader:
             return
 
         total_chars = sum(len(document.page_content) for document in documents)
-        sources = sorted({document.metadata.get("source_file", "Unknown") for document in documents})
+        sources = sorted(
+            {document.metadata.get("source_file", "Unknown") for document in documents}
+        )
         self.logger.info(
             f"文档加载摘要: 片段={len(documents)}, 字符={total_chars}, "
             f"来源={len(sources)} ({', '.join(sources)})"
@@ -196,7 +203,10 @@ class UniversalDocumentLoader:
             preview = document.page_content[:200].replace("\n", " ")
             source = document.metadata.get("source_file", "Unknown")
             page = document.metadata.get("page_number", "N/A")
-            self.logger.info(f"片段 {index} (来源: {source}, 页码: {page}): {preview}...")
+            self.logger.info(
+                f"片段 {index} (来源: {source}, 页码: {page}): {preview}..."
+            )
+
 
 def demo_load_single_file():
     """
@@ -249,7 +259,7 @@ RAG（Retrieval-Augmented Generation）是检索增强生成技术。
     """.strip()
 
     test_file = "test_document.txt"
-    with open(test_file, 'w', encoding='utf-8') as f:
+    with open(test_file, "w", encoding="utf-8") as f:
         f.write(test_content)
 
     logger.info(f"\n已创建测试文件: {test_file}")

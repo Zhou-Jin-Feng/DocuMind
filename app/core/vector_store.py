@@ -105,7 +105,9 @@ class VectorStore:
             or document.metadata.get("source")
             or "unknown"
         )
-        page = document.metadata.get("page_number") or document.metadata.get("page") or ""
+        page = (
+            document.metadata.get("page_number") or document.metadata.get("page") or ""
+        )
         chunk_index = document.metadata.get("chunk_index", index)
         payload = f"{source}\0{page}\0{chunk_index}\0{document.page_content}".encode(
             "utf-8"
@@ -175,7 +177,9 @@ class VectorStore:
         self._embedding_dimension = dimension
         return dimension
 
-    def _validate_vector_dimension(self, vector: List[float], *, operation: str) -> None:
+    def _validate_vector_dimension(
+        self, vector: List[float], *, operation: str
+    ) -> None:
         """确保写入或查询向量与 Collection 的 Embedding 空间一致。"""
         expected = self._require_embedding_dimension()
         actual = len(vector)
@@ -201,7 +205,7 @@ class VectorStore:
         元数据过滤条件改变表达式结构。
         """
         expressions = [
-            f'{cls._RECORD_TYPE_FIELD} == {cls._literal(cls._CHUNK_RECORD_TYPE)}'
+            f"{cls._RECORD_TYPE_FIELD} == {cls._literal(cls._CHUNK_RECORD_TYPE)}"
         ]
         for key, value in (where or {}).items():
             normalized_key = str(key)
@@ -294,7 +298,7 @@ class VectorStore:
             return None
         rows = self.client.query(
             collection_name=self.collection_name,
-            filter=f'id == {self._literal(self._CONFIG_ID)}',
+            filter=f"id == {self._literal(self._CONFIG_ID)}",
             output_fields=[
                 "embedding_provider",
                 "embedding_model",
@@ -304,7 +308,9 @@ class VectorStore:
         )
         return dict(rows[0]) if rows else None
 
-    def _query_all(self, *, filter_expression: str, output_fields: List[str]) -> List[Dict]:
+    def _query_all(
+        self, *, filter_expression: str, output_fields: List[str]
+    ) -> List[Dict]:
         """
         查询全部匹配记录，并兼容没有 ``query_iterator`` 的旧客户端。
 
@@ -426,9 +432,7 @@ class VectorStore:
             raise ValueError("Duplicate chunk IDs exist in the same batch")
 
         rows: List[Dict] = []
-        for chunk_id, document, embedding in zip(
-            normalized_ids, documents, embeddings
-        ):
+        for chunk_id, document, embedding in zip(normalized_ids, documents, embeddings):
             self._validate_document(document.page_content)
             metadata = self._sanitize_metadata(document.metadata)
             rows.append(
@@ -493,7 +497,9 @@ class VectorStore:
             return {
                 "ids": [str(hit.get("id")) for hit in hits],
                 "documents": [str(entity.get("document") or "") for entity in entities],
-                "metadatas": [dict(entity.get("metadata") or {}) for entity in entities],
+                "metadatas": [
+                    dict(entity.get("metadata") or {}) for entity in entities
+                ],
                 "distances": [float(hit.get("distance")) for hit in hits],
             }
         except Exception:
@@ -502,9 +508,7 @@ class VectorStore:
 
     def delete_by_ids(self, ids: List[str]) -> None:
         """按主键分批删除 Chunk，避免构造过大的单次 RPC。"""
-        normalized = [
-            self._validate_id(value) for value in ids if str(value).strip()
-        ]
+        normalized = [self._validate_id(value) for value in ids if str(value).strip()]
         if not normalized or not self._collection_ready:
             return
         try:

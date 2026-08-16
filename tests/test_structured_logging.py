@@ -54,8 +54,13 @@ class StructuredLoggingTests(unittest.TestCase):
                 )
             reset_logger()
 
-            records = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
-            record = next(item for item in records if item["event"] == "retrieval_completed")
+            records = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
+            record = next(
+                item for item in records if item["event"] == "retrieval_completed"
+            )
             self.assertEqual(record["service"], "rag-test")
             self.assertEqual(record["environment"], "test")
             self.assertEqual(record["request_id"], "req-123")
@@ -82,9 +87,7 @@ class StructuredLoggingTests(unittest.TestCase):
             )
 
         records = [
-            json.loads(line)
-            for line in console.getvalue().splitlines()
-            if line.strip()
+            json.loads(line) for line in console.getvalue().splitlines() if line.strip()
         ]
         record = next(item for item in records if item["event"] == "response_sent")
         self.assertIn("failed <stream>", record["exception"])
@@ -121,7 +124,10 @@ class StructuredLoggingTests(unittest.TestCase):
             ["正在加载文档", "文档加载完成"],
         )
         self.assertTrue(
-            all(record.get("fields", {}).get("file_extension") == ".txt" for record in loader_records)
+            all(
+                record.get("fields", {}).get("file_extension") == ".txt"
+                for record in loader_records
+            )
         )
 
     def test_secrets_are_redacted_from_message_and_fields(self):

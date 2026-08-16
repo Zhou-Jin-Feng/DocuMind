@@ -162,8 +162,7 @@ class FakeMilvusClient:
             if len(query_vector) != len(row["vector"]):
                 raise ValueError("Vector dimension mismatch")
             distance = sum(
-                (left - right) ** 2
-                for left, right in zip(query_vector, row["vector"])
+                (left - right) ** 2 for left, right in zip(query_vector, row["vector"])
             )
             hits.append(
                 {
@@ -189,9 +188,7 @@ class FakeMilvusClient:
                 rows.pop(str(value), None)
             return
         for row_id in [
-            row_id
-            for row_id, row in rows.items()
-            if self._matches(row, filter or "")
+            row_id for row_id, row in rows.items() if self._matches(row, filter or "")
         ]:
             rows.pop(row_id, None)
 

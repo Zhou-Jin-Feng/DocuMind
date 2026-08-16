@@ -68,7 +68,11 @@ class WebAppTests(unittest.TestCase):
         sources = outputs[-1][2]
         self.assertEqual(
             retriever.calls[0],
-            ("什么是RAG？", settings.retrieval_top_k, settings.retrieval_score_threshold),
+            (
+                "什么是RAG？",
+                settings.retrieval_top_k,
+                settings.retrieval_score_threshold,
+            ),
         )
         self.assertEqual(generator.config.temperature, settings.llm_temperature)
         self.assertEqual(generator.config.max_tokens, settings.llm_max_tokens)
@@ -168,8 +172,6 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(args[0], "noop")
         self.assertEqual(kwargs["chunks_created"], 0)
         self.assertEqual(kwargs["chunks_indexed"], 0)
-
-
 
 
 if __name__ == "__main__":

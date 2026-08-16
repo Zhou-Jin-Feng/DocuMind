@@ -59,9 +59,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_tokens=args.max_tokens,
     )
     output_path = Path(args.output)
-    checkpoint_path = Path(
-        args.checkpoint or f"{output_path}.partial"
-    )
+    checkpoint_path = Path(args.checkpoint or f"{output_path}.partial")
     existing_rewrites = None
     if checkpoint_path.is_file():
         checkpoint = load_rewrite_artifact_file(checkpoint_path)
@@ -80,15 +78,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             if getattr(checkpoint, name) != expected
         ]
         if mismatches:
-            raise ValueError(
-                "Rewrite checkpoint 配置不匹配: " + ", ".join(mismatches)
-            )
+            raise ValueError("Rewrite checkpoint 配置不匹配: " + ", ".join(mismatches))
         expected_questions = {" ".join(case.question.split()) for case in cases}
         unknown_questions = sorted(set(checkpoint.rewrites) - expected_questions)
         if unknown_questions:
-            raise ValueError(
-                f"Rewrite checkpoint 包含未知问题: {unknown_questions}"
-            )
+            raise ValueError(f"Rewrite checkpoint 包含未知问题: {unknown_questions}")
         existing_rewrites = checkpoint.rewrites
         print(f"checkpoint_resumed={len(existing_rewrites)}/{len(cases)}", flush=True)
 

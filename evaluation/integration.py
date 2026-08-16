@@ -30,9 +30,12 @@ class DeterministicEmbeddingClient:
             raise ValueError("评估 Embedding 输入不能为空")
         vector = [0.0] * self.dimension
         for token in tokens:
-            bucket = int.from_bytes(
-                hashlib.sha256(token.encode("utf-8")).digest()[:4], "big"
-            ) % self.dimension
+            bucket = (
+                int.from_bytes(
+                    hashlib.sha256(token.encode("utf-8")).digest()[:4], "big"
+                )
+                % self.dimension
+            )
             vector[bucket] += 1.0
         return vector
 
@@ -62,8 +65,12 @@ class InMemoryVectorStore:
             raise ValueError("评估向量维度必须一致")
 
     @staticmethod
-    def _matches_where(metadata: Mapping[str, Any], where: Mapping[str, Any] | None) -> bool:
-        return not where or all(metadata.get(key) == value for key, value in where.items())
+    def _matches_where(
+        metadata: Mapping[str, Any], where: Mapping[str, Any] | None
+    ) -> bool:
+        return not where or all(
+            metadata.get(key) == value for key, value in where.items()
+        )
 
     def search(
         self,
@@ -94,7 +101,10 @@ class InMemoryVectorStore:
             "documents": [document.page_content for document, _ in ranked],
             "metadatas": [dict(document.metadata) for document, _ in ranked],
             "distances": [
-                sum((left - right) ** 2 for left, right in zip(query_embedding, embedding))
+                sum(
+                    (left - right) ** 2
+                    for left, right in zip(query_embedding, embedding)
+                )
                 for document, embedding in ranked
             ],
         }

@@ -10,7 +10,10 @@ from typing import List
 
 import tiktoken
 from langchain_core.documents import Document
-from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
+from langchain_text_splitters import (
+    CharacterTextSplitter,
+    RecursiveCharacterTextSplitter,
+)
 from rich.panel import Panel
 from rich.table import Table
 
@@ -67,8 +70,16 @@ class DocumentChunker:
         for document in documents:
             if document.metadata.get("document_id"):
                 continue
-            source = str(document.metadata.get("source_file") or document.metadata.get("source") or "unknown")
-            page = str(document.metadata.get("page_number") or document.metadata.get("page") or "")
+            source = str(
+                document.metadata.get("source_file")
+                or document.metadata.get("source")
+                or "unknown"
+            )
+            page = str(
+                document.metadata.get("page_number")
+                or document.metadata.get("page")
+                or ""
+            )
             payload = f"{source}\0{page}\0{document.page_content}".encode("utf-8")
             document.metadata["document_id"] = hashlib.sha256(payload).hexdigest()
 
@@ -101,7 +112,9 @@ class DocumentChunker:
             page_number = chunk.metadata.get("page_number", "")
             content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
             chunk_id = hashlib.sha256(
-                f"{index_identity}:{page_number}:{chunk_index}:{content_hash}".encode("utf-8")
+                f"{index_identity}:{page_number}:{chunk_index}:{content_hash}".encode(
+                    "utf-8"
+                )
             ).hexdigest()
 
             chunk.metadata["chunk_index"] = chunk_index
@@ -188,8 +201,7 @@ class DocumentChunker:
 
         if tokenizer:
             chunk_tokens = [
-                len(tokenizer.encode(chunk.page_content))
-                for chunk in chunks
+                len(tokenizer.encode(chunk.page_content)) for chunk in chunks
             ]
             avg_tokens = sum(chunk_tokens) / len(chunk_tokens)
             total_tokens = sum(chunk_tokens)
@@ -197,7 +209,9 @@ class DocumentChunker:
             avg_tokens = 0
             total_tokens = 0
 
-        table = Table(title="分块统计摘要", show_header=True, header_style="bold magenta")
+        table = Table(
+            title="分块统计摘要", show_header=True, header_style="bold magenta"
+        )
         table.add_column("指标", style="cyan", width=20)
         table.add_column("数值", style="green", width=30)
 
@@ -220,7 +234,7 @@ class DocumentChunker:
             "401-600": 0,
             "601-800": 0,
             "801-1000": 0,
-            "1000+": 0
+            "1000+": 0,
         }
 
         for length in chunk_lengths:
@@ -255,11 +269,11 @@ class DocumentChunker:
         logger.info(f"\n前 {num_preview} 个分块预览:\n")
 
         for i, chunk in enumerate(chunks[:num_preview], 1):
-            source = chunk.metadata.get('source_file', 'Unknown')
-            page = chunk.metadata.get('page', 'N/A')
+            source = chunk.metadata.get("source_file", "Unknown")
+            page = chunk.metadata.get("page", "N/A")
 
             content = chunk.page_content.strip()
-            preview = content[:150].replace('\n', ' ')
+            preview = content[:150].replace("\n", " ")
 
             if len(content) > 150:
                 preview += "..."
@@ -276,7 +290,7 @@ def demo_chunking():
     """
     from app.core.document_loader import UniversalDocumentLoader
 
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # 步骤1：创建测试文档
     logger.info("\n步骤1: 准备测试文档")
@@ -326,7 +340,7 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
 
     # 创建测试文件
     test_file = "test_chunking_document.txt"
-    with open(test_file, 'w', encoding='utf-8') as f:
+    with open(test_file, "w", encoding="utf-8") as f:
         f.write(test_content)
 
     logger.info(f"已创建测试文档: {test_file}")
@@ -338,9 +352,9 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
     documents = loader.load_document(test_file)
 
     # 步骤3：测试不同的分块策略
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("步骤3: 测试不同分块策略")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # 策略1：小块分割（chunk_size=300）
     logger.info("\n方案A: 小块分割 (size=300, overlap=50)")
@@ -350,7 +364,7 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
     DocumentChunker.preview_chunks(chunks_small, num_preview=3)
 
     # 策略2：推荐分割（chunk_size=600）
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("\n方案B: 推荐分割 (size=600, overlap=100)")
     chunker_recommended = DocumentChunker(chunk_size=600, chunk_overlap=100)
     chunks_recommended = chunker_recommended.chunk_documents_recursive(documents)
@@ -358,7 +372,7 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
     DocumentChunker.preview_chunks(chunks_recommended, num_preview=3)
 
     # 策略3：大块分割（chunk_size=1000）
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("\n方案C: 大块分割 (size=1000, overlap=150)")
     chunker_large = DocumentChunker(chunk_size=1000, chunk_overlap=150)
     chunks_large = chunker_large.chunk_documents_recursive(documents)
@@ -366,15 +380,17 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
     DocumentChunker.preview_chunks(chunks_large, num_preview=3)
 
     # 总结
-    logger.info("\n" + "="*60)
-    logger.info(Panel.fit(
-        "[bold cyan]分块策略对比总结[/bold cyan]\n\n"
-        f"小块分割: {len(chunks_small)} 个块 - 检索精度高，但上下文可能不足\n"
-        f"推荐分割: {len(chunks_recommended)} 个块 - 平衡精度和上下文 ✓\n"
-        f"大块分割: {len(chunks_large)} 个块 - 上下文充足，但可能包含无关信息\n\n"
-        "[bold green]对于中文文档，推荐使用 size=600-800, overlap=100[/bold green]",
-        border_style="cyan"
-    ))
+    logger.info("\n" + "=" * 60)
+    logger.info(
+        Panel.fit(
+            "[bold cyan]分块策略对比总结[/bold cyan]\n\n"
+            f"小块分割: {len(chunks_small)} 个块 - 检索精度高，但上下文可能不足\n"
+            f"推荐分割: {len(chunks_recommended)} 个块 - 平衡精度和上下文 ✓\n"
+            f"大块分割: {len(chunks_large)} 个块 - 上下文充足，但可能包含无关信息\n\n"
+            "[bold green]对于中文文档，推荐使用 size=600-800, overlap=100[/bold green]",
+            border_style="cyan",
+        )
+    )
 
 
 if __name__ == "__main__":

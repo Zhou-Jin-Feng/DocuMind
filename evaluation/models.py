@@ -40,7 +40,11 @@ class GoldenCase:
             raise ValueError("评估问题不能为空")
         if not isinstance(self.should_answer, bool):
             raise TypeError("should_answer 必须是布尔值")
-        if not isinstance(self.top_k, int) or isinstance(self.top_k, bool) or self.top_k <= 0:
+        if (
+            not isinstance(self.top_k, int)
+            or isinstance(self.top_k, bool)
+            or self.top_k <= 0
+        ):
             raise ValueError("top_k 必须是正整数")
         if not isinstance(self.category, str) or not self.category.strip():
             raise ValueError("评估用例 category 不能为空")
@@ -201,9 +205,7 @@ class CaseEvaluation:
             "retrieved_distances": list(self.retrieved_distances),
             "retrieved_lexical_scores": list(self.retrieved_lexical_scores),
             "retrieved_fusion_scores": list(self.retrieved_fusion_scores),
-            "retrieved_query_fusion_scores": list(
-                self.retrieved_query_fusion_scores
-            ),
+            "retrieved_query_fusion_scores": list(self.retrieved_query_fusion_scores),
             "retrieved_rerank_scores": list(self.retrieved_rerank_scores),
             "metrics": dict(self.metrics),
             "duration_ms": round(self.duration_ms, 3),
@@ -262,8 +264,7 @@ class EvaluationReport:
                 for category, metrics in self.category_metrics.items()
             },
             "split_metrics": {
-                split: dict(metrics)
-                for split, metrics in self.split_metrics.items()
+                split: dict(metrics) for split, metrics in self.split_metrics.items()
             },
             "cases": [result.to_dict() for result in self.case_results],
         }
@@ -279,11 +280,19 @@ class EvaluationReport:
             f"- Default Top-K: {self.top_k}",
         ]
         if self.metadata:
-            lines.extend(["", "## Run Configuration", "", "| Setting | Value |", "|---|---|"])
+            lines.extend(
+                ["", "## Run Configuration", "", "| Setting | Value |", "|---|---|"]
+            )
             for name, value in self.metadata.items():
-                formatted = json.dumps(value, ensure_ascii=False) if value is not None else "null"
+                formatted = (
+                    json.dumps(value, ensure_ascii=False)
+                    if value is not None
+                    else "null"
+                )
                 lines.append(f"| `{name}` | `{formatted}` |")
-        lines.extend(["", "## Aggregate Metrics", "", "| Metric | Value |", "|---|---:|"])
+        lines.extend(
+            ["", "## Aggregate Metrics", "", "| Metric | Value |", "|---|---:|"]
+        )
         for name, value in self.metrics.items():
             formatted = "N/A" if value is None else f"{value:.4f}"
             lines.append(f"| `{name}` | {formatted} |")
@@ -298,6 +307,7 @@ class EvaluationReport:
                 ]
             )
             for category, metrics in self.category_metrics.items():
+
                 def formatted(name: str) -> str:
                     value = metrics.get(name)
                     return "N/A" if value is None else f"{value:.4f}"
@@ -323,6 +333,7 @@ class EvaluationReport:
                 ]
             )
             for split, metrics in self.split_metrics.items():
+
                 def formatted(name: str) -> str:
                     value = metrics.get(name)
                     return "N/A" if value is None else f"{value:.4f}"

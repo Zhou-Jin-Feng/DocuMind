@@ -199,9 +199,7 @@ class VectorStoreTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "no embedding-space metadata"):
             self.store.ensure_embedding_space("fake", "model-a", 2)
-        self.assertTrue(
-            self.store.client.has_collection(self.store.collection_name)
-        )
+        self.assertTrue(self.store.client.has_collection(self.store.collection_name))
 
         self.store.client.insert(
             collection_name=self.store.collection_name,

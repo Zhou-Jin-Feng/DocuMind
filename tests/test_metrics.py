@@ -45,9 +45,7 @@ class MetricsTests(unittest.TestCase):
         metrics.record_no_context("OpenAI")
         metrics.record_component_error("vector.search", "RuntimeError")
         metrics.observe_embedding("OpenAI", "embedding.query", "success", 0.1)
-        metrics.observe_retrieval(
-            "OpenAI", "success", 0.2, result_count=3
-        )
+        metrics.observe_retrieval("OpenAI", "success", 0.2, result_count=3)
         metrics.observe_first_token("OpenAI", "success", 0.15)
         metrics.observe_llm_total("OpenAI", "success", 0.4)
 

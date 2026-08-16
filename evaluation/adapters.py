@@ -13,8 +13,7 @@ from evaluation.models import AnswerResult, RetrievedDocument
 class RetrievalAdapter(Protocol):
     """Protocol implemented by real and fake retrieval backends."""
 
-    def retrieve(self, question: str, top_k: int) -> Sequence[RetrievedDocument]:
-        ...
+    def retrieve(self, question: str, top_k: int) -> Sequence[RetrievedDocument]: ...
 
 
 class AnswerAdapter(Protocol):
@@ -24,8 +23,7 @@ class AnswerAdapter(Protocol):
         self,
         question: str,
         retrieved_documents: Sequence[RetrievedDocument],
-    ) -> AnswerResult:
-        ...
+    ) -> AnswerResult: ...
 
 
 class RetrieverAdapter:
@@ -58,7 +56,10 @@ class RetrieverAdapter:
 
     def retrieve(self, question: str, top_k: int) -> Sequence[RetrievedDocument]:
         retrieval_kwargs = {"top_k": top_k}
-        if self.score_threshold is not None and self.retrieval_method != "retrieve_lexical":
+        if (
+            self.score_threshold is not None
+            and self.retrieval_method != "retrieve_lexical"
+        ):
             retrieval_kwargs["score_threshold"] = self.score_threshold
         if self.lexical_score_threshold is not None and self.retrieval_method in {
             "retrieve_lexical",
@@ -167,7 +168,9 @@ class FakeAnswerAdapter:
     ):
         self._answers = {
             FakeRetrievalAdapter._normalize(question): (
-                value if isinstance(value, AnswerResult) else AnswerResult(answered=value)
+                value
+                if isinstance(value, AnswerResult)
+                else AnswerResult(answered=value)
             )
             for question, value in answers_by_question.items()
         }

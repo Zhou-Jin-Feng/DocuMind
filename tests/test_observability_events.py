@@ -130,9 +130,7 @@ class ObservabilityEventTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
 
         request_ids = {
-            record["request_id"]
-            for record in records
-            if record["event"] in expected
+            record["request_id"] for record in records if record["event"] in expected
         }
         self.assertEqual(len(request_ids), 1)
         self.assertNotIn(private_query, self.console.getvalue())
@@ -211,9 +209,7 @@ class ObservabilityEventTests(unittest.TestCase):
         self.assertNotIn("private provider failure", final_answer)
         records = self._records()
         completion = next(
-            record
-            for record in records
-            if record["event"] == "generation_completed"
+            record for record in records if record["event"] == "generation_completed"
         )
         response = next(
             record for record in records if record["event"] == "response_sent"
@@ -261,9 +257,7 @@ class ObservabilityEventTests(unittest.TestCase):
         positions = [events.index(event) for event in expected]
         self.assertEqual(positions, sorted(positions))
         request_ids = {
-            record["request_id"]
-            for record in records
-            if record["event"] in expected
+            record["request_id"] for record in records if record["event"] in expected
         }
         self.assertEqual(len(request_ids), 1)
         self.assertNotIn(file_name, self.console.getvalue())

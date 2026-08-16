@@ -103,8 +103,7 @@ class QueryRewriteResult:
 
 
 class QueryRewriter(Protocol):
-    def rewrite(self, query: str) -> QueryRewriteResult:
-        ...
+    def rewrite(self, query: str) -> QueryRewriteResult: ...
 
 
 class IdentityQueryRewriter:
@@ -222,7 +221,9 @@ class LLMQueryRewriter:
         if any(not isinstance(query, str) for query in queries):
             raise ValueError('Query Rewrite 的 "queries" 只能包含字符串')
         if not queries:
-            raise ValueError("Query Rewrite response cannot contain an empty queries array")
+            raise ValueError(
+                "Query Rewrite response cannot contain an empty queries array"
+            )
         normalized: list[str] = []
         seen: set[str] = set()
         for query in queries:
@@ -231,7 +232,9 @@ class LLMQueryRewriter:
                 raise ValueError("Query Rewrite response cannot contain an empty query")
             key = candidate.casefold()
             if key in seen:
-                raise ValueError("Query Rewrite response cannot contain duplicate queries")
+                raise ValueError(
+                    "Query Rewrite response cannot contain duplicate queries"
+                )
             seen.add(key)
             normalized.append(candidate)
         return tuple(normalized)
@@ -266,7 +269,9 @@ class LLMQueryRewriter:
             raise ValueError("Query Rewrite response cannot repeat the original query")
         for candidate in candidates:
             missing_terms = [
-                term for term in required_terms if term.casefold() not in candidate.casefold()
+                term
+                for term in required_terms
+                if term.casefold() not in candidate.casefold()
             ]
             if missing_terms:
                 raise ValueError(

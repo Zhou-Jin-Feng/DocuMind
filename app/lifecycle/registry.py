@@ -16,7 +16,6 @@ from app.lifecycle.models import (
     stable_hash,
 )
 
-
 SCHEMA_VERSION = 1
 
 
@@ -72,8 +71,7 @@ class DocumentRegistry:
                 raise RuntimeError(
                     f"Unsupported document registry schema: {current_version}"
                 )
-            connection.executescript(
-                """
+            connection.executescript("""
                 CREATE TABLE IF NOT EXISTS documents (
                     document_key TEXT PRIMARY KEY,
                     tenant_id TEXT NOT NULL,
@@ -131,8 +129,7 @@ class DocumentRegistry:
                     ON document_indexes(document_version_id);
                 CREATE INDEX IF NOT EXISTS idx_indexes_status
                     ON document_indexes(status);
-                """
-            )
+                """)
             connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     def claim_index(
@@ -535,8 +532,7 @@ class DocumentRegistry:
                 (document_key,),
             ).fetchall()
             if any(
-                index["status"] == LifecycleStatus.INDEXING.value
-                for index in indexes
+                index["status"] == LifecycleStatus.INDEXING.value for index in indexes
             ):
                 raise ValueError(
                     f"Document index operation is in progress: {document_key}"
@@ -605,9 +601,7 @@ class DocumentRegistry:
                 LifecycleStatus.DELETED.value,
             }
             if any(index["status"] not in allowed_statuses for index in indexes):
-                raise ValueError(
-                    f"Document deletion was not claimed: {document_key}"
-                )
+                raise ValueError(f"Document deletion was not claimed: {document_key}")
 
             source_rows = connection.execute(
                 """

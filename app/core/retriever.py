@@ -48,7 +48,9 @@ class RetrievalResult:
         """把来源和用户可读页码从统一元数据中提升为常用字段。"""
         self.metadata = self.metadata or {}
         self.source = str(
-            self.metadata.get("source_file") or self.metadata.get("source") or self.source
+            self.metadata.get("source_file")
+            or self.metadata.get("source")
+            or self.source
         )
         page = self.metadata.get("page_number")
         if isinstance(page, int) and page > 0:
@@ -121,21 +123,15 @@ class Retriever:
                     "embedding.query",
                     attributes={"provider": provider},
                 ):
-                    query_embedding = self.embedding_client.embed_text(
-                        normalized_query
-                    )
+                    query_embedding = self.embedding_client.embed_text(normalized_query)
             except Exception as exc:
                 embedding_duration = perf_counter() - embedding_started
                 retrieval_duration = perf_counter() - retrieval_started
                 metrics.observe_embedding(
                     provider, "embedding.query", "error", embedding_duration
                 )
-                metrics.observe_retrieval(
-                    provider, "error", retrieval_duration
-                )
-                metrics.record_component_error(
-                    "embedding.query", type(exc).__name__
-                )
+                metrics.observe_retrieval(provider, "error", retrieval_duration)
+                metrics.record_component_error("embedding.query", type(exc).__name__)
                 logger.exception(
                     "查询向量化失败",
                     event="query_embedding_failed",
@@ -204,18 +200,16 @@ class Retriever:
                     # 内存谓词无法下推，过取候选以降低过滤后不足 top_k 的概率。
                     search_results = self.vector_store.search(
                         query_embedding=query_embedding,
-                        n_results=(max(top_k * 5, top_k) if result_predicate else top_k),
+                        n_results=(
+                            max(top_k * 5, top_k) if result_predicate else top_k
+                        ),
                         where=metadata_filter,
                     )
             except Exception as exc:
                 search_duration = perf_counter() - search_started
                 retrieval_duration = perf_counter() - retrieval_started
-                metrics.observe_retrieval(
-                    provider, "error", retrieval_duration
-                )
-                metrics.record_component_error(
-                    "vector.search", type(exc).__name__
-                )
+                metrics.observe_retrieval(provider, "error", retrieval_duration)
+                metrics.record_component_error("vector.search", type(exc).__name__)
                 logger.exception(
                     "向量检索失败",
                     event="vector_search_failed",
@@ -244,7 +238,9 @@ class Retriever:
                 numeric_distance = float(distance)
                 if score_threshold is not None and numeric_distance > score_threshold:
                     continue
-                if result_predicate is not None and not result_predicate(metadata or {}):
+                if result_predicate is not None and not result_predicate(
+                    metadata or {}
+                ):
                     continue
                 results.append(
                     RetrievalResult(
@@ -295,7 +291,9 @@ class Retriever:
         terms = set(re.findall(r"[a-z0-9_]+", normalized))
         for sequence in re.findall(r"[\u4e00-\u9fff]+", normalized):
             terms.update(sequence)
-            terms.update(sequence[index : index + 2] for index in range(len(sequence) - 1))
+            terms.update(
+                sequence[index : index + 2] for index in range(len(sequence) - 1)
+            )
         return terms
 
     @staticmethod
@@ -314,7 +312,9 @@ class Retriever:
         for result in results:
             content_terms = Retriever._keyword_terms(result.content)
             keyword_overlap = (
-                len(query_terms & content_terms) / len(query_terms) if query_terms else 0.0
+                len(query_terms & content_terms) / len(query_terms)
+                if query_terms
+                else 0.0
             )
             distance_similarity = (
                 1 / (1 + max(result.distance, 0.0))
@@ -325,7 +325,9 @@ class Retriever:
 
         reranked = sorted(
             results,
-            key=lambda result: result.rerank_score if result.rerank_score is not None else -1.0,
+            key=lambda result: (
+                result.rerank_score if result.rerank_score is not None else -1.0
+            ),
             reverse=True,
         )[:top_k]
         for rank, result in enumerate(reranked, 1):
@@ -349,7 +351,9 @@ class Retriever:
         return "\n".join(context_parts)
 
     @staticmethod
-    def display_results(results: List[RetrievalResult], title: str = "检索结果") -> None:
+    def display_results(
+        results: List[RetrievalResult], title: str = "检索结果"
+    ) -> None:
         """以普通日志输出检索结果摘要。"""
         logger.info(f"{title}: {len(results)} 条")
         for result in results:
@@ -398,14 +402,11 @@ class BM25Retriever:
 
         for sequence in re.findall(r"[\u4e00-\u9fff]+", normalized):
             terms.extend(
-                token
-                for token in jieba.lcut(sequence, cut_all=False)
-                if token.strip()
+                token for token in jieba.lcut(sequence, cut_all=False) if token.strip()
             )
             terms.extend(sequence)
             terms.extend(
-                sequence[index : index + 2]
-                for index in range(len(sequence) - 1)
+                sequence[index : index + 2] for index in range(len(sequence) - 1)
             )
         return terms
 
@@ -484,9 +485,7 @@ class BM25Retriever:
         ranked = [
             (document_index, float(score))
             for document_index, score in zip(eligible_indexes, scores)
-            if query_term_set.intersection(
-                self._tokenized_documents[document_index]
-            )
+            if query_term_set.intersection(self._tokenized_documents[document_index])
             and (
                 lexical_score_threshold is None
                 or float(score) >= float(lexical_score_threshold)
@@ -526,9 +525,11 @@ class HybridRetriever:
     ):
         if not isinstance(rrf_k, int) or isinstance(rrf_k, bool) or rrf_k <= 0:
             raise ValueError("rrf_k 必须大于 0")
-        if not isinstance(candidate_multiplier, int) or isinstance(
-            candidate_multiplier, bool
-        ) or candidate_multiplier <= 0:
+        if (
+            not isinstance(candidate_multiplier, int)
+            or isinstance(candidate_multiplier, bool)
+            or candidate_multiplier <= 0
+        ):
             raise ValueError("candidate_multiplier 必须是大于 0 的整数")
         for name, weight in (
             ("dense_weight", dense_weight),
@@ -622,7 +623,9 @@ class HybridRetriever:
                 else:
                     existing.lexical_rank = rank
                     existing.lexical_score = result.lexical_score
-                    existing.fusion_score = (existing.fusion_score or 0.0) + contribution
+                    existing.fusion_score = (
+                        existing.fusion_score or 0.0
+                    ) + contribution
         results = sorted(
             merged.values(),
             key=lambda result: (
@@ -676,9 +679,11 @@ class MultiQueryRetriever:
             raise TypeError("query_rewriter 必须提供 rewrite 方法")
         if not isinstance(rrf_k, int) or isinstance(rrf_k, bool) or rrf_k <= 0:
             raise ValueError("rrf_k 必须是大于 0 的整数")
-        if not isinstance(candidate_multiplier, int) or isinstance(
-            candidate_multiplier, bool
-        ) or candidate_multiplier <= 0:
+        if (
+            not isinstance(candidate_multiplier, int)
+            or isinstance(candidate_multiplier, bool)
+            or candidate_multiplier <= 0
+        ):
             raise ValueError("candidate_multiplier 必须是大于 0 的整数")
         self.base_retriever = base_retriever
         self.query_rewriter = query_rewriter
@@ -797,15 +802,18 @@ class RerankingRetriever:
         retrieval_method: str = "retrieve_semantic",
         candidate_multiplier: int = 5,
     ):
-        if retrieval_method not in MultiQueryRetriever.SUPPORTED_METHODS or not callable(
-            getattr(base_retriever, retrieval_method, None)
+        if (
+            retrieval_method not in MultiQueryRetriever.SUPPORTED_METHODS
+            or not callable(getattr(base_retriever, retrieval_method, None))
         ):
             raise ValueError(f"retrieval_method 不可调用: {retrieval_method}")
         if not callable(getattr(reranker, "rerank", None)):
             raise TypeError("reranker 必须提供 rerank 方法")
-        if not isinstance(candidate_multiplier, int) or isinstance(
-            candidate_multiplier, bool
-        ) or candidate_multiplier <= 0:
+        if (
+            not isinstance(candidate_multiplier, int)
+            or isinstance(candidate_multiplier, bool)
+            or candidate_multiplier <= 0
+        ):
             raise ValueError("candidate_multiplier 必须是大于 0 的整数")
         self.base_retriever = base_retriever
         self.reranker = reranker
@@ -855,7 +863,7 @@ def demo_retrieval():
     """
     演示：完整的检索流程
     """
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # 导入依赖模块
     try:
@@ -925,7 +933,7 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     """.strip()
 
     kb_file = "knowledge_base.txt"
-    with open(kb_file, 'w', encoding='utf-8') as f:
+    with open(kb_file, "w", encoding="utf-8") as f:
         f.write(knowledge_content)
 
     logger.info(f"已创建知识库: {kb_file}")
@@ -946,7 +954,7 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     logger.info("\n步骤3: 向量化并存储到向量库")
 
     try:
-        provider = os.getenv('DEFAULT_EMBEDDING_PROVIDER', 'openai')
+        provider = os.getenv("DEFAULT_EMBEDDING_PROVIDER", "openai")
         embedding_client = UniversalEmbeddingClient(provider)
 
         texts = [chunk.page_content for chunk in chunks]
@@ -957,6 +965,7 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
         logger.info("使用模拟向量继续演示...")
 
         import random
+
         embeddings = [[random.random() for _ in range(1536)] for _ in chunks]
         embedding_client = None  # 标记为模拟模式
 
@@ -986,7 +995,7 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     retriever = Retriever(vector_store, embedding_client)
 
     # 步骤5：测试不同的查询
-    logger.info("\n" + "="*70)
+    logger.info("\n" + "=" * 70)
     logger.info("\n步骤5: 测试检索功能")
 
     test_queries = [
@@ -996,7 +1005,7 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     ]
 
     for i, query in enumerate(test_queries, 1):
-        logger.info("\n" + "="*70)
+        logger.info("\n" + "=" * 70)
         logger.info(f"\n查询 {i}: {query}")
 
         # 执行检索
@@ -1009,10 +1018,12 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
         if i == 1:  # 只在第一个查询展示上下文格式
             logger.info("\n格式化为LLM上下文:")
             llm_context = Retriever.format_results_for_llm(results[:2])
-            logger.info(Panel(llm_context, border_style="green", title="供LLM使用的上下文"))
+            logger.info(
+                Panel(llm_context, border_style="green", title="供LLM使用的上下文")
+            )
 
     # 步骤6：测试重排序
-    logger.info("\n" + "="*70)
+    logger.info("\n" + "=" * 70)
     logger.info("\n步骤6: 测试重排序功能")
 
     query = test_queries[0]
@@ -1027,8 +1038,8 @@ RAG的优势在于结合了知识检索和生成能力，可以提供有据可�
     Retriever.display_results(reranked_results, title="重排序后 (Top-3)")
 
     # 完成
-    logger.info("\n" + "="*70)
-    logger.info("="*60)
+    logger.info("\n" + "=" * 70)
+    logger.info("=" * 60)
     vector_store.close()
 
 

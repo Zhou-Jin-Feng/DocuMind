@@ -12,7 +12,6 @@ from evaluation.regression import (
     report_compatibility_issues,
 )
 
-
 ENHANCEMENT_MODES = ("baseline", "rewrite", "rerank", "rewrite-rerank")
 COMPARISON_METRICS = (
     "recall_at_k",
@@ -135,9 +134,7 @@ def build_evaluation_comparison(
         snapshot = snapshots[mode]
         actual_mode = snapshot.metadata.get("enhancement_mode")
         if actual_mode != mode:
-            issues.append(
-                f"{mode}: metadata.enhancement_mode 不一致: {actual_mode!r}"
-            )
+            issues.append(f"{mode}: metadata.enhancement_mode 不一致: {actual_mode!r}")
         if mode != "baseline":
             issues.extend(
                 f"{mode}: {issue}"

@@ -187,6 +187,8 @@ if __name__ == "__main__":
     print(f"Embedding Provider: {settings.default_embedding_provider}")
     print(f"LLM Provider: {settings.default_llm_provider}")
     print(f"Chunk: {settings.chunk_size} / overlap {settings.chunk_overlap}")
-    print(f"Retrieval: top_k={settings.retrieval_top_k}, threshold={settings.retrieval_score_threshold}")
+    print(
+        f"Retrieval: top_k={settings.retrieval_top_k}, threshold={settings.retrieval_score_threshold}"
+    )
     print(f"Server: {settings.server_host}:{settings.server_port}")
     print(f"Log Level: {settings.log_level}")

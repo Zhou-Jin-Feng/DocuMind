@@ -215,7 +215,9 @@ class APITests(unittest.TestCase):
             headers={"X-Request-ID": "test-request-1234"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["content-type"], "text/event-stream; charset=utf-8")
+        self.assertEqual(
+            response.headers["content-type"], "text/event-stream; charset=utf-8"
+        )
         self.assertIn("event: sources", response.text)
         self.assertIn('event: token\ndata: {"text":"回答"}', response.text)
         self.assertIn("event: done", response.text)
@@ -231,7 +233,9 @@ class APITests(unittest.TestCase):
     def test_upload_rejects_unsupported_extension(self):
         response = self.client.post(
             "/api/v1/documents",
-            files={"file": ("legacy.doc", io.BytesIO(b"content"), "application/msword")},
+            files={
+                "file": ("legacy.doc", io.BytesIO(b"content"), "application/msword")
+            },
         )
         self.assertEqual(response.status_code, 415)
         self.assertEqual(response.json()["error"]["code"], "unsupported_file_type")

@@ -80,9 +80,7 @@ class RAGApplication:
                     chunk_size=self.settings.chunk_size,
                     chunk_overlap=self.settings.chunk_overlap,
                 )
-                self.registry = DocumentRegistry(
-                    self.settings.document_registry_path
-                )
+                self.registry = DocumentRegistry(self.settings.document_registry_path)
                 self.lifecycle_service = DocumentLifecycleService(
                     loader=self.doc_loader,
                     chunker=self.chunker,
@@ -234,7 +232,11 @@ class RAGApplication:
                     error_type=type(exc).__name__,
                 )
         for name, value in components.items():
-            if value == "unavailable" and name not in failures and name != "application":
+            if (
+                value == "unavailable"
+                and name not in failures
+                and name != "application"
+            ):
                 failures.append(name)
         ready = self.initialized and all(
             value == "ready" for value in components.values()

@@ -194,9 +194,7 @@ def setup_logger(
 
         sink = console_sink if console_sink is not None else sys.stdout
         console_formatter = (
-            _text_formatter
-            if normalized_console_format == "text"
-            else _json_formatter
+            _text_formatter if normalized_console_format == "text" else _json_formatter
         )
         _HANDLER_IDS.append(
             logger.add(
@@ -214,9 +212,7 @@ def setup_logger(
             path = Path(log_file_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             file_formatter = (
-                _json_formatter
-                if normalized_file_format == "json"
-                else _text_formatter
+                _json_formatter if normalized_file_format == "json" else _text_formatter
             )
             _HANDLER_IDS.append(
                 logger.add(

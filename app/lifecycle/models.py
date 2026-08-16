@@ -13,6 +13,7 @@ from typing import Any, Mapping
 
 class LifecycleStatus(str, Enum):
     """索引从构建、激活到回收的持久化状态。"""
+
     PENDING = "pending"
     INDEXING = "indexing"
     ACTIVE = "active"
@@ -24,6 +25,7 @@ class LifecycleStatus(str, Enum):
 
 class OperationStatus(str, Enum):
     """一次摄取或重建操作的执行状态。"""
+
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -71,6 +73,7 @@ def build_index_id(document_version_id: str, index_fingerprint: str) -> str:
 @dataclass(frozen=True)
 class IndexManifest:
     """影响 Chunk 或向量结果的配置快照，也是索引指纹的输入。"""
+
     schema_version: int
     parser: str
     chunker: str
@@ -124,6 +127,7 @@ class IndexManifest:
 @dataclass(frozen=True)
 class IndexClaim:
     """注册表对索引请求的裁决：构建、无操作或已有操作进行中。"""
+
     action: str
     operation_id: str
     document_key: str
@@ -169,6 +173,7 @@ class DocumentDeletionResult:
 @dataclass(frozen=True)
 class IndexAuditReport:
     """SQLite 注册状态与 Milvus 实际库存之间的差异报告。"""
+
     active_index_ids: tuple[str, ...]
     stale_index_ids: tuple[str, ...]
     orphan_index_ids: tuple[str, ...]

@@ -88,7 +88,10 @@ class LifecycleCliTests(unittest.TestCase):
 
     def test_list_json(self):
         output = io.StringIO()
-        with patch("app.lifecycle.cli._build_service", return_value=FakeService()), redirect_stdout(output):
+        with (
+            patch("app.lifecycle.cli._build_service", return_value=FakeService()),
+            redirect_stdout(output),
+        ):
             status = main(["list", "--json"])
 
         self.assertEqual(status, 0)
@@ -98,8 +101,13 @@ class LifecycleCliTests(unittest.TestCase):
 
     def test_rebuild_dry_run_json(self):
         output = io.StringIO()
-        with patch("app.lifecycle.cli._build_service", return_value=FakeService()), redirect_stdout(output):
-            status = main(["rebuild", "--document-key", "document-1", "--dry-run", "--json"])
+        with (
+            patch("app.lifecycle.cli._build_service", return_value=FakeService()),
+            redirect_stdout(output),
+        ):
+            status = main(
+                ["rebuild", "--document-key", "document-1", "--dry-run", "--json"]
+            )
 
         self.assertEqual(status, 0)
         payload = json.loads(output.getvalue())

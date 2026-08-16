@@ -174,8 +174,7 @@ class DocumentService:
             if version_id not in version_ids:
                 version_ids.append(version_id)
         version_numbers = {
-            version_id: number
-            for number, version_id in enumerate(version_ids, start=1)
+            version_id: number for number, version_id in enumerate(version_ids, start=1)
         }
         active_index_id = (
             str(document["active_index_id"])
@@ -196,9 +195,7 @@ class DocumentService:
                 created_at=str(index["created_at"]),
                 updated_at=str(index["updated_at"]),
                 activated_at=(
-                    str(index["activated_at"])
-                    if index.get("activated_at")
-                    else None
+                    str(index["activated_at"]) if index.get("activated_at") else None
                 ),
                 is_active=str(index["index_id"]) == active_index_id,
             )
@@ -233,9 +230,7 @@ class DocumentService:
                 metrics.record_component_error(
                     "rag.document.reindex", type(exc).__name__
                 )
-                metrics.record_document_ingestion(
-                    "error", perf_counter() - started
-                )
+                metrics.record_document_ingestion("error", perf_counter() - started)
                 logger.exception(
                     "文档重新索引失败",
                     event="document_reindex_completed",
@@ -285,9 +280,7 @@ class DocumentService:
 
     @staticmethod
     def _index_error_type(index: dict[str, Any]) -> str | None:
-        error_type = index.get("error_type") or index.get(
-            "last_operation_error_type"
-        )
+        error_type = index.get("error_type") or index.get("last_operation_error_type")
         return str(error_type) if error_type else None
 
     @staticmethod
@@ -306,11 +299,7 @@ class DocumentService:
             else None
         )
         active_index = next(
-            (
-                index
-                for index in indexes
-                if str(index["index_id"]) == active_index_id
-            ),
+            (index for index in indexes if str(index["index_id"]) == active_index_id),
             None,
         )
         current_index = active_index or (indexes[-1] if indexes else None)
@@ -323,23 +312,17 @@ class DocumentService:
             ),
             None,
         )
-        version_count = len(
-            {str(index["document_version_id"]) for index in indexes}
-        )
+        version_count = len({str(index["document_version_id"]) for index in indexes})
         return DocumentRecord(
             document_key=str(document["document_key"]),
             display_name=str(document["display_name"]),
             status=str(current_index["status"] if current_index else "pending"),
             chunk_count=int(current_index["chunk_count"] if current_index else 0),
-            file_type=(
-                str(current_index["file_type"]) if current_index else None
-            ),
+            file_type=(str(current_index["file_type"]) if current_index else None),
             file_size_bytes=(
                 int(current_index["file_size_bytes"]) if current_index else None
             ),
-            active_index_id=(
-                str(active_index_id) if active_index_id else None
-            ),
+            active_index_id=(str(active_index_id) if active_index_id else None),
             active_version_id=(
                 str(active_index["document_version_id"])
                 if active_index is not None

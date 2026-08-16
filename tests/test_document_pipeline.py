@@ -12,7 +12,9 @@ class DocumentPipelineTests(unittest.TestCase):
     def test_txt_load_and_chunk_ids_are_stable(self):
         with tempfile.TemporaryDirectory() as directory:
             file_path = Path(directory) / "知识库.txt"
-            file_path.write_text("第一段介绍RAG系统。\n\n第二段介绍向量检索。" * 5, encoding="utf-8")
+            file_path.write_text(
+                "第一段介绍RAG系统。\n\n第二段介绍向量检索。" * 5, encoding="utf-8"
+            )
 
             loader = UniversalDocumentLoader()
             first_documents = loader.load_document(str(file_path))
@@ -22,7 +24,9 @@ class DocumentPipelineTests(unittest.TestCase):
                 second_documents[0].metadata["document_id"],
             )
             self.assertEqual(first_documents[0].metadata["source"], "知识库.txt")
-            self.assertNotIn(str(file_path.parent), first_documents[0].metadata["source"])
+            self.assertNotIn(
+                str(file_path.parent), first_documents[0].metadata["source"]
+            )
 
             chunker = DocumentChunker(chunk_size=40, chunk_overlap=5)
             first_chunks = chunker.chunk_documents_recursive(first_documents)

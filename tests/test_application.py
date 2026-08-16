@@ -79,9 +79,7 @@ class ApplicationTests(unittest.TestCase):
 
     def test_failed_initialization_clears_partial_components(self):
         vector_store = Mock()
-        application = RAGApplication(
-            Settings(_env_file=None, metrics_enabled=False)
-        )
+        application = RAGApplication(Settings(_env_file=None, metrics_enabled=False))
 
         with (
             patch(

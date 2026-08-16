@@ -8,10 +8,17 @@ from unittest.mock import patch
 
 from langchain_core.documents import Document
 
-from evaluation.adapters import FakeAnswerAdapter, FakeRetrievalAdapter, RetrieverAdapter
+from evaluation.adapters import (
+    FakeAnswerAdapter,
+    FakeRetrievalAdapter,
+    RetrieverAdapter,
+)
 from evaluation import EvaluationRunner as PublicEvaluationRunner
 from evaluation.comparison import build_evaluation_comparison
-from evaluation.integration import DeterministicEmbeddingClient, build_deterministic_retriever
+from evaluation.integration import (
+    DeterministicEmbeddingClient,
+    build_deterministic_retriever,
+)
 from evaluation.production import (
     build_indexed_retrieval_adapter,
     build_lexical_retrieval_adapter,
@@ -32,7 +39,12 @@ from evaluation.metrics import (
     recall_at_k,
     reciprocal_rank_at_k,
 )
-from evaluation.models import AnswerResult, EvaluationReport, GoldenCase, RetrievedDocument
+from evaluation.models import (
+    AnswerResult,
+    EvaluationReport,
+    GoldenCase,
+    RetrievedDocument,
+)
 from evaluation.regression import (
     EvaluationSnapshot,
     RegressionGate,
@@ -51,7 +63,9 @@ from evaluation.runner import EvaluationRunner, _percentile, load_golden_dataset
 
 class EvaluationTests(unittest.TestCase):
     @staticmethod
-    def _snapshot_payload(*, recall=1.0, dataset_sha="dataset", documents_sha="documents"):
+    def _snapshot_payload(
+        *, recall=1.0, dataset_sha="dataset", documents_sha="documents"
+    ):
         return {
             "dataset_name": "test-dataset",
             "top_k": 3,
@@ -226,9 +240,7 @@ class EvaluationTests(unittest.TestCase):
             GoldenCase("train", "q1", ("doc-a",), split="train"),
             GoldenCase("holdout", "q2", (), should_answer=False, split="holdout"),
         ]
-        retrieval = FakeRetrievalAdapter(
-            {"q1": [RetrievedDocument("doc-a")], "q2": []}
-        )
+        retrieval = FakeRetrievalAdapter({"q1": [RetrievedDocument("doc-a")], "q2": []})
         report = EvaluationRunner(retrieval).run(cases)
         self.assertEqual(report.split_metrics["train"]["recall_at_k"], 1.0)
         self.assertEqual(
@@ -322,9 +334,15 @@ class EvaluationTests(unittest.TestCase):
         )
 
     def test_threshold_report_stem_is_distinct_from_baseline(self):
-        self.assertEqual(_default_report_stem("ollama", None), "ollama_retrieval_baseline")
-        self.assertEqual(_default_report_stem("ollama", 1.0), "ollama_retrieval_threshold_1")
-        self.assertEqual(_default_report_stem("ollama", 0.75), "ollama_retrieval_threshold_0_75")
+        self.assertEqual(
+            _default_report_stem("ollama", None), "ollama_retrieval_baseline"
+        )
+        self.assertEqual(
+            _default_report_stem("ollama", 1.0), "ollama_retrieval_threshold_1"
+        )
+        self.assertEqual(
+            _default_report_stem("ollama", 0.75), "ollama_retrieval_threshold_0_75"
+        )
         self.assertEqual(
             _default_report_stem("ollama", None, "hybrid"),
             "ollama_hybrid_retrieval_baseline",
@@ -365,9 +383,7 @@ class EvaluationTests(unittest.TestCase):
         cases = [GoldenCase("one", "How does RRF work?", ("doc",))]
         artifact = build_rewrite_artifact(
             cases,
-            MappingQueryRewriter(
-                {"How does RRF work?": ["reciprocal rank fusion"]}
-            ),
+            MappingQueryRewriter({"How does RRF work?": ["reciprocal rank fusion"]}),
             provider="deepseek",
             model="deepseek-chat",
             max_rewrites=2,
@@ -494,7 +510,9 @@ class EvaluationTests(unittest.TestCase):
 
         documents = adapter.retrieve("RRF 排名融合", 3)
 
-        self.assertEqual([item.document_id for item in documents], ["retrieval-quality"])
+        self.assertEqual(
+            [item.document_id for item in documents], ["retrieval-quality"]
+        )
         self.assertIsNone(documents[0].distance)
         self.assertEqual(summary.embedding_provider, "none")
         adapter.close()
@@ -514,8 +532,7 @@ class EvaluationTests(unittest.TestCase):
                 )()
                 return (
                     []
-                    if score_threshold is not None
-                    and result.distance > score_threshold
+                    if score_threshold is not None and result.distance > score_threshold
                     else [result]
                 )
 
@@ -535,16 +552,19 @@ class EvaluationTests(unittest.TestCase):
             documents = [
                 Document(
                     page_content="RAG 使用向量数据库保存 Embedding，并通过检索增强生成。",
-                    metadata={"document_id": "knowledge-base", "source_file": "knowledge.txt"},
+                    metadata={
+                        "document_id": "knowledge-base",
+                        "source_file": "knowledge.txt",
+                    },
                 ),
                 Document(
                     page_content="天气预报用于查询温度、降雨和出行建议。",
                     metadata={"document_id": "weather", "source_file": "weather.txt"},
                 ),
             ]
-            chunks = DocumentChunker(chunk_size=200, chunk_overlap=0).chunk_documents_recursive(
-                documents
-            )
+            chunks = DocumentChunker(
+                chunk_size=200, chunk_overlap=0
+            ).chunk_documents_recursive(documents)
             embedder = DeterministicEmbeddingClient()
             store = VectorStore(
                 collection_name="evaluation_documents",
@@ -581,7 +601,7 @@ class EvaluationTests(unittest.TestCase):
             self.assertEqual(summary.chunk_size, 200)
             self.assertEqual(summary.chunk_overlap, 0)
         finally:
-            if 'adapter' in locals() and adapter is not None:
+            if "adapter" in locals() and adapter is not None:
                 adapter.close()
             store = None
             client_patcher.stop()
@@ -718,7 +738,6 @@ class EvaluationTests(unittest.TestCase):
         self.assertIn("p95_duration_ms", parsed["metrics"])
         self.assertIn("maximum_duration_ms", parsed["metrics"])
         self.assertIn("Run Configuration", report.to_markdown())
-
 
     def test_rewrite_artifact_rejects_normalized_duplicates(self):
         with self.assertRaises(ValueError):

@@ -1,6 +1,10 @@
 """Offline RAG evaluation primitives and regression tooling."""
 
-from evaluation.adapters import FakeAnswerAdapter, FakeRetrievalAdapter, RetrieverAdapter
+from evaluation.adapters import (
+    FakeAnswerAdapter,
+    FakeRetrievalAdapter,
+    RetrieverAdapter,
+)
 from evaluation.comparison import EvaluationComparison, build_evaluation_comparison
 from evaluation.models import (
     AnswerResult,

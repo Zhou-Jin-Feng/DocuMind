@@ -184,9 +184,9 @@ class RAGMetrics:
         if not self.enabled:
             return
         normalized_provider = _label(provider)
-        self.retrieval_duration.labels(
-            normalized_provider, _label(status)
-        ).observe(max(duration_seconds, 0.0))
+        self.retrieval_duration.labels(normalized_provider, _label(status)).observe(
+            max(duration_seconds, 0.0)
+        )
         if result_count is not None:
             self.retrieval_result_count.labels(normalized_provider).observe(
                 max(result_count, 0)
@@ -210,9 +210,9 @@ class RAGMetrics:
         duration_seconds: float,
     ) -> None:
         if self.enabled:
-            self.llm_total_duration.labels(
-                _label(provider), _label(status)
-            ).observe(max(duration_seconds, 0.0))
+            self.llm_total_duration.labels(_label(provider), _label(status)).observe(
+                max(duration_seconds, 0.0)
+            )
 
 
 _METRICS_LOCK = RLock()

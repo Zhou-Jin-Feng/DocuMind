@@ -28,7 +28,9 @@ from opentelemetry.trace import (
 
 from app.observability.context import trace_id_context
 
-SpanAttribute = str | bool | int | float | list[str] | list[bool] | list[int] | list[float]
+SpanAttribute = (
+    str | bool | int | float | list[str] | list[bool] | list[int] | list[float]
+)
 
 _SENSITIVE_ATTRIBUTE_NAMES = {
     "document",
@@ -134,9 +136,7 @@ class TracingManager:
         ) as span:
             span_context = span.get_span_context()
             trace_id = (
-                format(span_context.trace_id, "032x")
-                if span_context.is_valid
-                else None
+                format(span_context.trace_id, "032x") if span_context.is_valid else None
             )
             try:
                 if trace_id is None:

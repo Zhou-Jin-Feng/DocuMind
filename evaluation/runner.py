@@ -178,9 +178,9 @@ class EvaluationRunner:
             for name in metric_names
         }
         aggregate["case_count"] = float(len(results))
-        aggregate["successful_case_rate"] = (
-            sum(result.status == "success" for result in results) / len(results)
-        )
+        aggregate["successful_case_rate"] = sum(
+            result.status == "success" for result in results
+        ) / len(results)
         aggregate.update(_duration_statistics(results))
         return aggregate
 
@@ -203,10 +203,18 @@ class EvaluationRunner:
             retrieved = list(self.retrieval_adapter.retrieve(case.question, top_k))
             document_ids = [document.document_id for document in retrieved]
             metrics.update(
-                recall_at_k=recall_at_k(case.expected_document_ids, document_ids, top_k),
-                precision_at_k=precision_at_k(case.expected_document_ids, document_ids, top_k),
-                mrr_at_k=reciprocal_rank_at_k(case.expected_document_ids, document_ids, top_k),
-                top_k_hit_rate=hit_at_k(case.expected_document_ids, document_ids, top_k),
+                recall_at_k=recall_at_k(
+                    case.expected_document_ids, document_ids, top_k
+                ),
+                precision_at_k=precision_at_k(
+                    case.expected_document_ids, document_ids, top_k
+                ),
+                mrr_at_k=reciprocal_rank_at_k(
+                    case.expected_document_ids, document_ids, top_k
+                ),
+                top_k_hit_rate=hit_at_k(
+                    case.expected_document_ids, document_ids, top_k
+                ),
                 correct_document_avg_rank=first_relevant_rank(
                     case.expected_document_ids, document_ids, top_k
                 ),
@@ -217,7 +225,9 @@ class EvaluationRunner:
             if self.answer_adapter is not None:
                 answer = self.answer_adapter.answer(case.question, retrieved)
                 answered = answer.answered
-                metrics["refusal_accuracy"] = refusal_accuracy(case.should_answer, answered)
+                metrics["refusal_accuracy"] = refusal_accuracy(
+                    case.should_answer, answered
+                )
                 metrics["keyword_coverage"] = keyword_coverage(
                     case.expected_keywords, answer.text
                 )
@@ -231,7 +241,9 @@ class EvaluationRunner:
             case_id=case.id,
             question=case.question,
             top_k=top_k,
-            retrieved_document_ids=tuple(document.document_id for document in retrieved),
+            retrieved_document_ids=tuple(
+                document.document_id for document in retrieved
+            ),
             retrieved_distances=tuple(document.distance for document in retrieved),
             retrieved_lexical_scores=tuple(
                 document.lexical_score for document in retrieved
@@ -311,9 +323,13 @@ def _build_demo_runner(
         "dataset_sha256": file_sha256(dataset_path),
     }
     if documents:
-        metadata["documents_sha256"] = text_corpus_sha256(dataset_path.parent / "documents")
+        metadata["documents_sha256"] = text_corpus_sha256(
+            dataset_path.parent / "documents"
+        )
         if retrieval_mode == "dense":
-            retrieval_adapter = RetrieverAdapter(build_deterministic_retriever(documents))
+            retrieval_adapter = RetrieverAdapter(
+                build_deterministic_retriever(documents)
+            )
         elif retrieval_mode == "bm25":
             retrieval_adapter = RetrieverAdapter(
                 build_deterministic_bm25_retriever(documents),
@@ -356,7 +372,9 @@ def _build_demo_runner(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run an offline RAG golden evaluation dataset")
+    parser = argparse.ArgumentParser(
+        description="Run an offline RAG golden evaluation dataset"
+    )
     parser.add_argument(
         "--dataset",
         default="evaluation/datasets/golden_dataset.jsonl",

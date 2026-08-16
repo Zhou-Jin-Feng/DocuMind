@@ -13,7 +13,6 @@ from evaluation.regression import (
     report_compatibility_issues,
 )
 
-
 DEFAULT_ALLOWED_DROPS = {
     "recall_at_k": 0.02,
     "precision_at_k": 0.02,

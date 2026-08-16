@@ -75,14 +75,11 @@ class UniversalLLMClient:
             )
 
         self.model = model or self.MODELS[self.provider]["default_model"]
-        if (
-            request_timeout_seconds is not None
-            and (
-                isinstance(request_timeout_seconds, bool)
-                or not isinstance(request_timeout_seconds, (int, float))
-                or not isfinite(request_timeout_seconds)
-                or request_timeout_seconds <= 0
-            )
+        if request_timeout_seconds is not None and (
+            isinstance(request_timeout_seconds, bool)
+            or not isinstance(request_timeout_seconds, (int, float))
+            or not isfinite(request_timeout_seconds)
+            or request_timeout_seconds <= 0
         ):
             raise ValueError("request_timeout_seconds 必须是正有限数字")
         self.request_timeout_seconds = request_timeout_seconds
@@ -291,8 +288,7 @@ class RAGGenerator:
             if result.page_number:
                 source_info += f" 第{result.page_number}页"
             context_parts.append(
-                f"[文档{index}] 来源: {source_info}\n"
-                f"{result.content}\n"
+                f"[文档{index}] 来源: {source_info}\n" f"{result.content}\n"
             )
         return "\n".join(context_parts)
 
@@ -300,7 +296,9 @@ class RAGGenerator:
         normalized_query = (query or "").strip()
         if not normalized_query:
             raise ValueError("query 不能为空")
-        user_message = f"{context}\n\n用户问题：{normalized_query}\n\n请基于上述文档回答："
+        user_message = (
+            f"{context}\n\n用户问题：{normalized_query}\n\n请基于上述文档回答："
+        )
         return [
             {"role": "system", "content": self.SYSTEM_PROMPT},
             {"role": "user", "content": user_message},
@@ -334,11 +332,12 @@ class RAGGenerator:
         messages = self._build_prompt(query, context)
         yield from self.llm_client.generate_stream(messages, config)
 
+
 def demo_rag_generation():
     """
     演示：完整的RAG问答流程
     """
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # 导入依赖模块
     try:
@@ -385,7 +384,7 @@ def demo_rag_generation():
         return
 
     # 步骤4：测试问答
-    logger.info("\n" + "="*70)
+    logger.info("\n" + "=" * 70)
     logger.info("\n步骤4: 测试RAG问答")
 
     test_queries = [
@@ -394,7 +393,7 @@ def demo_rag_generation():
     ]
 
     for i, query in enumerate(test_queries, 1):
-        logger.info("\n" + "="*70)
+        logger.info("\n" + "=" * 70)
         logger.info(f"\n问题 {i}: {query}")
 
         # 执行检索
@@ -403,7 +402,7 @@ def demo_rag_generation():
 
         logger.info(f"检索到 {len(retrieval_results)} 个相关片段")
         for j, result in enumerate(retrieval_results, 1):
-            preview = result.content[:80].replace('\n', ' ')
+            preview = result.content[:80].replace("\n", " ")
             logger.info(f"  [{j}] {preview}...")
 
         # 生成答案
@@ -417,12 +416,12 @@ def demo_rag_generation():
             for chunk in rag_generator.generate_answer_stream(
                 query,
                 retrieval_results,
-                config=GenerationConfig(temperature=0.3, stream=True)
+                config=GenerationConfig(temperature=0.3, stream=True),
             ):
-                logger.info(chunk, end='')
+                logger.info(chunk, end="")
                 answer_parts.append(chunk)
 
-            full_answer = ''.join(answer_parts)
+            full_answer = "".join(answer_parts)
             logger.info("\n")
 
         else:
@@ -431,14 +430,14 @@ def demo_rag_generation():
                 query,
                 retrieval_results,
                 config=GenerationConfig(temperature=0.3, stream=False),
-                show_prompt=False
+                show_prompt=False,
             )
 
             logger.info("\n答案:")
             logger.info(Panel(answer, border_style="green"))
 
     # 步骤5：对比测试（有/无RAG）
-    logger.info("\n" + "="*70)
+    logger.info("\n" + "=" * 70)
     logger.info("\n步骤5: 对比测试（RAG vs 直接问）")
 
     comparison_query = "K-means聚类的具体步骤是什么？"
@@ -448,13 +447,10 @@ def demo_rag_generation():
     # 5.1 不使用RAG（直接问）
     logger.info("\n方式1: 不使用RAG（直接问LLM）")
 
-    direct_messages = [
-        {"role": "user", "content": comparison_query}
-    ]
+    direct_messages = [{"role": "user", "content": comparison_query}]
 
     direct_answer = llm_client.generate(
-        direct_messages,
-        config=GenerationConfig(temperature=0.3, stream=False)
+        direct_messages, config=GenerationConfig(temperature=0.3, stream=False)
     )
 
     logger.info("\n直接回答（可能不准确或编造）:")
@@ -468,15 +464,15 @@ def demo_rag_generation():
     rag_answer = rag_generator.generate_answer(
         comparison_query,
         retrieval_results,
-        config=GenerationConfig(temperature=0.3, stream=False)
+        config=GenerationConfig(temperature=0.3, stream=False),
     )
 
     logger.info("\nRAG回答（基于文档）:")
     logger.info(Panel(rag_answer, border_style="green", title="使用RAG"))
 
     # 完成
-    logger.info("\n" + "="*70)
-    logger.info("="*60)
+    logger.info("\n" + "=" * 70)
+    logger.info("=" * 60)
     vector_store.close()
 
 

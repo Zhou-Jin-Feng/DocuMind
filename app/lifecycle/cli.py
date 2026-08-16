@@ -94,18 +94,26 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    list_parser = subparsers.add_parser("list", help="List registered documents and indexes")
+    list_parser = subparsers.add_parser(
+        "list", help="List registered documents and indexes"
+    )
     list_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
-    audit_parser = subparsers.add_parser("audit", help="Audit registry and Milvus state")
+    audit_parser = subparsers.add_parser(
+        "audit", help="Audit registry and Milvus state"
+    )
     audit_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
-    cleanup_parser = subparsers.add_parser("cleanup", help="Delete stale or orphaned chunks")
+    cleanup_parser = subparsers.add_parser(
+        "cleanup", help="Delete stale or orphaned chunks"
+    )
     cleanup_parser.add_argument("--include-orphans", action="store_true")
     cleanup_parser.add_argument("--dry-run", action="store_true")
     cleanup_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
-    rebuild_parser = subparsers.add_parser("rebuild", help="Rebuild one or all active documents")
+    rebuild_parser = subparsers.add_parser(
+        "rebuild", help="Rebuild one or all active documents"
+    )
     target = rebuild_parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--document-key")
     target.add_argument("--all", action="store_true", dest="all_documents")
@@ -209,7 +217,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print(
                         f"{result['document_key']}: "
                         f"{result['status']}"
-                        + (f" ({result.get('error_type')})" if "error_type" in result else "")
+                        + (
+                            f" ({result.get('error_type')})"
+                            if "error_type" in result
+                            else ""
+                        )
                     )
             return 1 if failed else 0
     except Exception as exc:

@@ -182,9 +182,7 @@ class RAGWebApp:
         if file is None:
             return "⚠️ 请先上传文件"
 
-        with request_context(), trace_span(
-            "rag.document.ingest"
-        ) as root_span:
+        with request_context(), trace_span("rag.document.ingest") as root_span:
             metrics = get_metrics()
             total_started = perf_counter()
             active_operation = "rag.document.ingest"
@@ -278,10 +276,13 @@ class RAGWebApp:
             yield "", history, ""
             return
 
-        with request_context(), trace_span(
-            "rag.query",
-            attributes={"query.length": len(normalized_message)},
-        ) as root_span:
+        with (
+            request_context(),
+            trace_span(
+                "rag.query",
+                attributes={"query.length": len(normalized_message)},
+            ) as root_span,
+        ):
             metrics = get_metrics()
             total_started = perf_counter()
             llm_provider = getattr(self, "llm_provider", settings.default_llm_provider)
@@ -551,15 +552,13 @@ def create_web_interface():
     """
 
     with gr.Blocks(title="RAG知识库问答系统") as demo:
-        gr.Markdown(
-            """
+        gr.Markdown("""
             # 🤖 RAG知识库问答系统
 
             上传文档后，可以向 AI 提问文档相关问题。系统会检索相关内容并生成答案。
 
             **支持格式**: PDF、Word (.docx)、TXT
-            """
-        )
+            """)
 
         with gr.Row():
             with gr.Column(scale=2):
@@ -596,8 +595,7 @@ def create_web_interface():
                         value="上传文档并提问后，这里会显示答案的引用来源。"
                     )
 
-        gr.Markdown(
-            f"""
+        gr.Markdown(f"""
             ---
 
             💡 **使用提示**:
@@ -609,8 +607,7 @@ def create_web_interface():
             ⚙️ **当前配置**:
             - Embedding: {rag_app.embedding_provider}
             - LLM: {rag_app.llm_provider}
-            """
-        )
+            """)
 
         upload_btn.click(
             fn=rag_app.upload_and_index_document,

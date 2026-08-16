@@ -29,7 +29,6 @@ from app.lifecycle.registry import DocumentRegistry
 from app.observability.tracing import trace_span
 from app.utils.logger import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -136,7 +135,9 @@ class DocumentLifecycleService:
             chunker="RecursiveCharacterTextSplitter:v1",
             chunk_size=self.chunker.chunk_size,
             chunk_overlap=self.chunker.chunk_overlap,
-            embedding_provider=str(getattr(self.embedding_client, "provider", "unknown")),
+            embedding_provider=str(
+                getattr(self.embedding_client, "provider", "unknown")
+            ),
             embedding_model=model,
             embedding_dimension=dimension,
         )
@@ -297,7 +298,9 @@ class DocumentLifecycleService:
                 index_fingerprint=manifest.fingerprint,
             )
             active_operation = "document.chunk"
-            with trace_span("document.chunk", attributes={"document.count": len(documents)}):
+            with trace_span(
+                "document.chunk", attributes={"document.count": len(documents)}
+            ):
                 chunks = self.chunker.chunk_documents_recursive(documents)
             self._decorate_source_metadata(
                 chunks,
@@ -321,7 +324,10 @@ class DocumentLifecycleService:
             active_operation = "embedding.batch"
             with trace_span(
                 "embedding.batch",
-                attributes={"provider": manifest.embedding_provider, "chunk.count": len(chunks)},
+                attributes={
+                    "provider": manifest.embedding_provider,
+                    "chunk.count": len(chunks),
+                },
             ):
                 embeddings = self.embedding_client.embed_texts_batch(
                     texts,
@@ -464,12 +470,8 @@ class DocumentLifecycleService:
             "tenant_id": self.tenant_id,
             "collection_id": self.collection_id,
         }
-        managed_ids = set(
-            self.registry.all_index_ids(collection_id=self.collection_id)
-        )
-        active_ids = set(
-            self.registry.active_index_ids(**tenant_scope)
-        )
+        managed_ids = set(self.registry.all_index_ids(collection_id=self.collection_id))
+        active_ids = set(self.registry.active_index_ids(**tenant_scope))
         stale_registry_ids = set(
             self.registry.index_ids_by_status(
                 LifecycleStatus.SUPERSEDED,
@@ -589,9 +591,7 @@ class DocumentLifecycleService:
             current_manifest.fingerprint != planned_manifest.fingerprint
         )
         active_index = (
-            self.registry.get_index(str(active_index_id))
-            if active_index_id
-            else None
+            self.registry.get_index(str(active_index_id)) if active_index_id else None
         )
         return RebuildPlan(
             status="planned",
@@ -621,7 +621,9 @@ class DocumentLifecycleService:
             raise ValueError(f"Document has no active index: {document_key}")
         index = self.registry.get_index(str(active_index_id))
         if index is None:
-            raise ValueError(f"Active index is missing from registry: {active_index_id}")
+            raise ValueError(
+                f"Active index is missing from registry: {active_index_id}"
+            )
         return self._plan_index(
             document,
             index,
