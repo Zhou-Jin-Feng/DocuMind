@@ -52,7 +52,13 @@ const INITIAL_ASSISTANT_MESSAGE: ChatMessage = {
 };
 
 const QUERY_RETRY_COUNT = 2;
-const QUERY_REFRESH_INTERVAL = 30_000;
+const configuredRefreshInterval = Number(
+  import.meta.env.VITE_QUERY_REFRESH_INTERVAL_MS,
+);
+const QUERY_REFRESH_INTERVAL =
+  Number.isFinite(configuredRefreshInterval) && configuredRefreshInterval >= 250
+    ? configuredRefreshInterval
+    : 30_000;
 
 function formatBytes(value?: number | null): string {
   if (!value) return "--";
