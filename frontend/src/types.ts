@@ -32,6 +32,9 @@ export interface DocumentRecord {
   file_type?: string | null;
   file_size_bytes?: number | null;
   active_index_id?: string | null;
+  active_version_id?: string | null;
+  version_count: number;
+  error_type?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +42,26 @@ export interface DocumentRecord {
 export interface DocumentListResponse {
   items: DocumentRecord[];
   total: number;
+}
+
+export interface DocumentIndexRecord {
+  index_id: string;
+  document_version_id: string;
+  version_number: number;
+  status: string;
+  chunk_count: number;
+  error_type?: string | null;
+  file_type: string;
+  file_size_bytes: number;
+  source_sha256: string;
+  created_at: string;
+  updated_at: string;
+  activated_at?: string | null;
+  is_active: boolean;
+}
+
+export interface DocumentDetail extends DocumentRecord {
+  indexes: DocumentIndexRecord[];
 }
 
 export interface IngestionResponse {
@@ -51,6 +74,15 @@ export interface IngestionResponse {
   chunk_count: number;
   collection_count: number;
   previous_index_id?: string | null;
+  cleanup_pending: boolean;
+}
+
+export interface DocumentDeletionResponse {
+  status: string;
+  document_key: string;
+  deleted_index_count: number;
+  deleted_chunk_count: number;
+  collection_count: number;
   cleanup_pending: boolean;
 }
 

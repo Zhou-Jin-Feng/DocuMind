@@ -39,6 +39,9 @@ class DocumentResponse(BaseModel):
     file_type: str | None = None
     file_size_bytes: int | None = None
     active_index_id: str | None = None
+    active_version_id: str | None = None
+    version_count: int
+    error_type: str | None = None
     created_at: str
     updated_at: str
 
@@ -46,6 +49,26 @@ class DocumentResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     items: list[DocumentResponse]
     total: int
+
+
+class DocumentIndexResponse(BaseModel):
+    index_id: str
+    document_version_id: str
+    version_number: int
+    status: str
+    chunk_count: int
+    error_type: str | None = None
+    file_type: str
+    file_size_bytes: int
+    source_sha256: str
+    created_at: str
+    updated_at: str
+    activated_at: str | None = None
+    is_active: bool
+
+
+class DocumentDetailResponse(DocumentResponse):
+    indexes: list[DocumentIndexResponse]
 
 
 class IngestionResponse(BaseModel):
@@ -58,6 +81,15 @@ class IngestionResponse(BaseModel):
     chunk_count: int
     collection_count: int
     previous_index_id: str | None = None
+    cleanup_pending: bool = False
+
+
+class DocumentDeletionResponse(BaseModel):
+    status: str
+    document_key: str
+    deleted_index_count: int
+    deleted_chunk_count: int
+    collection_count: int
     cleanup_pending: bool = False
 
 

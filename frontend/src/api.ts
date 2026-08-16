@@ -1,5 +1,7 @@
 import type {
   ChatEvent,
+  DocumentDeletionResponse,
+  DocumentDetail,
   DocumentListResponse,
   ErrorResponse,
   HealthResponse,
@@ -70,6 +72,12 @@ export function getDocuments(): Promise<DocumentListResponse> {
   return getJSON<DocumentListResponse>("/api/v1/documents");
 }
 
+export function getDocument(documentKey: string): Promise<DocumentDetail> {
+  return getJSON<DocumentDetail>(
+    `/api/v1/documents/${encodeURIComponent(documentKey)}`,
+  );
+}
+
 export async function uploadDocument(file: File): Promise<IngestionResponse> {
   const formData = new FormData();
   formData.append("file", file);
@@ -81,6 +89,32 @@ export async function uploadDocument(file: File): Promise<IngestionResponse> {
     throw await parseError(response);
   }
   return (await response.json()) as IngestionResponse;
+}
+
+export async function reindexDocument(
+  documentKey: string,
+): Promise<IngestionResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/documents/${encodeURIComponent(documentKey)}/reindex`,
+    { method: "POST", headers: { Accept: "application/json" } },
+  );
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  return (await response.json()) as IngestionResponse;
+}
+
+export async function deleteDocument(
+  documentKey: string,
+): Promise<DocumentDeletionResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/documents/${encodeURIComponent(documentKey)}`,
+    { method: "DELETE", headers: { Accept: "application/json" } },
+  );
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  return (await response.json()) as DocumentDeletionResponse;
 }
 
 interface StreamCallbacks {

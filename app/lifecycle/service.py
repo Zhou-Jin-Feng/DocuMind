@@ -15,6 +15,7 @@ from langchain_core.documents import Document
 from app.core.document_chunker import DocumentChunker
 from app.core.document_loader import UniversalDocumentLoader
 from app.lifecycle.models import (
+    DocumentDeletionResult,
     IndexAuditReport,
     IndexManifest,
     IngestionResult,
@@ -478,12 +479,15 @@ class DocumentLifecycleService:
             mismatched_active_index_ids=tuple(sorted(mismatched_active_ids)),
         )
 
-    def _source_path_for_index(self, index: dict) -> Path:
+    def _registered_source_path(self, relative_path: str) -> Path:
         source_root = Path(self.upload_dir).resolve()
-        source = (source_root / str(index["source_path"])).resolve()
+        source = (source_root / relative_path).resolve()
         if source != source_root and source_root not in source.parents:
             raise ValueError("Registered source path escapes the upload directory")
         return source
+
+    def _source_path_for_index(self, index: dict) -> Path:
+        return self._registered_source_path(str(index["source_path"]))
 
     def _scoped_document(self, document_key: str) -> dict:
         document = self.registry.get_document(document_key)
@@ -639,6 +643,48 @@ class DocumentLifecycleService:
             display_name=plan.display_name,
             operation_type="rebuild",
             force=True,
+        )
+
+    def delete_document(self, document_key: str) -> DocumentDeletionResult:
+        self._scoped_document(document_key)
+        index_ids = self.registry.claim_document_deletion(
+            document_key,
+            tenant_id=self.tenant_id,
+            collection_id=self.collection_id,
+        )
+        deleted_chunk_count = 0
+        with trace_span("rag.document.delete"):
+            for index_id in index_ids:
+                deleted_chunk_count += self.vector_store.count_by_index_id(index_id)
+                self.vector_store.delete_by_index_id(index_id)
+
+            unreferenced_paths = self.registry.finalize_document_deletion(
+                document_key,
+                tenant_id=self.tenant_id,
+                collection_id=self.collection_id,
+            )
+
+        cleanup_pending = False
+        for relative_path in unreferenced_paths:
+            try:
+                self._registered_source_path(relative_path).unlink(missing_ok=True)
+            except OSError:
+                cleanup_pending = True
+                logger.warning(
+                    "文档源文件清理失败",
+                    event="document_source_cleanup_failed",
+                    operation="rag.document.delete",
+                    status="warning",
+                    error_type="OSError",
+                )
+
+        return DocumentDeletionResult(
+            status="deleted",
+            document_key=document_key,
+            deleted_index_count=len(index_ids),
+            deleted_chunk_count=deleted_chunk_count,
+            collection_count=self.vector_store.count(),
+            cleanup_pending=cleanup_pending,
         )
 
     def cleanup(

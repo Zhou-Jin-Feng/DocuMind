@@ -150,6 +150,35 @@ class DocumentRegistry:
         now = _utc_now()
         operation_id = stable_hash(operation_type, index_id)
         with self._transaction() as connection:
+            existing_document = connection.execute(
+                "SELECT active_index_id FROM documents WHERE document_key=?",
+                (document_key,),
+            ).fetchone()
+            if (
+                existing_document is not None
+                and existing_document["active_index_id"] is None
+            ):
+                deleting = connection.execute(
+                    """
+                    SELECT 1
+                    FROM document_indexes i
+                    JOIN document_versions v
+                      ON v.document_version_id=i.document_version_id
+                    WHERE v.document_key=? AND i.status=?
+                    LIMIT 1
+                    """,
+                    (document_key, LifecycleStatus.DELETING.value),
+                ).fetchone()
+                if deleting is not None:
+                    return IndexClaim(
+                        action="in_progress",
+                        operation_id=operation_id,
+                        document_key=document_key,
+                        document_version_id=document_version_id,
+                        index_id=index_id,
+                        previous_index_id=None,
+                    )
+
             connection.execute(
                 """
                 INSERT INTO documents(
@@ -455,6 +484,167 @@ class DocumentRegistry:
                 ),
             )
 
+    def claim_document_deletion(
+        self,
+        document_key: str,
+        *,
+        tenant_id: str,
+        collection_id: str,
+    ) -> tuple[str, ...]:
+        """Hide a document from retrieval and claim all of its indexes for deletion."""
+        now = _utc_now()
+        with self._transaction() as connection:
+            document = connection.execute(
+                """
+                SELECT document_key
+                FROM documents
+                WHERE document_key=? AND tenant_id=? AND collection_id=?
+                """,
+                (document_key, tenant_id, collection_id),
+            ).fetchone()
+            if document is None:
+                raise KeyError(f"Unknown document in the current scope: {document_key}")
+
+            indexes = connection.execute(
+                """
+                SELECT i.index_id, i.status
+                FROM document_indexes i
+                JOIN document_versions v
+                  ON v.document_version_id=i.document_version_id
+                WHERE v.document_key=?
+                ORDER BY i.created_at, i.index_id
+                """,
+                (document_key,),
+            ).fetchall()
+            if any(
+                index["status"] == LifecycleStatus.INDEXING.value
+                for index in indexes
+            ):
+                raise ValueError(
+                    f"Document index operation is in progress: {document_key}"
+                )
+
+            connection.execute(
+                """
+                UPDATE documents
+                SET active_index_id=NULL, updated_at=?
+                WHERE document_key=?
+                """,
+                (now, document_key),
+            )
+            connection.execute(
+                """
+                UPDATE document_indexes
+                SET status=?, error_type=NULL, updated_at=?
+                WHERE document_version_id IN (
+                    SELECT document_version_id
+                    FROM document_versions
+                    WHERE document_key=?
+                ) AND status<>?
+                """,
+                (
+                    LifecycleStatus.DELETING.value,
+                    now,
+                    document_key,
+                    LifecycleStatus.DELETED.value,
+                ),
+            )
+            index_ids = tuple(str(index["index_id"]) for index in indexes)
+            return index_ids
+
+    def finalize_document_deletion(
+        self,
+        document_key: str,
+        *,
+        tenant_id: str,
+        collection_id: str,
+    ) -> tuple[str, ...]:
+        """Remove registry history after vector deletion has completed."""
+        with self._transaction() as connection:
+            document = connection.execute(
+                """
+                SELECT document_key
+                FROM documents
+                WHERE document_key=? AND tenant_id=? AND collection_id=?
+                """,
+                (document_key, tenant_id, collection_id),
+            ).fetchone()
+            if document is None:
+                raise KeyError(f"Unknown document in the current scope: {document_key}")
+
+            indexes = connection.execute(
+                """
+                SELECT i.status
+                FROM document_indexes i
+                JOIN document_versions v
+                  ON v.document_version_id=i.document_version_id
+                WHERE v.document_key=?
+                """,
+                (document_key,),
+            ).fetchall()
+            allowed_statuses = {
+                LifecycleStatus.DELETING.value,
+                LifecycleStatus.DELETED.value,
+            }
+            if any(index["status"] not in allowed_statuses for index in indexes):
+                raise ValueError(
+                    f"Document deletion was not claimed: {document_key}"
+                )
+
+            source_rows = connection.execute(
+                """
+                SELECT DISTINCT source_path
+                FROM document_versions
+                WHERE document_key=?
+                """,
+                (document_key,),
+            ).fetchall()
+            source_paths = tuple(str(row["source_path"]) for row in source_rows)
+            connection.execute(
+                """
+                DELETE FROM index_operations
+                WHERE index_id IN (
+                    SELECT i.index_id
+                    FROM document_indexes i
+                    JOIN document_versions v
+                      ON v.document_version_id=i.document_version_id
+                    WHERE v.document_key=?
+                )
+                """,
+                (document_key,),
+            )
+            connection.execute(
+                """
+                DELETE FROM document_indexes
+                WHERE document_version_id IN (
+                    SELECT document_version_id
+                    FROM document_versions
+                    WHERE document_key=?
+                )
+                """,
+                (document_key,),
+            )
+            connection.execute(
+                "DELETE FROM document_versions WHERE document_key=?",
+                (document_key,),
+            )
+            deleted = connection.execute(
+                "DELETE FROM documents WHERE document_key=?",
+                (document_key,),
+            )
+            if deleted.rowcount != 1:
+                raise RuntimeError(f"Failed to delete document: {document_key}")
+
+            unreferenced_paths = []
+            for source_path in source_paths:
+                reference = connection.execute(
+                    "SELECT 1 FROM document_versions WHERE source_path=? LIMIT 1",
+                    (source_path,),
+                ).fetchone()
+                if reference is None:
+                    unreferenced_paths.append(source_path)
+            return tuple(sorted(unreferenced_paths))
+
     def mark_index_deleting(self, index_id: str) -> None:
         """Claim a non-active index for recoverable vector deletion."""
         with self._transaction() as connection:
@@ -720,7 +910,10 @@ class DocumentRegistry:
         query = (
             "SELECT i.*, v.document_key, v.source_sha256, v.source_path, "
             "v.file_type, v.file_size_bytes, d.display_name, "
-            "d.tenant_id, d.collection_id, d.active_index_id "
+            "d.tenant_id, d.collection_id, d.active_index_id, "
+            "(SELECT o.error_type FROM index_operations o "
+            " WHERE o.index_id=i.index_id AND o.status=? "
+            " ORDER BY o.updated_at DESC LIMIT 1) AS last_operation_error_type "
             "FROM document_indexes i "
             "JOIN document_versions v ON v.document_version_id=i.document_version_id "
             "JOIN documents d ON d.document_key=v.document_key"
@@ -728,5 +921,8 @@ class DocumentRegistry:
             + " ORDER BY d.display_name, i.created_at, i.index_id"
         )
         with self._connection() as connection:
-            rows = connection.execute(query, parameters).fetchall()
+            rows = connection.execute(
+                query,
+                [OperationStatus.FAILED.value, *parameters],
+            ).fetchall()
         return tuple(dict(row) for row in rows)

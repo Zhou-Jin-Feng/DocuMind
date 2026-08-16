@@ -9,6 +9,8 @@ function initialState() {
     streamMode: "complete",
     documents: [],
     uploadCount: 0,
+    reindexCount: 0,
+    deleteCount: 0,
     streamRequests: 0,
     abortedStreams: 0,
   };
@@ -19,7 +21,7 @@ let state = initialState();
 function corsHeaders(contentType = "application/json; charset=utf-8") {
   return {
     "Access-Control-Allow-Headers": "Content-Type, X-Request-ID",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Origin": "*",
     "Content-Type": contentType,
   };
@@ -50,6 +52,29 @@ function readyComponents() {
     embedding: "ready",
     llm: "ready",
     registry: "ready",
+  };
+}
+
+function documentDetail(document) {
+  return {
+    ...document,
+    indexes: [
+      {
+        index_id: document.active_index_id,
+        document_version_id: document.active_version_id,
+        version_number: 1,
+        status: "active",
+        chunk_count: document.chunk_count,
+        error_type: null,
+        file_type: document.file_type,
+        file_size_bytes: document.file_size_bytes,
+        source_sha256: "sha256-guide",
+        created_at: document.created_at,
+        updated_at: document.updated_at,
+        activated_at: document.updated_at,
+        is_active: true,
+      },
+    ],
   };
 }
 
@@ -184,6 +209,9 @@ const server = http.createServer(async (request, response) => {
         file_type: ".txt",
         file_size_bytes: 42,
         active_index_id: "index-guide",
+        active_version_id: "version-guide",
+        version_count: 1,
+        error_type: null,
         created_at: timestamp,
         updated_at: timestamp,
       },
@@ -197,6 +225,80 @@ const server = http.createServer(async (request, response) => {
       index_id: "index-guide",
       chunk_count: 3,
       collection_count: 3,
+      cleanup_pending: false,
+    });
+    return;
+  }
+  const reindexMatch = url.pathname.match(
+    /^\/api\/v1\/documents\/([^/]+)\/reindex$/,
+  );
+  if (reindexMatch && request.method === "POST") {
+    const documentKey = decodeURIComponent(reindexMatch[1]);
+    const document = state.documents.find(
+      (item) => item.document_key === documentKey,
+    );
+    if (!document) {
+      sendJson(response, 404, {
+        error: { code: "document_not_found", message: "未找到该文档。" },
+      });
+      return;
+    }
+    const updatedAt = new Date().toISOString();
+    state.reindexCount += 1;
+    state.documents = state.documents.map((item) =>
+      item.document_key === documentKey
+        ? { ...item, updated_at: updatedAt }
+        : item,
+    );
+    sendJson(response, 200, {
+      status: "indexed",
+      operation_id: "operation-reindex-guide",
+      document_key: documentKey,
+      document_version_id: "version-guide",
+      source_sha256: "sha256-guide",
+      index_id: "index-guide",
+      chunk_count: 3,
+      collection_count: 3,
+      cleanup_pending: false,
+    });
+    return;
+  }
+  const documentMatch = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)$/);
+  if (documentMatch && request.method === "GET") {
+    const documentKey = decodeURIComponent(documentMatch[1]);
+    const document = state.documents.find(
+      (item) => item.document_key === documentKey,
+    );
+    if (!document) {
+      sendJson(response, 404, {
+        error: { code: "document_not_found", message: "未找到该文档。" },
+      });
+      return;
+    }
+    sendJson(response, 200, documentDetail(document));
+    return;
+  }
+  if (documentMatch && request.method === "DELETE") {
+    const documentKey = decodeURIComponent(documentMatch[1]);
+    const exists = state.documents.some(
+      (item) => item.document_key === documentKey,
+    );
+    if (!exists) {
+      sendJson(response, 404, {
+        error: { code: "document_not_found", message: "未找到该文档。" },
+      });
+      return;
+    }
+    state.deleteCount += 1;
+    state.documents = state.documents.filter(
+      (item) => item.document_key !== documentKey,
+    );
+    sendJson(response, 200, {
+      status: "deleted",
+      document_key: documentKey,
+      deleted_index_count: 1,
+      deleted_chunk_count: 3,
+      collection_count: 0,
       cleanup_pending: false,
     });
     return;

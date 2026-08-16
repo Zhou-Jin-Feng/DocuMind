@@ -48,6 +48,48 @@ test("上传文档后展示索引结果", async ({ page }) => {
   await expect(page.getByText("1 个文档", { exact: true })).toBeVisible();
 });
 
+test("查看详情、重新索引并删除文档", async ({ page, request }) => {
+  await page.goto("/");
+  await expect(page.getByText("服务就绪", { exact: true })).toBeVisible();
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "guide.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("RAG 文档管理测试。", "utf-8"),
+  });
+  await page.getByRole("button", { name: "查看文档 guide.txt" }).click();
+
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "guide.txt" })).toBeVisible();
+  await expect(page.getByText("1 个版本", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "索引历史" })).toBeVisible();
+  await expect(page.getByText("版本 1", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "重新建立索引" }).click();
+  await expect(
+    page.getByText("索引重建完成，共生成 3 个 chunks。", { exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "删除文档" }).click();
+  await expect(
+    page.getByText("删除文档及全部向量索引？", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "确认删除" }).click();
+
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(
+    page.getByText("文档及向量索引已删除。", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("知识库为空", { exact: true })).toBeVisible();
+  const response = await request.get(`${apiUrl}/__e2e/state`);
+  const state = (await response.json()) as {
+    reindexCount: number;
+    deleteCount: number;
+  };
+  expect(state.reindexCount).toBe(1);
+  expect(state.deleteCount).toBe(1);
+});
+
 test("流式问答展示回答和引用来源", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("服务就绪", { exact: true })).toBeVisible();

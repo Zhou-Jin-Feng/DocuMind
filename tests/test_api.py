@@ -5,8 +5,12 @@ from fastapi.testclient import TestClient
 
 from app.api.main import create_app
 from app.config import Settings
-from app.lifecycle.models import IngestionResult
-from app.services.document_service import DocumentRecord
+from app.lifecycle.models import DocumentDeletionResult, IngestionResult
+from app.services.document_service import (
+    DocumentDetail,
+    DocumentIndexRecord,
+    DocumentRecord,
+)
 from app.services.rag_service import ChatEvent
 
 
@@ -48,8 +52,36 @@ class FakeDocumentService:
                 file_type=".txt",
                 file_size_bytes=18,
                 active_index_id="index-1",
+                active_version_id="version-1",
+                version_count=1,
+                error_type=None,
                 created_at="2026-08-14T00:00:00+00:00",
                 updated_at="2026-08-14T00:00:00+00:00",
+            ),
+        )
+
+    def get_document(self, document_key):
+        if document_key != "doc-1":
+            raise KeyError(document_key)
+        summary = self.list_documents()[0]
+        return DocumentDetail(
+            summary=summary,
+            indexes=(
+                DocumentIndexRecord(
+                    index_id="index-1",
+                    document_version_id="version-1",
+                    version_number=1,
+                    status="active",
+                    chunk_count=3,
+                    error_type=None,
+                    file_type=".txt",
+                    file_size_bytes=18,
+                    source_sha256="sha256",
+                    created_at="2026-08-14T00:00:00+00:00",
+                    updated_at="2026-08-14T00:00:00+00:00",
+                    activated_at="2026-08-14T00:00:00+00:00",
+                    is_active=True,
+                ),
             ),
         )
 
@@ -64,6 +96,22 @@ class FakeDocumentService:
             source_sha256="sha256",
             chunk_count=3,
             collection_count=3,
+        )
+
+    def reindex(self, document_key):
+        if document_key != "doc-1":
+            raise KeyError(document_key)
+        return self.ingest("persisted-source", display_name="guide.txt")
+
+    def delete(self, document_key):
+        if document_key != "doc-1":
+            raise KeyError(document_key)
+        return DocumentDeletionResult(
+            status="deleted",
+            document_key=document_key,
+            deleted_index_count=1,
+            deleted_chunk_count=3,
+            collection_count=0,
         )
 
 
@@ -145,6 +193,20 @@ class APITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["total"], 1)
         self.assertEqual(response.json()["items"][0]["status"], "active")
+        self.assertEqual(response.json()["items"][0]["version_count"], 1)
+
+    def test_document_detail_includes_index_history(self):
+        response = self.client.get("/api/v1/documents/doc-1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["active_version_id"], "version-1")
+        self.assertTrue(response.json()["indexes"][0]["is_active"])
+
+    def test_document_detail_returns_public_not_found_error(self):
+        response = self.client.get("/api/v1/documents/missing")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"]["code"], "document_not_found")
 
     def test_chat_stream_emits_sse_events(self):
         response = self.client.post(
@@ -185,6 +247,27 @@ class APITests(unittest.TestCase):
         self.assertEqual(
             response.headers["access-control-allow-origin"], "http://localhost:5173"
         )
+
+    def test_reindex_and_delete_return_structured_results(self):
+        reindexed = self.client.post("/api/v1/documents/doc-1/reindex")
+        deleted = self.client.delete("/api/v1/documents/doc-1")
+
+        self.assertEqual(reindexed.status_code, 200)
+        self.assertEqual(reindexed.json()["index_id"], "index-1")
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json()["deleted_chunk_count"], 3)
+
+    def test_document_delete_is_allowed_by_cors_preflight(self):
+        response = self.client.options(
+            "/api/v1/documents/doc-1",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "DELETE",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("DELETE", response.headers["access-control-allow-methods"])
 
 
 if __name__ == "__main__":

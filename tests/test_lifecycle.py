@@ -18,7 +18,8 @@ from app.lifecycle.models import (
     build_index_id,
 )
 from app.lifecycle.registry import DocumentRegistry
-from app.lifecycle.service import DocumentLifecycleService
+from app.lifecycle.service import DocumentLifecycleService, IndexOperationInProgress
+from app.services.document_service import DocumentService
 from tests.fake_vector_store import FakeMilvusClient
 
 
@@ -168,6 +169,100 @@ class LifecycleTests(unittest.TestCase):
             LifecycleStatus.ACTIVE.value,
         )
         self.assertEqual(self.vector_store.count_by_index_id(first.index_id), first.chunk_count)
+        detail = DocumentService(
+            lifecycle_service=service,
+            registry=self.registry,
+            tenant_id=service.tenant_id,
+            collection_id=service.collection_id,
+        ).get_document(first.document_key)
+        self.assertEqual(detail.summary.status, LifecycleStatus.ACTIVE.value)
+        self.assertEqual(detail.summary.error_type, "RuntimeError")
+        self.assertEqual(detail.indexes[0].error_type, "RuntimeError")
+
+    def test_delete_document_removes_vectors_registry_and_source(self):
+        service = self._service()
+        indexed = service.ingest(self.source_path)
+        registered_index = self.registry.get_index(indexed.index_id)
+        persisted_source = Path(service.upload_dir) / registered_index["source_path"]
+
+        result = service.delete_document(indexed.document_key)
+
+        self.assertEqual(result.status, "deleted")
+        self.assertEqual(result.deleted_index_count, 1)
+        self.assertEqual(result.deleted_chunk_count, indexed.chunk_count)
+        self.assertEqual(self.vector_store.count_by_index_id(indexed.index_id), 0)
+        self.assertIsNone(self.registry.get_document(indexed.document_key))
+        self.assertIsNone(self.registry.get_index(indexed.index_id))
+        self.assertFalse(persisted_source.exists())
+
+    def test_delete_document_can_retry_after_vector_cleanup_failure(self):
+        service = self._service()
+        indexed = service.ingest(self.source_path)
+
+        with patch.object(
+            self.vector_store,
+            "delete_by_index_id",
+            side_effect=RuntimeError("milvus unavailable"),
+        ):
+            with self.assertRaises(RuntimeError):
+                service.delete_document(indexed.document_key)
+
+        document = self.registry.get_document(indexed.document_key)
+        self.assertIsNone(document["active_index_id"])
+        self.assertEqual(
+            self.registry.get_index(indexed.index_id)["status"],
+            LifecycleStatus.DELETING.value,
+        )
+        with self.assertRaises(IndexOperationInProgress):
+            service.ingest(self.source_path)
+
+        result = service.delete_document(indexed.document_key)
+
+        self.assertEqual(result.status, "deleted")
+        self.assertIsNone(self.registry.get_document(indexed.document_key))
+
+    def test_delete_keeps_source_file_referenced_by_another_document(self):
+        service = self._service()
+        first = service.ingest(self.source_path, display_name="guide.txt")
+        second = service.ingest(self.source_path, display_name="copy.txt")
+        first_index = self.registry.get_index(first.index_id)
+        second_index = self.registry.get_index(second.index_id)
+        self.assertEqual(first_index["source_path"], second_index["source_path"])
+        persisted_source = Path(service.upload_dir) / first_index["source_path"]
+
+        service.delete_document(first.document_key)
+
+        self.assertTrue(persisted_source.exists())
+        self.assertIsNotNone(self.registry.get_document(second.document_key))
+        self.assertGreater(self.vector_store.count_by_index_id(second.index_id), 0)
+
+        service.delete_document(second.document_key)
+
+        self.assertFalse(persisted_source.exists())
+
+    def test_delete_document_rejects_running_index_operation(self):
+        service = self._service()
+        indexed = service.ingest(self.source_path)
+        index = self.registry.get_index(indexed.index_id)
+        claim = self.registry.claim_index(
+            document_key=indexed.document_key,
+            document_version_id=indexed.document_version_id,
+            index_id=indexed.index_id,
+            tenant_id=service.tenant_id,
+            collection_id=service.collection_id,
+            display_name=self.source_path.name,
+            source_sha256=indexed.source_sha256,
+            source_path=index["source_path"],
+            file_type=index["file_type"],
+            file_size_bytes=index["file_size_bytes"],
+            manifest=service._manifest(),
+            operation_type="rebuild",
+            force=True,
+        )
+        self.assertEqual(claim.action, "build")
+
+        with self.assertRaisesRegex(ValueError, "in progress"):
+            service.delete_document(indexed.document_key)
 
     def test_interrupted_active_rebuild_can_be_explicitly_retried(self):
         service = self._service()

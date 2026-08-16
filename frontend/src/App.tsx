@@ -14,8 +14,10 @@ import {
   Bot,
   Check,
   CircleAlert,
+  Clock3,
   Database,
   FileText,
+  GitBranch,
   LibraryBig,
   LoaderCircle,
   MessageSquarePlus,
@@ -25,20 +27,25 @@ import {
   Send,
   Server,
   Square,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
 import {
   APIError,
+  deleteDocument,
+  getDocument,
   getDocuments,
   getPublicConfig,
   getReadiness,
+  reindexDocument,
   streamChat,
   uploadDocument,
 } from "./api";
 import type {
   ChatEvent,
   ChatMessage,
+  DocumentDetail,
   DocumentRecord,
   SourceReference,
 } from "./types";
@@ -78,6 +85,23 @@ function shortDate(value: string): string {
   }).format(parsed);
 }
 
+function fullDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "--";
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(parsed);
+}
+
+function shortIdentifier(value?: string | null): string {
+  return value ? value.slice(0, 12) : "--";
+}
+
 function updateMessage(
   messages: ChatMessage[],
   id: string,
@@ -90,12 +114,27 @@ function statusLabel(status: string): string {
   if (status === "active") return "已索引";
   if (status === "indexing") return "处理中";
   if (status === "failed") return "失败";
+  if (status === "pending") return "等待中";
+  if (status === "superseded") return "历史版本";
+  if (status === "deleting") return "删除中";
+  if (status === "deleted") return "已删除";
   return status;
 }
 
-function DocumentItem({ document }: { document: DocumentRecord }) {
+function DocumentItem({
+  document,
+  onOpen,
+}: {
+  document: DocumentRecord;
+  onOpen: () => void;
+}) {
   return (
-    <article className="document-item">
+    <button
+      className="document-item"
+      type="button"
+      aria-label={`查看文档 ${document.display_name}`}
+      onClick={onOpen}
+    >
       <div className="document-icon" aria-hidden="true">
         <FileText size={17} />
       </div>
@@ -108,7 +147,215 @@ function DocumentItem({ document }: { document: DocumentRecord }) {
       <span className={`document-status status-${document.status}`}>
         {statusLabel(document.status)}
       </span>
-    </article>
+    </button>
+  );
+}
+
+type ManagementNotice = {
+  kind: "success" | "error";
+  message: string;
+} | null;
+
+type SidebarNotice = {
+  kind: "success" | "error";
+  message: string;
+} | null;
+
+function DocumentDetailsDialog({
+  detail,
+  loading,
+  failed,
+  reindexing,
+  deleting,
+  notice,
+  onClose,
+  onReindex,
+  onDelete,
+}: {
+  detail?: DocumentDetail;
+  loading: boolean;
+  failed: boolean;
+  reindexing: boolean;
+  deleting: boolean;
+  notice: ManagementNotice;
+  onClose: () => void;
+  onReindex: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+  }, [detail?.document_key]);
+
+  return (
+    <div className="dialog-backdrop">
+      <section
+        className="document-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="document-dialog-title"
+      >
+        <header className="dialog-header">
+          <div>
+            <span>文档详情</span>
+            <h2 id="document-dialog-title">
+              {detail?.display_name || "正在读取文档"}
+            </h2>
+          </div>
+          <button
+            className="icon-button bordered"
+            type="button"
+            title="关闭文档详情"
+            aria-label="关闭文档详情"
+            onClick={onClose}
+            disabled={deleting}
+          >
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="dialog-body">
+          {loading && (
+            <div className="dialog-state">
+              <LoaderCircle className="spin" size={20} />
+              正在加载文档详情
+            </div>
+          )}
+          {failed && (
+            <div className="dialog-state error-text">
+              <CircleAlert size={20} />
+              文档详情暂时不可用
+            </div>
+          )}
+          {detail && (
+            <>
+              <div className="document-summary-row">
+                <span className={`document-status status-${detail.status}`}>
+                  {statusLabel(detail.status)}
+                </span>
+                <span>{detail.file_type?.replace(".", "").toUpperCase() || "未知格式"}</span>
+              </div>
+
+              <dl className="document-metadata">
+                <div>
+                  <dt><GitBranch size={14} />文档版本</dt>
+                  <dd>{detail.version_count} 个版本</dd>
+                </div>
+                <div>
+                  <dt><FileText size={14} />索引内容</dt>
+                  <dd>{detail.chunk_count} chunks · {formatBytes(detail.file_size_bytes)}</dd>
+                </div>
+                <div>
+                  <dt><Clock3 size={14} />最近更新</dt>
+                  <dd>{fullDate(detail.updated_at)}</dd>
+                </div>
+                <div>
+                  <dt><Database size={14} />活动版本</dt>
+                  <dd className="monospace">{shortIdentifier(detail.active_version_id)}</dd>
+                </div>
+              </dl>
+
+              {detail.error_type && (
+                <div className="document-failure">
+                  <CircleAlert size={17} />
+                  <div>
+                    <strong>最近一次索引失败</strong>
+                    <span>{detail.error_type}</span>
+                  </div>
+                </div>
+              )}
+
+              {notice && (
+                <div className={`management-notice notice-${notice.kind}`}>
+                  {notice.kind === "success" ? <Check size={16} /> : <CircleAlert size={16} />}
+                  <span>{notice.message}</span>
+                </div>
+              )}
+
+              <div className="document-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={onReindex}
+                  disabled={reindexing || deleting || detail.status === "indexing"}
+                >
+                  {reindexing ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />}
+                  {reindexing ? "正在重建" : "重新建立索引"}
+                </button>
+                <button
+                  className="danger-button"
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={reindexing || deleting || detail.status === "indexing"}
+                >
+                  <Trash2 size={16} />
+                  删除文档
+                </button>
+              </div>
+
+              {confirmDelete && (
+                <div className="delete-confirmation">
+                  <div>
+                    <strong>删除文档及全部向量索引？</strong>
+                    <span>此操作不可撤销。</span>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={deleting}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-button compact"
+                      onClick={onDelete}
+                      disabled={deleting}
+                    >
+                      {deleting ? <LoaderCircle className="spin" size={15} /> : <Trash2 size={15} />}
+                      {deleting ? "正在删除" : "确认删除"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <section className="index-history" aria-labelledby="index-history-title">
+                <header>
+                  <h3 id="index-history-title">索引历史</h3>
+                  <span>{detail.indexes.length} 条记录</span>
+                </header>
+                <div className="index-history-list">
+                  {detail.indexes.map((index) => (
+                    <article className="index-history-item" key={index.index_id}>
+                      <div className="index-history-heading">
+                        <div>
+                          <strong>版本 {index.version_number}</strong>
+                          {index.is_active && <span className="active-marker">当前</span>}
+                        </div>
+                        <span className={`document-status status-${index.status}`}>
+                          {statusLabel(index.status)}
+                        </span>
+                      </div>
+                      <div className="index-history-meta">
+                        <span>{index.chunk_count} chunks</span>
+                        <span>{fullDate(index.updated_at)}</span>
+                        <span className="monospace">{shortIdentifier(index.document_version_id)}</span>
+                      </div>
+                      {index.error_type && (
+                        <p className="index-error">失败原因：{index.error_type}</p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -142,7 +389,9 @@ function App() {
   const [activeAnswerId, setActiveAnswerId] = useState<string | null>(null);
   const [selectedSources, setSelectedSources] = useState<SourceReference[]>([]);
   const [sourcesOpen, setSourcesOpen] = useState(true);
-  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const [uploadNotice, setUploadNotice] = useState<SidebarNotice>(null);
+  const [selectedDocumentKey, setSelectedDocumentKey] = useState<string | null>(null);
+  const [managementNotice, setManagementNotice] = useState<ManagementNotice>(null);
   const streamController = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const chatEnd = useRef<HTMLDivElement | null>(null);
@@ -165,18 +414,70 @@ function App() {
     retry: QUERY_RETRY_COUNT,
     refetchInterval: QUERY_REFRESH_INTERVAL,
   });
+  const documentDetail = useQuery({
+    queryKey: ["document", selectedDocumentKey],
+    queryFn: () => getDocument(selectedDocumentKey as string),
+    enabled: selectedDocumentKey !== null,
+    retry: QUERY_RETRY_COUNT,
+    refetchInterval: QUERY_REFRESH_INTERVAL,
+  });
   const upload = useMutation({
     mutationFn: uploadDocument,
     onSuccess: (result) => {
-      setUploadNotice(
-        result.status === "noop"
-          ? "文档已存在，索引保持不变。"
-          : `索引完成，共生成 ${result.chunk_count} 个 chunks。`,
-      );
+      setUploadNotice({
+        kind: "success",
+        message:
+          result.status === "noop"
+            ? "文档已存在，索引保持不变。"
+            : `索引完成，共生成 ${result.chunk_count} 个 chunks。`,
+      });
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
     onError: (error) => {
-      setUploadNotice(error instanceof Error ? error.message : "文档上传失败。")
+      setUploadNotice({
+        kind: "error",
+        message: error instanceof Error ? error.message : "文档上传失败。",
+      });
+    },
+  });
+  const reindex = useMutation({
+    mutationFn: reindexDocument,
+    onMutate: () => setManagementNotice(null),
+    onSuccess: (result, documentKey) => {
+      setManagementNotice({
+        kind: "success",
+        message: `索引重建完成，共生成 ${result.chunk_count} 个 chunks。`,
+      });
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+      void queryClient.invalidateQueries({ queryKey: ["document", documentKey] });
+    },
+    onError: (error) => {
+      setManagementNotice({
+        kind: "error",
+        message: error instanceof Error ? error.message : "索引重建失败。",
+      });
+    },
+  });
+  const removeDocument = useMutation({
+    mutationFn: deleteDocument,
+    onMutate: () => setManagementNotice(null),
+    onSuccess: (result) => {
+      setSelectedDocumentKey(null);
+      setManagementNotice(null);
+      setUploadNotice({
+        kind: "success",
+        message: result.cleanup_pending
+          ? "文档已删除，但部分源文件仍待清理。"
+          : "文档及向量索引已删除。",
+      });
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.removeQueries({ queryKey: ["document", result.document_key] });
+    },
+    onError: (error) => {
+      setManagementNotice({
+        kind: "error",
+        message: error instanceof Error ? error.message : "文档删除失败。",
+      });
     },
   });
 
@@ -193,6 +494,17 @@ function App() {
   useEffect(() => {
     return () => streamController.current?.abort();
   }, []);
+
+  useEffect(() => {
+    if (!selectedDocumentKey) return;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && !removeDocument.isPending) {
+        setSelectedDocumentKey(null);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selectedDocumentKey, removeDocument.isPending]);
 
   const providerLabel = useMemo(() => {
     if (config.isError) return "配置不可用";
@@ -328,8 +640,14 @@ function App() {
     event.target.value = "";
   }
 
+  function openDocument(documentKey: string) {
+    setManagementNotice(null);
+    setSelectedDocumentKey(documentKey);
+  }
+
   return (
-    <div className="app-shell">
+    <>
+      <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark" aria-hidden="true">
@@ -381,9 +699,9 @@ function App() {
             {upload.isPending ? "正在建立索引" : "上传文档"}
           </button>
           {uploadNotice && (
-            <div className={`upload-notice ${upload.isError ? "notice-error" : ""}`}>
-              {upload.isError ? <CircleAlert size={15} /> : <Check size={15} />}
-              <span>{uploadNotice}</span>
+            <div className={`upload-notice ${uploadNotice.kind === "error" ? "notice-error" : ""}`}>
+              {uploadNotice.kind === "error" ? <CircleAlert size={15} /> : <Check size={15} />}
+              <span>{uploadNotice.message}</span>
               <button
                 className="notice-close"
                 type="button"
@@ -404,7 +722,11 @@ function App() {
               <div className="list-placeholder error-text"><CircleAlert size={18} />文档服务不可用</div>
             )}
             {documents.data?.items.map((document) => (
-              <DocumentItem key={document.document_key} document={document} />
+              <DocumentItem
+                key={document.document_key}
+                document={document}
+                onOpen={() => openDocument(document.document_key)}
+              />
             ))}
             {documents.data?.total === 0 && (
               <div className="empty-documents">
@@ -538,7 +860,21 @@ function App() {
           )}
         </div>
       </main>
-    </div>
+      </div>
+      {selectedDocumentKey && (
+        <DocumentDetailsDialog
+          detail={documentDetail.data}
+          loading={documentDetail.isLoading}
+          failed={documentDetail.isError}
+          reindexing={reindex.isPending}
+          deleting={removeDocument.isPending}
+          notice={managementNotice}
+          onClose={() => setSelectedDocumentKey(null)}
+          onReindex={() => reindex.mutate(selectedDocumentKey)}
+          onDelete={() => removeDocument.mutate(selectedDocumentKey)}
+        />
+      )}
+    </>
   );
 }
 

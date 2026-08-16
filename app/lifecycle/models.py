@@ -145,6 +145,19 @@ class IngestionResult:
 
 
 @dataclass(frozen=True)
+class DocumentDeletionResult:
+    status: str
+    document_key: str
+    deleted_index_count: int
+    deleted_chunk_count: int
+    collection_count: int
+    cleanup_pending: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class IndexAuditReport:
     active_index_ids: tuple[str, ...]
     stale_index_ids: tuple[str, ...]

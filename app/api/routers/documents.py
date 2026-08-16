@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from app.api.dependencies import get_application, get_document_service
 from app.api.errors import APIError
 from app.api.schemas import (
+    DocumentDeletionResponse,
+    DocumentDetailResponse,
     DocumentListResponse,
     ErrorResponse,
     IngestionResponse,
@@ -27,6 +29,27 @@ def list_documents(
 ) -> DocumentListResponse:
     items = [record.to_dict() for record in service.list_documents()]
     return DocumentListResponse(items=items, total=len(items))
+
+
+@router.get(
+    "/{document_key}",
+    response_model=DocumentDetailResponse,
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
+def get_document(
+    document_key: str,
+    service: DocumentService = Depends(get_document_service),
+) -> DocumentDetailResponse:
+    try:
+        return DocumentDetailResponse(**service.get_document(document_key).to_dict())
+    except KeyError as exc:
+        raise APIError(404, "document_not_found", "未找到该文档。") from exc
+    except Exception as exc:
+        raise APIError(
+            503,
+            "document_service_unavailable",
+            "文档详情暂时不可用，请稍后重试。",
+        ) from exc
 
 
 @router.post(
@@ -99,3 +122,71 @@ def upload_document(
         file.file.close()
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
+
+
+@router.post(
+    "/{document_key}/reindex",
+    response_model=IngestionResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
+def reindex_document(
+    document_key: str,
+    service: DocumentService = Depends(get_document_service),
+) -> IngestionResponse:
+    try:
+        return IngestionResponse(**service.reindex(document_key).to_dict())
+    except KeyError as exc:
+        raise APIError(404, "document_not_found", "未找到该文档。") from exc
+    except IndexOperationInProgress as exc:
+        raise APIError(
+            409,
+            "index_operation_in_progress",
+            "该文档正在执行索引操作，请稍后重试。",
+        ) from exc
+    except (FileNotFoundError, ValueError) as exc:
+        raise APIError(
+            409,
+            "document_reindex_unavailable",
+            "该文档当前无法重新建立索引。",
+        ) from exc
+    except Exception as exc:
+        raise APIError(
+            503,
+            "document_service_unavailable",
+            "重新建立索引失败，请查看服务日志。",
+        ) from exc
+
+
+@router.delete(
+    "/{document_key}",
+    response_model=DocumentDeletionResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
+def delete_document(
+    document_key: str,
+    service: DocumentService = Depends(get_document_service),
+) -> DocumentDeletionResponse:
+    try:
+        return DocumentDeletionResponse(**service.delete(document_key).to_dict())
+    except KeyError as exc:
+        raise APIError(404, "document_not_found", "未找到该文档。") from exc
+    except (IndexOperationInProgress, ValueError) as exc:
+        raise APIError(
+            409,
+            "document_operation_in_progress",
+            "该文档正在执行索引操作，请稍后重试。",
+        ) from exc
+    except Exception as exc:
+        raise APIError(
+            503,
+            "document_service_unavailable",
+            "删除文档失败，请查看服务日志。",
+        ) from exc
