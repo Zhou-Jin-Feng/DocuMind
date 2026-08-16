@@ -1,4 +1,4 @@
-"""Framework-neutral document lifecycle service."""
+"""面向 API 的文档管理用例和稳定输出模型。"""
 
 from __future__ import annotations
 
@@ -65,7 +65,12 @@ class DocumentDetail:
 
 
 class DocumentService:
-    """Expose lifecycle operations as structured application data."""
+    """
+    把生命周期操作转换为 API 可直接序列化的数据。
+
+    该层负责作用域校验、摘要聚合和可观测性，不负责解析文件或直接访问
+    Milvus；实际状态切换全部委托给 ``DocumentLifecycleService``。
+    """
 
     def __init__(
         self,
@@ -83,6 +88,7 @@ class DocumentService:
         self.metrics_getter = metrics_getter
 
     def ingest(self, source_path: Path, *, display_name: str) -> Any:
+        """摄取已保存的上传文件，并区分 indexed 与重复上传 no-op 指标。"""
         metrics = self.metrics_getter()
         started = perf_counter()
         extension = source_path.suffix.lower()
@@ -138,6 +144,7 @@ class DocumentService:
                 raise
 
     def list_documents(self) -> tuple[DocumentRecord, ...]:
+        """列出当前租户和 Collection 中的文档摘要。"""
         records: list[DocumentRecord] = []
         documents = self.registry.list_documents(
             tenant_id=self.tenant_id,
@@ -153,6 +160,7 @@ class DocumentService:
         return tuple(records)
 
     def get_document(self, document_key: str) -> DocumentDetail:
+        """返回文档摘要和按版本编号组织的索引历史。"""
         document = self._scoped_document(document_key)
         indexes = self.registry.list_indexes(
             document_key=document_key,
@@ -199,6 +207,7 @@ class DocumentService:
         return DocumentDetail(summary=summary, indexes=history)
 
     def reindex(self, document_key: str) -> Any:
+        """按当前配置重建文档，并完整记录成功或失败指标。"""
         started = perf_counter()
         metrics = self.metrics_getter()
         with trace_span("rag.document.reindex") as root_span:
@@ -237,6 +246,7 @@ class DocumentService:
                 raise
 
     def delete(self, document_key: str) -> Any:
+        """删除当前作用域内的文档及其索引数据。"""
         with trace_span("rag.document.delete") as root_span:
             try:
                 result = self.lifecycle_service.delete_document(document_key)
@@ -264,6 +274,7 @@ class DocumentService:
                 raise
 
     def _scoped_document(self, document_key: str) -> dict[str, Any]:
+        """把越权访问与不存在统一表现为 unknown，避免泄露其他作用域资源。"""
         document = self.registry.get_document(document_key)
         if document is None or (
             document["tenant_id"] != self.tenant_id
@@ -283,6 +294,12 @@ class DocumentService:
     def _build_summary(
         document: dict[str, Any], indexes: tuple[dict, ...]
     ) -> DocumentRecord:
+        """
+        以活动索引为主构建摘要，同时保留最近一次失败供 UI 展示。
+
+        重建失败不会覆盖仍可用活动索引的 Chunk 数和文件信息，但错误原因仍
+        会从失败历史中浮现。
+        """
         active_index_id = (
             str(document["active_index_id"])
             if document.get("active_index_id")

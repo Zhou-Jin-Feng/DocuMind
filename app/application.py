@@ -1,4 +1,4 @@
-"""Composition root for the RAG application."""
+"""RAG 应用的依赖装配、共享资源所有权和就绪状态。"""
 
 from __future__ import annotations
 
@@ -22,7 +22,12 @@ logger = get_logger(__name__)
 
 
 class RAGApplication:
-    """Own shared provider clients and expose framework-neutral services."""
+    """
+    统一创建并持有 Provider 客户端、存储适配器和框架无关服务。
+
+    FastAPI 与兼容入口应复用同一个实例，避免重复建立 Milvus 连接或让服务层
+    自行读取全局配置。
+    """
 
     def __init__(self, application_settings: Settings = settings) -> None:
         self.settings = application_settings
@@ -42,6 +47,12 @@ class RAGApplication:
         self.document_service: DocumentService | None = None
 
     def initialize(self) -> None:
+        """
+        幂等初始化完整依赖图。
+
+        启动失败会记录错误类型并释放已经创建的资源，由 readiness 对外返回
+        degraded；这里不抛出，从而让健康端点仍可用于诊断和等待依赖恢复。
+        """
         with self._lock:
             if self.initialized:
                 return
@@ -109,6 +120,7 @@ class RAGApplication:
                 self._close_resources()
 
     def _close_resources(self) -> None:
+        """按所有权释放资源，并兼容初始化只完成一部分的情况。"""
         lifecycle_service = self.lifecycle_service
         vector_store = self.vector_store
         self.lifecycle_service = None
@@ -140,6 +152,7 @@ class RAGApplication:
             self.registry = None
 
     def close(self) -> None:
+        """关闭共享资源，并把应用恢复为可重新初始化的状态。"""
         with self._lock:
             self._close_resources()
             self.initialized = False
@@ -176,6 +189,12 @@ class RAGApplication:
         )
 
     def readiness(self) -> dict[str, Any]:
+        """
+        聚合依赖状态：Milvus 与 Embedding 做真实探测，LLM 只检查配置。
+
+        不向 LLM 发送生成请求可以避免健康检查产生费用；注册表当前只检查已
+        初始化，不执行额外 SQL。任一必要组件不可用时整体状态为 degraded。
+        """
         components = {
             "application": "ready" if self.initialized else "unavailable",
             "milvus": "unknown",

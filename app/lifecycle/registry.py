@@ -1,4 +1,4 @@
-"""SQLite source of truth for documents, versions, indexes, and operations."""
+"""文档、版本、索引与操作状态的 SQLite 权威注册表。"""
 
 from __future__ import annotations
 
@@ -25,7 +25,12 @@ def _utc_now() -> str:
 
 
 class DocumentRegistry:
-    """Persist lifecycle state independently from the vector database."""
+    """
+    在向量库之外持久化生命周期状态。
+
+    写操作使用 ``BEGIN IMMEDIATE`` 串行化状态切换，使多个请求不能同时认领
+    同一索引；Milvus 只保存检索数据，不负责判断哪个索引版本对外可见。
+    """
 
     def __init__(self, database_path: str):
         self.database_path = str(Path(database_path))
@@ -147,6 +152,12 @@ class DocumentRegistry:
         operation_type: str = "ingest",
         force: bool = False,
     ) -> IndexClaim:
+        """
+        原子认领一次索引操作，并返回 ``build``、``noop`` 或 ``in_progress``。
+
+        身份相同且已激活时默认 no-op；强制重建只重新打开操作，不会提前
+        清除当前活动索引，因此失败时仍可继续检索旧版本。
+        """
         now = _utc_now()
         operation_id = stable_hash(operation_type, index_id)
         with self._transaction() as connection:
@@ -337,6 +348,12 @@ class DocumentRegistry:
         operation_id: str,
         chunk_count: int,
     ) -> str | None:
+        """
+        原子激活已完整写入的索引，并把旧活动索引标记为 superseded。
+
+        返回旧索引 ID 供调用方在事务提交后清理 Milvus 数据；数据库事务内
+        不执行网络 I/O，避免外部服务延迟长期占用 SQLite 写锁。
+        """
         if chunk_count < 0:
             raise ValueError("chunk_count cannot be negative")
         now = _utc_now()
@@ -443,6 +460,7 @@ class DocumentRegistry:
             return previous_index_id
 
     def fail_index(self, index_id: str, operation_id: str, error_type: str) -> None:
+        """记录构建失败；若目标原本就是活动索引，则恢复其可见状态。"""
         now = _utc_now()
         with self._transaction() as connection:
             active = connection.execute(
@@ -491,7 +509,7 @@ class DocumentRegistry:
         tenant_id: str,
         collection_id: str,
     ) -> tuple[str, ...]:
-        """Hide a document from retrieval and claim all of its indexes for deletion."""
+        """先隐藏文档并认领其全部索引，返回需要从 Milvus 删除的 ID。"""
         now = _utc_now()
         with self._transaction() as connection:
             document = connection.execute(
@@ -559,7 +577,7 @@ class DocumentRegistry:
         tenant_id: str,
         collection_id: str,
     ) -> tuple[str, ...]:
-        """Remove registry history after vector deletion has completed."""
+        """仅在向量删除完成后移除注册历史，并返回不再被引用的源文件。"""
         with self._transaction() as connection:
             document = connection.execute(
                 """
@@ -646,7 +664,7 @@ class DocumentRegistry:
             return tuple(sorted(unreferenced_paths))
 
     def mark_index_deleting(self, index_id: str) -> None:
-        """Claim a non-active index for recoverable vector deletion."""
+        """认领非活动索引的可恢复删除；活动索引永远不能在此路径删除。"""
         with self._transaction() as connection:
             index = connection.execute(
                 "SELECT status FROM document_indexes WHERE index_id=?",
@@ -681,6 +699,7 @@ class DocumentRegistry:
             )
 
     def mark_index_deleted(self, index_id: str) -> None:
+        """只有已被认领为 deleting 的索引才能进入 deleted。"""
         with self._transaction() as connection:
             index = connection.execute(
                 "SELECT status FROM document_indexes WHERE index_id=?",
@@ -711,7 +730,7 @@ class DocumentRegistry:
                 raise RuntimeError(f"Failed to mark index deleted: {index_id}")
 
     def reset_index_for_retry(self, index_id: str) -> None:
-        """Release an interrupted indexing claim for an explicit retry."""
+        """释放中断的 indexing 认领，为显式重试恢复可进入构建的状态。"""
         now = _utc_now()
         with self._transaction() as connection:
             index = connection.execute(

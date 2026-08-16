@@ -1,4 +1,4 @@
-"""Framework-neutral orchestration for streaming RAG answers."""
+"""框架无关的流式 RAG 问答编排和公开事件契约。"""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ ChatEventType = Literal["status", "sources", "token", "done", "error"]
 
 @dataclass(frozen=True, slots=True)
 class SourceReference:
-    """Public, provider-neutral citation returned to UI clients."""
+    """返回给 UI 的 Provider 无关引用，只暴露安全且稳定的字段。"""
 
     rank: int
     source: str
@@ -58,14 +58,19 @@ class SourceReference:
 
 @dataclass(frozen=True, slots=True)
 class ChatEvent:
-    """One event in the transport-independent answer stream."""
+    """与 SSE 等传输协议解耦的单个回答事件。"""
 
     type: ChatEventType
     data: dict[str, Any]
 
 
 class RAGService:
-    """Run retrieval and generation without depending on a Web framework."""
+    """
+    依次执行检索、引用构建和流式生成，不依赖具体 Web 框架。
+
+    服务只向外发送公开错误信息，真实异常保留在结构化日志和 Trace 中；若
+    流中断发生在首段回答之后，则标记 partial，让 UI 保留已收到的内容。
+    """
 
     NO_CONTEXT_MESSAGE = "未找到达到相关性阈值的文档内容，请先上传文档或换一种问法。"
     PUBLIC_ERROR_MESSAGE = "系统暂时无法完成回答，请稍后重试。"
@@ -92,7 +97,13 @@ class RAGService:
         *,
         request_id: str | None = None,
     ) -> Iterator[ChatEvent]:
-        """Keep one ContextVar context across thread-pooled iterator resumes."""
+        """
+        让生成器每次恢复都运行在同一份 ``ContextVar`` 上下文中。
+
+        Starlette 可能在线程池中多次恢复同步迭代器；显式复制上下文可保证
+        request_id 和 trace_id 不会在不同线程间丢失，并在客户端中止时关闭
+        内层生成器。
+        """
 
         stream = self._stream_answer(question, request_id=request_id)
         stream_context = copy_context()
@@ -151,6 +162,7 @@ class RAGService:
                 )
 
                 if not retrieval_results:
+                    # 无上下文是正常业务结果，不调用 LLM，也不作为组件异常计数。
                     elapsed = perf_counter() - total_started
                     metrics.record_no_context(llm_provider)
                     metrics.record_query(llm_provider, "no_context", elapsed)
@@ -295,6 +307,7 @@ class RAGService:
                 yield ChatEvent(
                     "error",
                     {
+                        # 已输出 Token 时保留部分回答，否则只暴露通用不可用信息。
                         "code": (
                             "generation_interrupted"
                             if answer_parts

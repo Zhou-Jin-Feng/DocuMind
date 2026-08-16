@@ -1,4 +1,4 @@
-"""Milvus-backed vector storage for the RAG system."""
+"""Milvus 向量存储适配器及 Embedding 空间一致性约束。"""
 
 from __future__ import annotations
 
@@ -16,7 +16,13 @@ logger = get_logger(__name__)
 
 
 class VectorStore:
-    """Expose the application's vector-store contract on top of Milvus."""
+    """
+    在 Milvus 之上实现应用需要的写入、检索和生命周期操作。
+
+    Collection 内除业务 Chunk 外还保存一条配置记录，用于锁定 Provider、
+    模型和维度。所有业务查询都会按 ``record_type`` 排除该记录，避免把配置
+    哨兵当成知识片段返回。
+    """
 
     _CONFIG_ID = "__rag_embedding_space__"
     _RECORD_TYPE_FIELD = "record_type"
@@ -25,6 +31,7 @@ class VectorStore:
     _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     _DELETE_BATCH_SIZE = 500
     _QUERY_BATCH_SIZE = 1000
+    # Milvus 的 VARCHAR 上限按 UTF-8 字节计算，不等同于 Python 字符数。
     _ID_MAX_BYTES = 512
     _DOCUMENT_MAX_BYTES = 65535
 
@@ -35,6 +42,7 @@ class VectorStore:
         token: Optional[str] = None,
         db_name: str = "default",
     ):
+        """连接 Milvus；已有 Collection 会立即加载，配置稍后由调用方校验。"""
         collection_name = collection_name.strip()
         uri = uri.strip()
         db_name = db_name.strip()
@@ -48,16 +56,21 @@ class VectorStore:
         self.collection_name = collection_name
         self.uri = uri
         self.db_name = db_name
+
         client_kwargs: Dict[str, Any] = {"uri": uri, "db_name": db_name}
         if token:
             client_kwargs["token"] = token
+
         self.client = MilvusClient(**client_kwargs)
         self._embedding_dimension: Optional[int] = None
+
         self._collection_ready = self.client.has_collection(
             collection_name=self.collection_name
         )
+
         if self._collection_ready:
             self.client.load_collection(collection_name=self.collection_name)
+
         logger.info(
             "Milvus vector store ready: collection={}, exists={}, uri={}, database={}",
             self.collection_name,
@@ -68,7 +81,7 @@ class VectorStore:
 
     @staticmethod
     def _sanitize_metadata(metadata: Dict) -> Dict:
-        """Keep JSON-compatible scalar metadata and remove empty values."""
+        """将元数据收敛为可同时写入 JSON 字段和动态字段的标量值。"""
         sanitized: Dict[str, str | int | float | bool] = {}
         for key, value in metadata.items():
             if value is None:
@@ -81,7 +94,12 @@ class VectorStore:
 
     @staticmethod
     def _fallback_chunk_id(document: Document, index: int) -> str:
-        """Generate a deterministic ID for callers that omit chunk_id."""
+        """
+        为缺少 ``chunk_id`` 的调用方生成确定性 ID。
+
+        NUL 分隔来源、页码、块序号和正文，避免普通字符串拼接产生边界歧义；
+        相同输入会得到相同主键，因此重试会走 Upsert 而不是重复插入。
+        """
         source = (
             document.metadata.get("source_file")
             or document.metadata.get("source")
@@ -96,6 +114,7 @@ class VectorStore:
 
     @staticmethod
     def _validate_embeddings(embeddings: List[List[float]]) -> None:
+        """拒绝空向量或批次内维度不一致的向量。"""
         if not embeddings:
             return
         dimension = len(embeddings[0])
@@ -106,10 +125,12 @@ class VectorStore:
 
     @staticmethod
     def _utf8_size(value: str) -> int:
+        """返回字符串实际写入 Milvus VARCHAR 时占用的字节数。"""
         return len(value.encode("utf-8"))
 
     @classmethod
     def _validate_id(cls, value: Any) -> str:
+        """规范化 Chunk ID，并保护内部配置主键和 Milvus 字节上限。"""
         normalized = str(value).strip()
         if not normalized:
             raise ValueError("Chunk ID cannot be empty")
@@ -124,6 +145,7 @@ class VectorStore:
 
     @classmethod
     def _validate_document(cls, value: str) -> None:
+        """在发起 RPC 前拒绝空正文和超过 VARCHAR 上限的 Chunk。"""
         if not value.strip():
             raise ValueError("Empty document chunks cannot be written")
         size = cls._utf8_size(value)
@@ -134,6 +156,7 @@ class VectorStore:
             )
 
     def _require_embedding_dimension(self) -> int:
+        """从缓存或配置记录读取维度；未建立空间契约时拒绝读写。"""
         if self._embedding_dimension is not None:
             return self._embedding_dimension
         record = self._config_record()
@@ -153,6 +176,7 @@ class VectorStore:
         return dimension
 
     def _validate_vector_dimension(self, vector: List[float], *, operation: str) -> None:
+        """确保写入或查询向量与 Collection 的 Embedding 空间一致。"""
         expected = self._require_embedding_dimension()
         actual = len(vector)
         if actual != expected:
@@ -163,12 +187,19 @@ class VectorStore:
 
     @classmethod
     def _literal(cls, value: Any) -> str:
+        """用 JSON 编码过滤值，避免手工拼接字符串转义。"""
         if not isinstance(value, (str, int, float, bool)):
             raise ValueError("Milvus metadata filters only support scalar values")
         return json.dumps(value, ensure_ascii=False)
 
     @classmethod
     def _filter_expression(cls, where: Optional[Dict] = None) -> str:
+        """
+        构建只匹配业务 Chunk 的 Milvus 表达式。
+
+        值由 JSON 负责编码，字段名则必须符合标识符白名单；两者共同避免
+        元数据过滤条件改变表达式结构。
+        """
         expressions = [
             f'{cls._RECORD_TYPE_FIELD} == {cls._literal(cls._CHUNK_RECORD_TYPE)}'
         ]
@@ -185,6 +216,12 @@ class VectorStore:
         model: str,
         dimension: int,
     ) -> None:
+        """
+        创建 Collection，并写入定义 Embedding 空间的配置记录。
+
+        动态字段用于服务端元数据过滤，JSON 字段用于完整返回元数据。配置
+        记录必须提供占位向量以满足同一 Schema，但会被 ``record_type`` 隔离。
+        """
         schema = MilvusClient.create_schema(
             auto_id=False,
             enable_dynamic_field=True,
@@ -218,12 +255,15 @@ class VectorStore:
             index_type="AUTOINDEX",
             metric_type="L2",
         )
+
         self.client.create_collection(
             collection_name=self.collection_name,
             schema=schema,
             index_params=index_params,
+            # 生命周期服务在写入后立即核对计数，需要读到刚完成的 Upsert。
             consistency_level="Strong",
         )
+
         self.client.insert(
             collection_name=self.collection_name,
             data=[
@@ -245,9 +285,11 @@ class VectorStore:
         self._embedding_dimension = dimension
 
     def _flush(self) -> None:
+        """同步刷新当前 Collection。"""
         self.client.flush(collection_name=self.collection_name)
 
     def _config_record(self) -> Optional[Dict]:
+        """读取内部空间配置；Collection 或配置不存在时返回 ``None``。"""
         if not self._collection_ready:
             return None
         rows = self.client.query(
@@ -263,6 +305,12 @@ class VectorStore:
         return dict(rows[0]) if rows else None
 
     def _query_all(self, *, filter_expression: str, output_fields: List[str]) -> List[Dict]:
+        """
+        查询全部匹配记录，并兼容没有 ``query_iterator`` 的旧客户端。
+
+        迭代器无论成功或异常都会关闭；兼容路径受 Milvus 单次 16384 条上限
+        约束，只用于旧客户端。
+        """
         iterator_factory = getattr(self.client, "query_iterator", None)
         if not callable(iterator_factory):
             return list(
@@ -297,7 +345,12 @@ class VectorStore:
         model: str,
         dimension: int,
     ) -> None:
-        """Create or validate the Collection's embedding-space contract."""
+        """
+        建立或验证 Collection 的 Embedding 空间契约。
+
+        空 Collection 可以按新配置重建；非空 Collection 一旦 Provider、模型
+        或维度不匹配就拒绝继续，防止不同向量空间的数据被混合检索。
+        """
         provider = str(provider).strip()
         model = str(model).strip()
         if not provider or not model:
@@ -340,7 +393,12 @@ class VectorStore:
         embeddings: List[List[float]],
         ids: Optional[List[str]] = None,
     ) -> List[str]:
-        """Idempotently write document chunks using their stable IDs."""
+        """
+        用稳定主键 Upsert 文档块，并返回最终采用的主键。
+
+        元数据既展开为动态字段以支持 Milvus 过滤，也保留 JSON 副本以便
+        查询时完整还原；同一批次出现重复主键会直接失败。
+        """
         if len(documents) != len(embeddings):
             raise ValueError(
                 f"Document count ({len(documents)}) does not match embedding count "
@@ -403,7 +461,12 @@ class VectorStore:
         n_results: int = 5,
         where: Optional[Dict] = None,
     ) -> Dict:
-        """Search with L2 distance and return the existing flattened result contract."""
+        """
+        执行 L2 向量搜索，距离越小表示越相关。
+
+        返回值继续采用旧 Chroma 适配层的扁平字典契约，避免检索层感知底层
+        数据库迁移；内部配置记录始终由过滤表达式排除。
+        """
         if not query_embedding:
             raise ValueError("Query embedding cannot be empty")
         if n_results <= 0:
@@ -438,7 +501,7 @@ class VectorStore:
             raise
 
     def delete_by_ids(self, ids: List[str]) -> None:
-        """Delete chunks by primary key."""
+        """按主键分批删除 Chunk，避免构造过大的单次 RPC。"""
         normalized = [
             self._validate_id(value) for value in ids if str(value).strip()
         ]
@@ -457,6 +520,7 @@ class VectorStore:
             raise
 
     def _delete_by_filter(self, field_name: str, value: str) -> None:
+        """按受控元数据字段删除全部匹配 Chunk。"""
         if not value.strip():
             raise ValueError(f"{field_name} cannot be empty")
         if not self._collection_ready:
@@ -468,13 +532,15 @@ class VectorStore:
         self._flush()
 
     def delete_by_document_id(self, document_id: str) -> None:
+        """按 ``document_id`` 删除所有关联 Chunk。"""
         self._delete_by_filter("document_id", document_id)
 
     def delete_by_index_id(self, index_id: str) -> None:
+        """按 ``index_id`` 删除所有关联 Chunk。"""
         self._delete_by_filter("index_id", index_id)
 
     def count(self) -> int:
-        """Return the number of document chunks, excluding the config record."""
+        """统计业务 Chunk 数量，不包含内部配置记录。"""
         if not self._collection_ready:
             return 0
         rows = self.client.query(
@@ -487,6 +553,7 @@ class VectorStore:
         return int(rows[0].get("count(*)", 0))
 
     def count_by_index_id(self, index_id: str) -> int:
+        """统计指定 ``index_id`` 的 Chunk 数量。"""
         if not index_id.strip():
             raise ValueError("index_id cannot be empty")
         if not self._collection_ready:
@@ -499,6 +566,7 @@ class VectorStore:
         return int(rows[0].get("count(*)", 0)) if rows else 0
 
     def list_ids_by_index_id(self, index_id: str) -> List[str]:
+        """列出指定 ``index_id`` 的全部 Chunk ID。"""
         if not index_id.strip():
             raise ValueError("index_id cannot be empty")
         if not self._collection_ready:
@@ -510,10 +578,17 @@ class VectorStore:
         return [str(row["id"]) for row in rows]
 
     def list_index_ids(self) -> List[str]:
+        """列出排序后的全部 ``index_id``。"""
         counts, _ = self.index_inventory()
         return sorted(counts)
 
     def index_inventory(self) -> tuple[Dict[str, int], int]:
+        """
+        返回各 ``index_id`` 的 Chunk 数量和无法归属索引的旧数据数量。
+
+        旧数据指迁移前没有 ``metadata.index_id`` 的 Chunk，单独计数可以让
+        生命周期盘点明确暴露待重建数据，而不是静默忽略。
+        """
         if not self._collection_ready:
             return {}, 0
         rows = self._query_all(
@@ -533,16 +608,19 @@ class VectorStore:
         return counts, legacy_count
 
     def count_legacy_chunks(self) -> int:
+        """统计缺少 ``index_id`` 的旧版 Chunk。"""
         _, legacy_count = self.index_inventory()
         return legacy_count
 
     def close(self) -> None:
+        """关闭 Milvus 客户端；兼容没有 ``close`` 的测试替身。"""
         client = getattr(self, "client", None)
         close = getattr(client, "close", None)
         if callable(close):
             close()
 
     def delete_collection(self) -> None:
+        """不可逆地删除整个 Collection，并清空本地空间状态。"""
         if not self._collection_ready:
             return
         try:
@@ -555,6 +633,7 @@ class VectorStore:
             raise
 
     def get_collection_info(self) -> Dict:
+        """返回 Collection 名称、业务 Chunk 数量和 Embedding 空间元数据。"""
         record = self._config_record() or {}
         return {
             "name": self.collection_name,
@@ -571,6 +650,7 @@ class VectorStore:
         }
 
     def peek_documents(self, limit: int = 5) -> Dict:
+        """返回少量业务 Chunk，供调试和人工检查使用。"""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if not self._collection_ready:

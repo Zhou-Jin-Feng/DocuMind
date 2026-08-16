@@ -1,4 +1,4 @@
-"""Synchronous, recoverable document indexing lifecycle."""
+"""同步且可恢复的文档摄取、索引切换、审计与清理流程。"""
 
 from __future__ import annotations
 
@@ -34,11 +34,16 @@ logger = get_logger(__name__)
 
 
 class IndexOperationInProgress(RuntimeError):
-    """Raised when another process is already building the same index."""
+    """同一索引已被另一个请求认领时抛出。"""
 
 
 class DocumentLifecycleService:
-    """Build and switch document indexes without exposing partial versions."""
+    """
+    编排源文件、SQLite 注册表和 Milvus 之间的文档生命周期。
+
+    新索引只有在向量数量核对通过后才会原子激活；构建期间旧索引继续服务，
+    因此检索不会看到半成品版本。激活后的旧向量清理允许失败并稍后恢复。
+    """
 
     def __init__(
         self,
@@ -71,7 +76,12 @@ class DocumentLifecycleService:
 
     @classmethod
     def persist_source_file(cls, file_path: Path, upload_dir: str) -> Path:
-        """Persist a source file under a content-addressed, atomic filename."""
+        """
+        以内容哈希命名并原子保存源文件。
+
+        临时文件与目标位于同一目录，``os.replace`` 不会暴露半写入文件；相同
+        内容重复上传直接复用已有文件。
+        """
         target_dir = Path(upload_dir)
         target_dir.mkdir(parents=True, exist_ok=True)
         source_hash = cls._sha256_file(file_path)
@@ -103,6 +113,7 @@ class DocumentLifecycleService:
             raise
 
     def _manifest(self) -> IndexManifest:
+        """固定所有会改变索引结果的解析、分块和 Embedding 配置。"""
         config = getattr(self.embedding_client, "config", {}) or {}
         model = str(
             config.get("model")
@@ -140,6 +151,7 @@ class DocumentLifecycleService:
         index_id: str,
         index_fingerprint: str,
     ) -> None:
+        """把三层身份和作用域写入页面及 Chunk，供过滤、审计和引用使用。"""
         for document in documents:
             document.metadata.update(
                 {
@@ -156,7 +168,11 @@ class DocumentLifecycleService:
             )
 
     def active_metadata_predicate(self) -> Callable[[dict], bool]:
-        """Return a compatibility predicate for managed and legacy vectors."""
+        """
+        返回仅允许活动索引的谓词；没有生命周期元数据的旧向量暂时放行。
+
+        该兼容行为只服务历史数据迁移，完成全量重建后可收紧为强制 index_id。
+        """
         active_ids = set(
             self.registry.active_index_ids(
                 tenant_id=self.tenant_id,
@@ -181,6 +197,13 @@ class DocumentLifecycleService:
         operation_type: str = "ingest",
         force: bool = False,
     ) -> IngestionResult:
+        """
+        摄取文档并以“先构建、后切换”的顺序发布新索引。
+
+        流程为：持久化源文件、计算稳定身份、认领操作、加载与分块、向量化、
+        Upsert、核对数量、激活新索引、尽力清理旧索引。任一步失败都会记录
+        失败状态并继续抛出异常，不把部分结果报告为成功。
+        """
         source = Path(source_path)
         if not source.is_file():
             raise FileNotFoundError(f"Source file does not exist: {source}")
@@ -215,6 +238,7 @@ class DocumentLifecycleService:
         claim = self.registry.claim_index(**claim_parameters, force=force)
 
         if claim.action == "noop":
+            # 注册表相同不代表向量一定完整；计数不一致时自动进入修复构建。
             index = self.registry.get_index(index_id) or {}
             expected_count = int(index.get("chunk_count", 0))
             actual_count = self.vector_store.count_by_index_id(index_id)
@@ -348,6 +372,7 @@ class DocumentLifecycleService:
                     None,
                 )
                 if callable(list_index_ids):
+                    # 强制重建的 Chunk 边界可能减少，清掉同一 index_id 下的残留主键。
                     unexpected_ids = sorted(
                         set(list_index_ids(index_id)) - set(stored_ids)
                     )
@@ -371,6 +396,7 @@ class DocumentLifecycleService:
                     f"Indexed chunk count mismatch: {indexed_count} != {len(chunks)}"
                 )
 
+            # 数量核对通过后才切换活动指针，避免检索命中半成品索引。
             previous_index_id = self.registry.activate_index(
                 document_key=document_key,
                 index_id=index_id,
@@ -379,6 +405,7 @@ class DocumentLifecycleService:
             )
             cleanup_pending = False
             if previous_index_id and previous_index_id != index_id:
+                # 新索引已可用，旧索引清理失败只需暴露待清理状态，不回滚发布。
                 try:
                     self.registry.mark_index_deleting(previous_index_id)
                     self.vector_store.delete_by_index_id(previous_index_id)
@@ -417,6 +444,7 @@ class DocumentLifecycleService:
                 cleanup_pending=cleanup_pending,
             )
         except Exception as exc:
+            # 注册表保留失败类型和操作进度，供详情页展示及显式重试。
             self.registry.fail_index(index_id, claim.operation_id, type(exc).__name__)
             logger.exception(
                 "文档索引失败",
@@ -431,6 +459,7 @@ class DocumentLifecycleService:
             raise
 
     def audit(self) -> IndexAuditReport:
+        """对比 SQLite 预期状态和 Milvus 实际库存，分类缺失、残留与孤儿索引。"""
         tenant_scope = {
             "tenant_id": self.tenant_id,
             "collection_id": self.collection_id,
@@ -480,6 +509,7 @@ class DocumentLifecycleService:
         )
 
     def _registered_source_path(self, relative_path: str) -> Path:
+        """解析注册路径，并拒绝通过 ``..`` 或绝对路径逃逸上传目录。"""
         source_root = Path(self.upload_dir).resolve()
         source = (source_root / relative_path).resolve()
         if source != source_root and source_root not in source.parents:
@@ -507,6 +537,7 @@ class DocumentLifecycleService:
         *,
         reason: str,
     ) -> RebuildPlan:
+        """校验源文件和身份链后生成无副作用的重建计划。"""
         document_key = str(document["document_key"])
         if (
             index["document_key"] != document_key
@@ -583,6 +614,7 @@ class DocumentLifecycleService:
         )
 
     def plan_rebuild_document(self, document_key: str) -> RebuildPlan:
+        """基于当前活动索引规划一次完整重建。"""
         document = self._scoped_document(document_key)
         active_index_id = document.get("active_index_id")
         if not active_index_id:
@@ -597,6 +629,7 @@ class DocumentLifecycleService:
         )
 
     def plan_retry_document(self, document_key: str) -> RebuildPlan:
+        """仅在目标唯一时规划中断索引的原配置重试。"""
         document = self._scoped_document(document_key)
         interrupted = [
             index
@@ -623,6 +656,12 @@ class DocumentLifecycleService:
         dry_run: bool = False,
         retry: bool = False,
     ) -> IngestionResult | RebuildPlan:
+        """
+        执行重建或中断重试；``dry_run`` 只返回计划，不认领操作或写向量。
+
+        Retry 必须保持原索引身份，配置已改变时要求走普通重建，避免把新配置
+        写入旧 ``index_id``。
+        """
         plan = (
             self.plan_retry_document(document_key)
             if retry
@@ -646,6 +685,12 @@ class DocumentLifecycleService:
         )
 
     def delete_document(self, document_key: str) -> DocumentDeletionResult:
+        """
+        先从活动集合隐藏文档，再删除向量，最后移除注册记录和无引用源文件。
+
+        源文件清理失败不会撤销已完成的数据删除，而是通过 ``cleanup_pending``
+        暴露给调用方。
+        """
         self._scoped_document(document_key)
         index_ids = self.registry.claim_document_deletion(
             document_key,
@@ -693,6 +738,11 @@ class DocumentLifecycleService:
         include_orphans: bool = False,
         dry_run: bool = False,
     ) -> IndexAuditReport:
+        """
+        清理可确认的旧索引；孤儿向量必须显式启用 ``include_orphans``。
+
+        默认保守策略避免误删来自其他注册表或人工导入的未知向量。
+        """
         report = self.audit()
         if dry_run:
             return report
@@ -715,7 +765,7 @@ class DocumentLifecycleService:
         return self.audit()
 
     def close(self) -> None:
-        """Release resources owned by the vector-store adapter."""
+        """释放生命周期服务持有的向量存储资源。"""
         close = getattr(self.vector_store, "close", None)
         if callable(close):
             close()

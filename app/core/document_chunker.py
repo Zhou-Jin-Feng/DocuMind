@@ -20,7 +20,13 @@ logger = get_logger(__name__)
 
 
 class DocumentChunker:
-    """文档分块器。"""
+    """
+    文档分块器。
+
+    提供递归分块和固定分隔符分块两种策略。分块后会补充稳定的
+    ``document_id``、``chunk_index``、``chunk_id`` 和字符数元数据，保证
+    后续 Milvus 写入可以幂等执行并保留来源追踪信息。
+    """
 
     def __init__(
         self,
@@ -28,6 +34,17 @@ class DocumentChunker:
         chunk_overlap: int = 100,
         separator: str = "\n\n",
     ):
+        """
+        初始化分块参数。
+
+        Args:
+            chunk_size: 每个 Chunk 的目标字符数。
+            chunk_overlap: 相邻 Chunk 的重叠字符数，用于保留跨边界上下文。
+            separator: 固定分块策略使用的分隔符。
+
+        ``chunk_overlap`` 必须小于 ``chunk_size``，否则会导致分块器无法
+        向前推进，因此在初始化阶段直接拒绝无效配置。
+        """
         if chunk_size <= 0:
             raise ValueError("chunk_size 必须大于 0")
         if chunk_overlap < 0:
@@ -41,7 +58,12 @@ class DocumentChunker:
 
     @staticmethod
     def _ensure_document_ids(documents: List[Document]) -> None:
-        """为手工构造的 Document 补充稳定 document_id。"""
+        """
+        为缺少 ID 的 ``Document`` 补充稳定 ``document_id``。
+
+        正常流程中 ID 通常由文档加载器生成；该兜底逻辑保证测试或调用方
+        手工构造的 ``Document`` 也能进入后续索引流程。
+        """
         for document in documents:
             if document.metadata.get("document_id"):
                 continue
@@ -52,7 +74,13 @@ class DocumentChunker:
 
     @staticmethod
     def _decorate_chunks(chunks: List[Document]) -> List[Document]:
-        """去除空 Chunk，并增加 chunk_index、chunk_id 和字符数。"""
+        """
+        清理并装饰分块结果。
+
+        空白 Chunk 会被丢弃；其余 Chunk 会按索引身份重新编号，并以
+        ``index_identity + 页码 + 序号 + 内容哈希`` 生成确定性的 ``chunk_id``。
+        同一索引重复运行时可以得到相同 ID，从而支持向量库幂等 Upsert。
+        """
         counters: defaultdict[str, int] = defaultdict(int)
         decorated: List[Document] = []
 
@@ -84,7 +112,12 @@ class DocumentChunker:
         return decorated
 
     def chunk_documents_recursive(self, documents: List[Document]) -> List[Document]:
-        """优先按段落和句子边界进行递归分块。"""
+        """
+        使用递归分隔符进行分块。
+
+        分隔符按“段落、换行、中文/英文句末、空格、字符”逐级降级，
+        尽量保持语义边界，同时确保超长文本仍能被切开。
+        """
         if not documents:
             return []
 
@@ -103,7 +136,12 @@ class DocumentChunker:
         return chunks
 
     def chunk_documents_fixed(self, documents: List[Document]) -> List[Document]:
-        """按固定大小进行分块。"""
+        """
+        使用指定分隔符进行固定分块。
+
+        该策略更容易预测块边界和数量，适合需要稳定切分规则的对比实验；
+        返回结果仍会经过统一的空块清理和 ID 装饰。
+        """
         if not documents:
             return []
 
@@ -124,24 +162,25 @@ class DocumentChunker:
     @staticmethod
     def analyze_chunks(chunks: List[Document]):
         """
-        分析分块结果
-        统计每个块的长度、token数等信息
+        分析分块结果并输出统计摘要。
 
         Args:
-            chunks: 分块后的Document列表
+            chunks: 分块后的 ``Document`` 列表。
+
+        统计字符长度、可用时的 Token 数，以及不同长度区间的分布；该方法
+        仅用于观察分块质量，不会修改 Chunk 内容。
         """
         if not chunks:
             logger.info("没有可分析的分块")
             return
 
-        # 初始化tokenizer（用于计算token数）
+        # Token 统计是可选能力，缺少 tokenizer 不应影响字符级分析。
         try:
             tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
         except:
             tokenizer = None
             logger.info("未安装tiktoken，跳过token统计")
 
-        # 统计信息
         chunk_lengths = [len(chunk.page_content) for chunk in chunks]
         avg_length = sum(chunk_lengths) / len(chunk_lengths)
         min_length = min(chunk_lengths)
@@ -158,7 +197,6 @@ class DocumentChunker:
             avg_tokens = 0
             total_tokens = 0
 
-        # 创建摘要表格
         table = Table(title="分块统计摘要", show_header=True, header_style="bold magenta")
         table.add_column("指标", style="cyan", width=20)
         table.add_column("数值", style="green", width=30)
@@ -175,7 +213,6 @@ class DocumentChunker:
         logger.info("\n")
         logger.info(table)
 
-        # 长度分布
         logger.info("\n字符数分布:")
         distribution = {
             "0-200": 0,
@@ -207,20 +244,20 @@ class DocumentChunker:
     @staticmethod
     def preview_chunks(chunks: List[Document], num_preview: int = 5):
         """
-        预览前N个分块内容
+        预览前 N 个分块内容。
 
         Args:
-            chunks: 分块列表
-            num_preview: 预览数量
+            chunks: 分块列表。
+            num_preview: 预览数量，默认展示前 5 个。
+
+        每个片段最多展示 150 个字符，避免调试输出被长文本淹没。
         """
         logger.info(f"\n前 {num_preview} 个分块预览:\n")
 
         for i, chunk in enumerate(chunks[:num_preview], 1):
-            # 获取元数据
             source = chunk.metadata.get('source_file', 'Unknown')
             page = chunk.metadata.get('page', 'N/A')
 
-            # 内容预览（最多显示150字符）
             content = chunk.page_content.strip()
             preview = content[:150].replace('\n', ' ')
 
@@ -342,4 +379,3 @@ AI的伦理和安全问题日益重要。我们需要确保AI系统的公平性�
 
 if __name__ == "__main__":
     demo_chunking()
-

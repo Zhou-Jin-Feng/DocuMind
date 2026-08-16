@@ -1,4 +1,4 @@
-"""Data contracts for document and index lifecycle management."""
+"""文档生命周期的状态、稳定身份和跨层数据契约。"""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from typing import Any, Mapping
 
 
 class LifecycleStatus(str, Enum):
+    """索引从构建、激活到回收的持久化状态。"""
     PENDING = "pending"
     INDEXING = "indexing"
     ACTIVE = "active"
@@ -22,12 +23,14 @@ class LifecycleStatus(str, Enum):
 
 
 class OperationStatus(str, Enum):
+    """一次摄取或重建操作的执行状态。"""
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
 
 
 def stable_hash(*parts: str) -> str:
+    """对带长度前缀的多个字段求哈希，避免直接拼接造成边界碰撞。"""
     digest = hashlib.sha256()
     for part in parts:
         encoded = part.encode("utf-8")
@@ -37,6 +40,7 @@ def stable_hash(*parts: str) -> str:
 
 
 def normalize_display_name(value: str) -> str:
+    """只保留文件名并做 Unicode NFKC 归一化，形成稳定的展示身份。"""
     name = Path(value).name.strip()
     if not name:
         raise ValueError("display_name cannot be empty")
@@ -49,20 +53,24 @@ def build_document_key(
     tenant_id: str,
     collection_id: str,
 ) -> str:
+    """由租户、Collection 和规范化文件名生成逻辑文档身份。"""
     normalized = normalize_display_name(display_name).casefold()
     return stable_hash("document", tenant_id, collection_id, normalized)
 
 
 def build_document_version_id(document_key: str, source_sha256: str) -> str:
+    """由逻辑文档身份和源文件内容生成不可变版本身份。"""
     return stable_hash("document-version", document_key, source_sha256)
 
 
 def build_index_id(document_version_id: str, index_fingerprint: str) -> str:
+    """由内容版本和索引配置生成可复现的索引身份。"""
     return stable_hash("index", document_version_id, index_fingerprint)
 
 
 @dataclass(frozen=True)
 class IndexManifest:
+    """影响 Chunk 或向量结果的配置快照，也是索引指纹的输入。"""
     schema_version: int
     parser: str
     chunker: str
@@ -115,6 +123,7 @@ class IndexManifest:
 
 @dataclass(frozen=True)
 class IndexClaim:
+    """注册表对索引请求的裁决：构建、无操作或已有操作进行中。"""
     action: str
     operation_id: str
     document_key: str
@@ -159,6 +168,7 @@ class DocumentDeletionResult:
 
 @dataclass(frozen=True)
 class IndexAuditReport:
+    """SQLite 注册状态与 Milvus 实际库存之间的差异报告。"""
     active_index_ids: tuple[str, ...]
     stale_index_ids: tuple[str, ...]
     orphan_index_ids: tuple[str, ...]
@@ -181,7 +191,7 @@ class IndexAuditReport:
 
 @dataclass(frozen=True)
 class RebuildPlan:
-    """Describe a document rebuild without changing registry or vectors."""
+    """只描述重建将产生的变化，不修改注册表或向量数据。"""
 
     status: str
     document_key: str

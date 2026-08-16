@@ -257,3 +257,8 @@ evaluation.runner / production_runner
 - 认证、多租户、限流和生产高可用。
 
 日志、指标、追踪和评估配置分别见 `OBSERVABILITY.md` 与 `EVALUATION.md`。
+
+## 存储维护约束
+
+- 业务检索只选择 `record_type == "chunk"` 的记录，向量空间配置记录不得作为知识返回；非空 Collection 不允许混用 Embedding 模型或维度。
+- 向量存储文本限制按 UTF-8 字节校验；过滤字段与值必须通过既有白名单和安全编码，不拼接不可信表达式。

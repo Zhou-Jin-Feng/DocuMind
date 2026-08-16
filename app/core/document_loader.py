@@ -17,8 +17,15 @@ logger = get_logger(__name__)
 
 
 class UniversalDocumentLoader:
-    """根据扩展名选择加载器，并统一规范文档元数据。"""
+    """
+    统一文档加载器。
 
+    根据文件扩展名选择 LangChain Loader，并把不同格式返回的
+    ``Document`` 元数据整理成项目统一的结构。这样后续分块、索引和
+    引用来源时，不需要关心原始文件格式的差异。
+    """
+
+    # 扩展名到 LangChain 加载器的映射；TXT 单独处理以兼容常见中文编码。
     LOADERS = {
         ".pdf": PyPDFLoader,
         ".docx": Docx2txtLoader,
@@ -30,7 +37,13 @@ class UniversalDocumentLoader:
 
     @staticmethod
     def _build_document_id(file_path: str) -> str:
-        """基于文件名和文件内容生成稳定文档 ID。"""
+        """
+        根据文件名和文件内容生成稳定文档 ID。
+
+        文件名参与哈希是为了区分同内容但来源不同的文件；内容按块读取，
+        避免一次性将大文件全部载入内存。返回值会写入每个页面/文档片段的
+        ``document_id`` 元数据。
+        """
         path = Path(file_path)
         digest = hashlib.sha256()
         digest.update(path.name.lower().encode("utf-8"))
@@ -44,7 +57,13 @@ class UniversalDocumentLoader:
     def _normalize_metadata(
         documents: List[Document], file_path: str, file_ext: str, document_id: str
     ) -> None:
-        """补充稳定 ID、文件名和从 1 开始的 PDF 页码。"""
+        """
+        统一补充可追踪元数据。
+
+        PDF Loader 的 ``page`` 通常从 0 开始，因此这里转换成用户可读的
+        ``page_number``（从 1 开始）。同时只保存文件名，不把本机绝对路径
+        写进向量库，避免暴露运行环境路径。
+        """
         file_name = Path(file_path).name
         for document in documents:
             raw_page = document.metadata.get("page")
@@ -59,7 +78,12 @@ class UniversalDocumentLoader:
                 document.metadata["page_number"] = page_number
 
     def _load_text(self, file_path: str) -> List[Document]:
-        """依次尝试常见中文文本编码。"""
+        """
+        加载纯文本文件。
+
+        先尝试带 BOM 的 UTF-8，再尝试兼容中文 Windows 文件的 GB18030；
+        两种编码都失败时重新抛出最后一次解码异常。
+        """
         last_error: UnicodeDecodeError | None = None
         path = Path(file_path)
         for encoding in ("utf-8-sig", "gb18030"):
@@ -74,7 +98,13 @@ class UniversalDocumentLoader:
         return []
 
     def load_document(self, file_path: str) -> List[Document]:
-        """加载单个文档。"""
+        """
+        加载单个 PDF、DOCX 或 TXT 文档。
+
+        返回的每个 ``Document`` 都已经经过元数据规范化，可直接交给
+        ``DocumentChunker`` 继续处理。文件不存在、格式不支持或文档为空时
+        会抛出明确异常，并记录结构化失败日志。
+        """
         path = Path(file_path)
         if not path.is_file():
             raise FileNotFoundError(f"文件不存在或不是普通文件: {file_path}")
@@ -117,7 +147,12 @@ class UniversalDocumentLoader:
             raise
 
     def load_directory(self, dir_path: str) -> List[Document]:
-        """按文件名排序，加载目录下所有支持的文档。"""
+        """
+        按文件名排序加载目录中的所有支持文件。
+
+        单个文件加载失败不会阻止其他文件继续处理；失败文件会记录警告，
+        方法最终返回成功加载的片段集合。
+        """
         directory = Path(dir_path)
         if not directory.is_dir():
             raise NotADirectoryError(f"不是有效的目录: {dir_path}")
@@ -145,7 +180,7 @@ class UniversalDocumentLoader:
         return all_documents
 
     def print_document_info(self, documents: List[Document]) -> None:
-        """输出文档摘要，供手动验证使用。"""
+        """输出加载摘要和最多三个片段预览，供手动检查解析结果。"""
         if not documents:
             self.logger.info("没有文档可显示")
             return
@@ -171,17 +206,13 @@ def demo_load_single_file():
 
     loader = UniversalDocumentLoader()
 
-    # 提示用户输入文件路径
     logger.info("\n请输入文档路径（支持 .pdf / .docx / .txt）:")
     logger.info("示例: C:\\Users\\test\\Desktop\\sample.pdf")
 
     file_path = input("\n文件路径: ").strip()
 
     try:
-        # 加载文档
         documents = loader.load_document(file_path)
-
-        # 打印信息
         loader.print_document_info(documents)
 
         return documents
@@ -217,18 +248,14 @@ RAG（Retrieval-Augmented Generation）是检索增强生成技术。
 - 知识可以实时更新，无需重新训练模型
     """.strip()
 
-    # 创建测试文件
     test_file = "test_document.txt"
     with open(test_file, 'w', encoding='utf-8') as f:
         f.write(test_content)
 
     logger.info(f"\n已创建测试文件: {test_file}")
 
-    # 加载测试文件
     loader = UniversalDocumentLoader()
     documents = loader.load_document(test_file)
-
-    # 打印信息
     loader.print_document_info(documents)
 
     return documents

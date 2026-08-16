@@ -1,7 +1,8 @@
 """
-RAG 系统检索模块。
+RAG 检索策略及统一结果模型。
 
-明确区分 Milvus L2 距离和重排分数，并保留检索异常语义。
+语义检索使用 L2 距离，值越小越相关；BM25、RRF 和重排分数均是值越大
+越相关。调用方不能把这些分数直接放在同一阈值尺度上比较。
 """
 
 import hashlib
@@ -22,7 +23,12 @@ logger = get_logger(__name__)
 
 @dataclass
 class RetrievalResult:
-    """单条检索结果。distance 越小越相关，rerank_score 越大越相关。"""
+    """
+    不同检索策略共享的结果模型。
+
+    ``distance`` 是越小越好的 L2 距离；其余 score 字段越大越好。各阶段
+    保留自己的排名和分数，便于解释混合检索结果，而不覆盖原始信号。
+    """
 
     content: str
     metadata: Dict
@@ -39,6 +45,7 @@ class RetrievalResult:
     query_ranks: Dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        """把来源和用户可读页码从统一元数据中提升为常用字段。"""
         self.metadata = self.metadata or {}
         self.source = str(
             self.metadata.get("source_file") or self.metadata.get("source") or self.source
@@ -54,7 +61,7 @@ class RetrievalResult:
 
 
 class Retriever:
-    """封装语义检索和轻量重排。"""
+    """封装查询向量化、Milvus 语义检索和轻量重排。"""
 
     def __init__(self, vector_store, embedding_client):
         self.vector_store = vector_store
@@ -69,7 +76,13 @@ class Retriever:
         metadata_filter: Optional[Dict] = None,
         result_predicate: Optional[Callable[[Dict], bool]] = None,
     ) -> List[RetrievalResult]:
-        """执行语义检索；score_threshold 表示允许的最大距离。"""
+        """
+        执行语义检索，``score_threshold`` 表示允许的最大 L2 距离。
+
+        ``metadata_filter`` 会下推给 Milvus；``result_predicate`` 只能在返回后
+        执行，因此启用谓词时会多取候选，再截断为 ``top_k``。Embedding 或
+        向量检索失败会在记录指标和日志后原样抛出，不静默降级为空结果。
+        """
         normalized_query = (query or "").strip()
         if not normalized_query:
             raise ValueError("查询内容不能为空")
@@ -188,6 +201,7 @@ class Retriever:
                             embedding_model,
                             len(query_embedding),
                         )
+                    # 内存谓词无法下推，过取候选以降低过滤后不足 top_k 的概率。
                     search_results = self.vector_store.search(
                         query_embedding=query_embedding,
                         n_results=(max(top_k * 5, top_k) if result_predicate else top_k),
@@ -290,7 +304,7 @@ class Retriever:
         query: str,
         top_k: int = 3,
     ) -> List[RetrievalResult]:
-        """结合向量距离和轻量关键词覆盖率进行重排。"""
+        """按 70% 距离相似度和 30% 关键词覆盖率进行轻量重排。"""
         if top_k <= 0:
             raise ValueError("top_k 必须大于 0")
         if not results:
@@ -354,7 +368,7 @@ class Retriever:
 
 
 class BM25Retriever:
-    """Deterministic lexical retriever over the supplied chunks."""
+    """在固定 Chunk 集合上提供可复现的 BM25 词法检索。"""
 
     def __init__(self, documents: Iterable[Any]):
         self._documents = tuple(
@@ -372,6 +386,12 @@ class BM25Retriever:
 
     @staticmethod
     def tokenize(text: str) -> list[str]:
+        """
+        同时生成 Jieba 词、中文单字和二元组。
+
+        冗余粒度是有意设计：词语负责语义完整性，单字和二元组减少专有名词
+        未登录或分词边界错误造成的漏召回。
+        """
         normalized = (text or "").casefold()
         terms = re.findall(r"[a-z0-9_]+", normalized)
         import jieba
@@ -401,6 +421,7 @@ class BM25Retriever:
 
     @staticmethod
     def _document_key(content: str, metadata: Mapping[str, Any]) -> str:
+        """优先用稳定 Chunk ID；旧数据则根据文档身份和正文生成去重键。"""
         chunk_id = metadata.get("chunk_id")
         if chunk_id:
             return str(chunk_id)
@@ -425,6 +446,12 @@ class BM25Retriever:
         result_predicate: Optional[Callable[[Dict], bool]] = None,
         lexical_score_threshold: Optional[float] = None,
     ) -> List[RetrievalResult]:
+        """
+        返回 BM25 Top-K，``lexical_score_threshold`` 是允许的最小分数。
+
+        过滤子集时重新建立 BM25 模型，使 IDF 基于实际候选集合计算；额外
+        要求查询与候选至少共享一个 Token，避免全零分结果进入上下文。
+        """
         normalized_query = (query or "").strip()
         if not normalized_query:
             raise ValueError("查询内容不能为空")
@@ -480,7 +507,12 @@ class BM25Retriever:
 
 
 class HybridRetriever:
-    """Fuse dense and lexical rankings using reciprocal rank fusion (RRF)."""
+    """
+    使用加权倒数排名融合（RRF）合并语义检索与 BM25。
+
+    RRF 只依赖名次，不直接比较 L2 距离和 BM25 分数，因此适合融合量纲
+    不同的检索信号；相同 Chunk 通过稳定键去重并累加两路贡献。
+    """
 
     def __init__(
         self,
@@ -530,6 +562,7 @@ class HybridRetriever:
         metadata_filter: Optional[Dict] = None,
         result_predicate: Optional[Callable[[Dict], bool]] = None,
     ) -> List[RetrievalResult]:
+        """分别扩大两路候选集，按权重计算 RRF 后返回最终 Top-K。"""
         if top_k <= 0:
             raise ValueError("top_k 必须大于 0")
         multiplier = (
@@ -608,12 +641,17 @@ class HybridRetriever:
         top_k: int = 5,
         **kwargs: Any,
     ) -> List[RetrievalResult]:
-        """Compatibility entry point for callers that select a retriever by contract."""
+        """兼容统一 Retriever 契约，实际执行混合检索。"""
         return self.retrieve_hybrid(query, top_k=top_k, **kwargs)
 
 
 class MultiQueryRetriever:
-    """Retrieve each rewritten query independently and fuse ranks with RRF."""
+    """
+    独立执行原查询及其改写，并用 RRF 融合结果。
+
+    原查询必须保留在首位，保证改写质量不佳时仍有基础召回；融合强制依赖
+    ``metadata.chunk_id``，否则无法可靠判断不同查询命中的是否为同一 Chunk。
+    """
 
     SUPPORTED_METHODS = {
         "retrieve_semantic",
@@ -651,6 +689,7 @@ class MultiQueryRetriever:
 
     @staticmethod
     def _chunk_id(result: RetrievalResult) -> str:
+        """取得跨查询去重所需的稳定 Chunk 身份。"""
         chunk_id = (result.metadata or {}).get("chunk_id")
         if not isinstance(chunk_id, str) or not chunk_id.strip():
             raise ValueError("多查询融合要求每条候选都包含稳定 metadata.chunk_id")
@@ -662,6 +701,7 @@ class MultiQueryRetriever:
         top_k: int,
         **kwargs: Any,
     ) -> List[RetrievalResult]:
+        """执行多查询召回，并保留每个改写查询贡献的排名用于解释。"""
         if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
             raise ValueError("top_k 必须是大于 0 的整数")
         rewrite_result = self.query_rewriter.rewrite(query)
@@ -743,7 +783,11 @@ class MultiQueryRetriever:
 
 
 class RerankingRetriever:
-    """Expand a base candidate set, then apply a dedicated reranker."""
+    """
+    扩大基础检索候选集，再交给独立精排器选择最终 Top-K。
+
+    ``candidate_multiplier`` 控制召回率与 Cross-Encoder 推理成本之间的取舍。
+    """
 
     def __init__(
         self,
@@ -774,6 +818,7 @@ class RerankingRetriever:
         top_k: int,
         **kwargs: Any,
     ) -> List[RetrievalResult]:
+        """按倍数召回候选，最终数量仍由调用方的 ``top_k`` 决定。"""
         if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
             raise ValueError("top_k 必须是大于 0 的整数")
         candidate_k = max(top_k * self.candidate_multiplier, top_k)
