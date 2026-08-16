@@ -9,6 +9,7 @@ function initialState() {
     streamMode: "complete",
     documents: [],
     uploadCount: 0,
+    uploadDelayMs: 0,
     reindexCount: 0,
     deleteCount: 0,
     streamRequests: 0,
@@ -216,6 +217,9 @@ const server = http.createServer(async (request, response) => {
         updated_at: timestamp,
       },
     ];
+    if (state.uploadDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, state.uploadDelayMs));
+    }
     sendJson(response, 200, {
       status: "indexed",
       operation_id: "operation-guide",

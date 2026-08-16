@@ -33,7 +33,8 @@ test("后端不可用时给出明确状态，并在恢复后自动刷新", async
   await expect(page.getByText("ollama · deepseek", { exact: true })).toBeVisible();
 });
 
-test("上传文档后展示索引结果", async ({ page }) => {
+test("上传文档后展示索引结果", async ({ page, request }) => {
+  await updateState(request, { uploadDelayMs: 600 });
   await page.goto("/");
   await expect(page.getByText("服务就绪", { exact: true })).toBeVisible();
 
@@ -43,7 +44,8 @@ test("上传文档后展示索引结果", async ({ page }) => {
     buffer: Buffer.from("RAG 通过检索外部知识增强模型回答。", "utf-8"),
   });
 
-  await expect(page.getByText("索引完成，共生成 3 个 chunks。", { exact: true })).toBeVisible();
+  await expect(page.getByText("解析、切分与向量化", { exact: true })).toBeVisible();
+  await expect(page.getByText("索引完成，共生成 3 个片段。", { exact: true })).toBeVisible();
   await expect(page.getByTitle("guide.txt")).toBeVisible();
   await expect(page.getByText("1 个文档", { exact: true })).toBeVisible();
 });
@@ -67,7 +69,7 @@ test("查看详情、重新索引并删除文档", async ({ page, request }) => 
 
   await page.getByRole("button", { name: "重新建立索引" }).click();
   await expect(
-    page.getByText("索引重建完成，共生成 3 个 chunks。", { exact: true }),
+    page.getByText("索引重建完成，共生成 3 个片段。", { exact: true }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "删除文档" }).click();
@@ -125,4 +127,33 @@ test("停止生成会中止浏览器中的流式请求", async ({ page, request 
       return state.abortedStreams;
     })
     .toBe(1);
+});
+
+test("本地保存、切换并清空对话历史", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("服务就绪", { exact: true })).toBeVisible();
+
+  await page.getByPlaceholder("向知识库提问").fill("什么是 RAG？");
+  await page.getByRole("button", { name: "发送" }).click();
+  await expect(page.getByText("RAG 是检索增强生成技术。", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开对话 什么是 RAG？" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("rag-workbench-conversations-v1")),
+    )
+    .not.toBeNull();
+
+  await page.reload();
+  await expect(page.getByText("RAG 是检索增强生成技术。", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "新建对话" }).click();
+  await expect(page.getByText("暂无对话", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "打开对话 什么是 RAG？" }).click();
+  await expect(page.getByText("RAG 是检索增强生成技术。", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "清空当前对话" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "清空对话", exact: true }).click();
+  await expect(page.getByText("暂无对话", { exact: true })).toBeVisible();
+  await expect(page.getByText("暂无历史对话", { exact: true })).toBeVisible();
 });

@@ -78,17 +78,62 @@ export function getDocument(documentKey: string): Promise<DocumentDetail> {
   );
 }
 
-export async function uploadDocument(file: File): Promise<IngestionResponse> {
-  const formData = new FormData();
-  formData.append("file", file);
-  const response = await fetch(`${API_BASE_URL}/api/v1/documents`, {
-    method: "POST",
-    body: formData,
+export interface UploadProgress {
+  phase: "uploading" | "indexing";
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
+export function uploadDocument(
+  file: File,
+  onProgress?: (progress: UploadProgress) => void,
+): Promise<IngestionResponse> {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const request = new XMLHttpRequest();
+    request.open("POST", `${API_BASE_URL}/api/v1/documents`);
+    request.setRequestHeader("Accept", "application/json");
+
+    request.upload.addEventListener("progress", (event) => {
+      const total = event.lengthComputable ? event.total : file.size;
+      const percent = total > 0 ? Math.min(100, Math.round((event.loaded / total) * 100)) : 0;
+      onProgress?.({ phase: "uploading", loaded: event.loaded, total, percent });
+    });
+    request.upload.addEventListener("load", () => {
+      onProgress?.({
+        phase: "indexing",
+        loaded: file.size,
+        total: file.size,
+        percent: 100,
+      });
+    });
+    request.addEventListener("load", () => {
+      let payload: IngestionResponse | ErrorResponse | undefined;
+      try {
+        payload = JSON.parse(request.responseText) as IngestionResponse | ErrorResponse;
+      } catch {
+        payload = undefined;
+      }
+      if (request.status >= 200 && request.status < 300 && payload) {
+        resolve(payload as IngestionResponse);
+        return;
+      }
+      const error = payload as ErrorResponse | undefined;
+      reject(
+        new APIError(
+          error?.error?.message || `请求失败 (${request.status || "网络错误"})`,
+          error?.error?.code,
+          error?.error?.request_id || request.getResponseHeader("X-Request-ID") || undefined,
+        ),
+      );
+    });
+    request.addEventListener("error", () => {
+      reject(new APIError("无法连接文档服务", "network_error"));
+    });
+    request.send(formData);
   });
-  if (!response.ok) {
-    throw await parseError(response);
-  }
-  return (await response.json()) as IngestionResponse;
 }
 
 export async function reindexDocument(

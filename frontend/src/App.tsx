@@ -41,7 +41,16 @@ import {
   reindexDocument,
   streamChat,
   uploadDocument,
+  type UploadProgress,
 } from "./api";
+import {
+  createConversation,
+  hasConversationContent,
+  loadConversations,
+  saveConversations,
+  titleFromMessages,
+  type ConversationRecord,
+} from "./conversations";
 import type {
   ChatEvent,
   ChatMessage,
@@ -49,14 +58,6 @@ import type {
   DocumentRecord,
   SourceReference,
 } from "./types";
-
-const INITIAL_ASSISTANT_MESSAGE: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content: "RAG 工作台已启动。",
-  stage: "done",
-  sources: [],
-};
 
 const QUERY_RETRY_COUNT = 2;
 const configuredRefreshInterval = Number(
@@ -110,6 +111,29 @@ function updateMessage(
   return messages.map((message) => (message.id === id ? update(message) : message));
 }
 
+function latestSources(messages: ChatMessage[]): SourceReference[] {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].sources.length > 0) return messages[index].sources;
+  }
+  return [];
+}
+
+type ConversationState = {
+  activeId: string;
+  items: ConversationRecord[];
+};
+
+type ConversationAction =
+  | { type: "clear-current" }
+  | { type: "clear-history" }
+  | { type: "delete"; conversationId: string }
+  | null;
+
+type UploadState = UploadProgress & {
+  filename: string;
+  fileSize: number;
+};
+
 function statusLabel(status: string): string {
   if (status === "active") return "已索引";
   if (status === "indexing") return "处理中";
@@ -141,7 +165,7 @@ function DocumentItem({
       <div className="document-copy">
         <strong title={document.display_name}>{document.display_name}</strong>
         <span>
-          {document.chunk_count} chunks · {formatBytes(document.file_size_bytes)} · {shortDate(document.updated_at)}
+          {document.chunk_count} 个片段 · {formatBytes(document.file_size_bytes)} · {shortDate(document.updated_at)}
         </span>
       </div>
       <span className={`document-status status-${document.status}`}>
@@ -244,7 +268,7 @@ function DocumentDetailsDialog({
                 </div>
                 <div>
                   <dt><FileText size={14} />索引内容</dt>
-                  <dd>{detail.chunk_count} chunks · {formatBytes(detail.file_size_bytes)}</dd>
+                  <dd>{detail.chunk_count} 个片段 · {formatBytes(detail.file_size_bytes)}</dd>
                 </div>
                 <div>
                   <dt><Clock3 size={14} />最近更新</dt>
@@ -340,7 +364,7 @@ function DocumentDetailsDialog({
                         </span>
                       </div>
                       <div className="index-history-meta">
-                        <span>{index.chunk_count} chunks</span>
+                        <span>{index.chunk_count} 个片段</span>
                         <span>{fullDate(index.updated_at)}</span>
                         <span className="monospace">{shortIdentifier(index.document_version_id)}</span>
                       </div>
@@ -359,11 +383,158 @@ function DocumentDetailsDialog({
   );
 }
 
+function ConversationHistory({
+  conversations,
+  activeId,
+  onSelect,
+  onDelete,
+  onClear,
+}: {
+  conversations: ConversationRecord[];
+  activeId: string;
+  onSelect: (conversation: ConversationRecord) => void;
+  onDelete: (conversationId: string) => void;
+  onClear: () => void;
+}) {
+  const history = conversations
+    .filter(hasConversationContent)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  return (
+    <section className="conversation-section" aria-labelledby="conversation-history-title">
+      <header className="section-heading">
+        <div>
+          <span id="conversation-history-title">最近对话</span>
+          <small>{history.length} 条</small>
+        </div>
+        <button
+          className="icon-button"
+          type="button"
+          title="清空对话历史"
+          aria-label="清空对话历史"
+          onClick={onClear}
+          disabled={history.length === 0}
+        >
+          <Trash2 size={15} />
+        </button>
+      </header>
+      <div className="conversation-list">
+        {history.map((conversation) => (
+          <div
+            className={`conversation-item ${conversation.id === activeId ? "active" : ""}`}
+            key={conversation.id}
+          >
+            <button
+              className="conversation-select"
+              type="button"
+              onClick={() => onSelect(conversation)}
+              aria-label={`打开对话 ${conversation.title}`}
+              aria-current={conversation.id === activeId ? "page" : undefined}
+            >
+              <MessageSquarePlus size={14} aria-hidden="true" />
+              <span>
+                <strong title={conversation.title}>{conversation.title}</strong>
+                <small>{shortDate(conversation.updatedAt)}</small>
+              </span>
+            </button>
+            <button
+              className="conversation-delete"
+              type="button"
+              title={`删除对话 ${conversation.title}`}
+              aria-label={`删除对话 ${conversation.title}`}
+              onClick={() => onDelete(conversation.id)}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ))}
+        {history.length === 0 && (
+          <div className="conversation-empty">
+            <Clock3 size={16} />
+            <span>暂无历史对话</span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function UploadProgressPanel({ progress }: { progress: UploadState }) {
+  const indexing = progress.phase === "indexing";
+  return (
+    <div className="upload-progress" role="status" aria-live="polite">
+      <div className="upload-progress-heading">
+        <FileText size={15} />
+        <span>
+          <strong title={progress.filename}>{progress.filename}</strong>
+          <small>{formatBytes(progress.fileSize)}</small>
+        </span>
+      </div>
+      <div
+        className={`upload-progress-track ${indexing ? "indexing" : ""}`}
+        aria-label={indexing ? "正在建立向量索引" : `文件上传进度 ${progress.percent}%`}
+      >
+        <span style={{ width: `${Math.max(progress.percent, 4)}%` }} />
+      </div>
+      <div className="upload-stages">
+        <span className={indexing ? "complete" : "active"}>
+          {indexing ? <Check size={13} /> : <LoaderCircle className="spin" size={13} />}
+          上传文件{indexing ? "完成" : ` ${progress.percent}%`}
+        </span>
+        <span className={indexing ? "active" : "pending"}>
+          {indexing ? <LoaderCircle className="spin" size={13} /> : <Clock3 size={13} />}
+          解析、切分与向量化
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmationDialog({
+  title,
+  description,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="dialog-backdrop conversation-confirm-backdrop">
+      <section
+        className="conversation-confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="conversation-confirm-title"
+      >
+        <div className="confirmation-icon" aria-hidden="true">
+          <Trash2 size={20} />
+        </div>
+        <div>
+          <h2 id="conversation-confirm-title">{title}</h2>
+          <p>{description}</p>
+        </div>
+        <div className="confirmation-actions">
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            取消
+          </button>
+          <button className="danger-button" type="button" onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function SourceItem({ source }: { source: SourceReference }) {
   const metrics = [
-    source.distance != null ? `L2 ${source.distance.toFixed(4)}` : null,
-    source.rerank_score != null ? `Rerank ${source.rerank_score.toFixed(4)}` : null,
-    source.fusion_score != null ? `RRF ${source.fusion_score.toFixed(5)}` : null,
+    source.distance != null ? `距离 ${source.distance.toFixed(4)}` : null,
+    source.rerank_score != null ? `重排 ${source.rerank_score.toFixed(4)}` : null,
+    source.fusion_score != null ? `融合 ${source.fusion_score.toFixed(5)}` : null,
   ].filter(Boolean);
   return (
     <article className="source-item">
@@ -382,19 +553,33 @@ function SourceItem({ source }: { source: SourceReference }) {
 
 function App() {
   const queryClient = useQueryClient();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    INITIAL_ASSISTANT_MESSAGE,
-  ]);
+  const [conversationState, setConversationState] = useState<ConversationState>(() => {
+    const saved = loadConversations(window.localStorage);
+    const active = saved[0] ?? createConversation();
+    return {
+      activeId: active.id,
+      items: saved.length > 0 ? saved : [active],
+    };
+  });
   const [question, setQuestion] = useState("");
   const [activeAnswerId, setActiveAnswerId] = useState<string | null>(null);
   const [selectedSources, setSelectedSources] = useState<SourceReference[]>([]);
-  const [sourcesOpen, setSourcesOpen] = useState(true);
+  const [sourcesOpen, setSourcesOpen] = useState(
+    () => !window.matchMedia("(max-width: 860px)").matches,
+  );
   const [uploadNotice, setUploadNotice] = useState<SidebarNotice>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadState | null>(null);
   const [selectedDocumentKey, setSelectedDocumentKey] = useState<string | null>(null);
   const [managementNotice, setManagementNotice] = useState<ManagementNotice>(null);
+  const [conversationAction, setConversationAction] = useState<ConversationAction>(null);
   const streamController = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const chatEnd = useRef<HTMLDivElement | null>(null);
+
+  const activeConversation =
+    conversationState.items.find((item) => item.id === conversationState.activeId) ??
+    conversationState.items[0];
+  const messages = activeConversation?.messages ?? [];
 
   const readiness = useQuery({
     queryKey: ["readiness"],
@@ -422,14 +607,27 @@ function App() {
     refetchInterval: QUERY_REFRESH_INTERVAL,
   });
   const upload = useMutation({
-    mutationFn: uploadDocument,
+    mutationFn: (file: File) =>
+      uploadDocument(file, (progress) => {
+        setUploadProgress({ ...progress, filename: file.name, fileSize: file.size });
+      }),
+    onMutate: (file) => {
+      setUploadProgress({
+        phase: "uploading",
+        loaded: 0,
+        total: file.size,
+        percent: 0,
+        filename: file.name,
+        fileSize: file.size,
+      });
+    },
     onSuccess: (result) => {
       setUploadNotice({
         kind: "success",
         message:
           result.status === "noop"
             ? "文档已存在，索引保持不变。"
-            : `索引完成，共生成 ${result.chunk_count} 个 chunks。`,
+            : `索引完成，共生成 ${result.chunk_count} 个片段。`,
       });
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
@@ -439,6 +637,7 @@ function App() {
         message: error instanceof Error ? error.message : "文档上传失败。",
       });
     },
+    onSettled: () => setUploadProgress(null),
   });
   const reindex = useMutation({
     mutationFn: reindexDocument,
@@ -446,7 +645,7 @@ function App() {
     onSuccess: (result, documentKey) => {
       setManagementNotice({
         kind: "success",
-        message: `索引重建完成，共生成 ${result.chunk_count} 个 chunks。`,
+        message: `索引重建完成，共生成 ${result.chunk_count} 个片段。`,
       });
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
       void queryClient.invalidateQueries({ queryKey: ["document", documentKey] });
@@ -486,10 +685,46 @@ function App() {
   const serviceReady = readiness.data?.ready === true;
   const currentSourceCount = selectedSources.length;
   const documentsTotal = documents.data?.total ?? 0;
+  const serviceChecking = readiness.isLoading && !readiness.data;
+  const serviceStatusLabel = serviceChecking
+    ? "正在检查服务"
+    : serviceReady
+      ? "服务就绪"
+      : "服务未就绪";
+  const actionConversation =
+    conversationAction?.type === "delete"
+      ? conversationState.items.find(
+          (item) => item.id === conversationAction.conversationId,
+        )
+      : undefined;
+  const conversationActionCopy =
+    conversationAction?.type === "clear-history"
+      ? {
+          title: "清空全部对话历史？",
+          description: "本机保存的全部问答记录将被删除，此操作不可撤销。",
+          confirmLabel: "清空历史",
+        }
+      : conversationAction?.type === "delete"
+        ? {
+            title: "删除这条对话？",
+            description: `“${actionConversation?.title || "未命名对话"}”将从本机历史中删除。`,
+            confirmLabel: "删除对话",
+          }
+        : {
+            title: "清空当前对话？",
+            description: "当前问答内容将被清除，此操作不可撤销。",
+            confirmLabel: "清空对话",
+          };
 
   useEffect(() => {
     chatEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      saveConversations(window.localStorage, conversationState.items);
+    }
+  }, [conversationState.items, isStreaming]);
 
   useEffect(() => {
     return () => streamController.current?.abort();
@@ -506,11 +741,39 @@ function App() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedDocumentKey, removeDocument.isPending]);
 
+  useEffect(() => {
+    if (!conversationAction) return;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setConversationAction(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [conversationAction]);
+
   const providerLabel = useMemo(() => {
     if (config.isError) return "配置不可用";
     if (!config.data) return "配置加载中";
     return `${config.data.embedding_provider} · ${config.data.llm_provider}`;
   }, [config.data, config.isError]);
+
+  function setMessages(
+    update: ChatMessage[] | ((current: ChatMessage[]) => ChatMessage[]),
+  ) {
+    setConversationState((current) => ({
+      ...current,
+      items: current.items.map((conversation) => {
+        if (conversation.id !== current.activeId) return conversation;
+        const nextMessages =
+          typeof update === "function" ? update(conversation.messages) : update;
+        return {
+          ...conversation,
+          messages: nextMessages,
+          title: titleFromMessages(nextMessages),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+  }
 
   function applyChatEvent(answerId: string, event: ChatEvent) {
     if (event.type === "sources") {
@@ -624,12 +887,75 @@ function App() {
     streamController.current?.abort();
   }
 
-  function resetConversation() {
+  function startNewConversation() {
     streamController.current?.abort();
     setActiveAnswerId(null);
-    setMessages([INITIAL_ASSISTANT_MESSAGE]);
+    setConversationState((current) => {
+      const active = current.items.find((item) => item.id === current.activeId);
+      if (active && !hasConversationContent(active)) {
+        return {
+          ...current,
+          items: current.items.map((item) =>
+            item.id === current.activeId
+              ? { ...item, messages: [], title: "新对话", updatedAt: new Date().toISOString() }
+              : item,
+          ),
+        };
+      }
+      const conversation = createConversation();
+      return {
+        activeId: conversation.id,
+        items: [conversation, ...current.items],
+      };
+    });
     setSelectedSources([]);
     setQuestion("");
+  }
+
+  function selectConversation(conversation: ConversationRecord) {
+    if (conversation.id === conversationState.activeId) return;
+    streamController.current?.abort();
+    setActiveAnswerId(null);
+    setConversationState((current) => ({ ...current, activeId: conversation.id }));
+    setSelectedSources(latestSources(conversation.messages));
+    setQuestion("");
+  }
+
+  function deleteConversation(conversationId: string) {
+    const remaining = conversationState.items.filter((item) => item.id !== conversationId);
+    const fallback = remaining[0] ?? createConversation();
+    const deletingActive = conversationState.activeId === conversationId;
+    setConversationState({
+      activeId: deletingActive ? fallback.id : conversationState.activeId,
+      items: remaining.length > 0 ? remaining : [fallback],
+    });
+    if (deletingActive) {
+      streamController.current?.abort();
+      setActiveAnswerId(null);
+      setSelectedSources(latestSources(fallback.messages));
+      setQuestion("");
+    }
+  }
+
+  function confirmConversationAction() {
+    if (!conversationAction) return;
+    if (conversationAction.type === "clear-current") {
+      streamController.current?.abort();
+      setActiveAnswerId(null);
+      setMessages([]);
+      setSelectedSources([]);
+      setQuestion("");
+    } else if (conversationAction.type === "clear-history") {
+      const conversation = createConversation();
+      streamController.current?.abort();
+      setActiveAnswerId(null);
+      setConversationState({ activeId: conversation.id, items: [conversation] });
+      setSelectedSources([]);
+      setQuestion("");
+    } else {
+      deleteConversation(conversationAction.conversationId);
+    }
+    setConversationAction(null);
   }
 
   function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -655,14 +981,24 @@ function App() {
           </div>
           <div>
             <strong>RAG Workbench</strong>
-            <span>Knowledge operations</span>
+            <span>知识库工作台</span>
           </div>
         </div>
 
-        <button className="new-chat-button" type="button" onClick={resetConversation}>
+        <button className="new-chat-button" type="button" onClick={startNewConversation}>
           <MessageSquarePlus size={17} />
           新建对话
         </button>
+
+        <ConversationHistory
+          conversations={conversationState.items}
+          activeId={conversationState.activeId}
+          onSelect={selectConversation}
+          onDelete={(conversationId) =>
+            setConversationAction({ type: "delete", conversationId })
+          }
+          onClear={() => setConversationAction({ type: "clear-history" })}
+        />
 
         <section className="sidebar-section">
           <header className="section-heading">
@@ -694,10 +1030,12 @@ function App() {
             type="button"
             onClick={() => fileInput.current?.click()}
             disabled={upload.isPending || !serviceReady}
+            title={!serviceReady ? "文档服务就绪后可上传" : "上传文档"}
           >
             {upload.isPending ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
-            {upload.isPending ? "正在建立索引" : "上传文档"}
+            {upload.isPending ? "正在处理文档" : "上传文档"}
           </button>
+          {uploadProgress && <UploadProgressPanel progress={uploadProgress} />}
           {uploadNotice && (
             <div className={`upload-notice ${uploadNotice.kind === "error" ? "notice-error" : ""}`}>
               {uploadNotice.kind === "error" ? <CircleAlert size={15} /> : <Check size={15} />}
@@ -715,24 +1053,36 @@ function App() {
           )}
 
           <div className="document-list">
-            {documents.isLoading && (
-              <div className="list-placeholder"><LoaderCircle className="spin" size={18} />加载文档</div>
-            )}
-            {documents.isError && (
-              <div className="list-placeholder error-text"><CircleAlert size={18} />文档服务不可用</div>
-            )}
-            {documents.data?.items.map((document) => (
-              <DocumentItem
-                key={document.document_key}
-                document={document}
-                onOpen={() => openDocument(document.document_key)}
-              />
-            ))}
-            {documents.data?.total === 0 && (
-              <div className="empty-documents">
-                <Database size={22} />
-                <span>知识库为空</span>
+            {documents.isLoading && !documents.data ? (
+              <div className="list-placeholder">
+                <LoaderCircle className="spin" size={18} />
+                正在读取文档
               </div>
+            ) : documents.isError ? (
+              <div className="list-error-state">
+                <CircleAlert size={20} />
+                <strong>文档服务不可用</strong>
+                <button type="button" onClick={() => void documents.refetch()}>
+                  <RefreshCw size={13} />重新加载
+                </button>
+              </div>
+            ) : (
+              <>
+                {documents.data?.items.map((document) => (
+                  <DocumentItem
+                    key={document.document_key}
+                    document={document}
+                    onOpen={() => openDocument(document.document_key)}
+                  />
+                ))}
+                {documents.data?.total === 0 && (
+                  <div className="empty-documents">
+                    <Database size={22} />
+                    <strong>知识库为空</strong>
+                    <span>尚未上传文档</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -740,7 +1090,7 @@ function App() {
         <footer className="sidebar-footer">
           <div className={`readiness-dot ${serviceReady ? "ready" : "offline"}`} />
           <div>
-            <strong>{serviceReady ? "服务就绪" : "服务未就绪"}</strong>
+            <strong>{serviceStatusLabel}</strong>
             <span>{providerLabel}</span>
           </div>
         </footer>
@@ -750,7 +1100,7 @@ function App() {
         <header className="workspace-header">
           <div>
             <h1>知识库问答</h1>
-            <span>Dense retrieval · source-grounded generation</span>
+            <span>{activeConversation?.title || "新对话"}</span>
           </div>
           <div className="header-actions">
             <div className="service-pills" aria-label="服务状态">
@@ -758,9 +1108,19 @@ function App() {
                 <Database size={14} /> Milvus
               </span>
               <span className={activeComponents?.llm === "ready" ? "healthy" : "unhealthy"}>
-                <Server size={14} /> LLM
+                <Server size={14} /> 语言模型
               </span>
             </div>
+            <button
+              className="icon-button bordered"
+              type="button"
+              title="清空当前对话"
+              aria-label="清空当前对话"
+              onClick={() => setConversationAction({ type: "clear-current" })}
+              disabled={messages.length === 0}
+            >
+              <Trash2 size={17} />
+            </button>
             <button
               className="icon-button bordered"
               type="button"
@@ -775,13 +1135,59 @@ function App() {
 
         <div className={`content-grid ${sourcesOpen ? "with-sources" : ""}`}>
           <section className="chat-panel" aria-label="问答对话">
+            {(serviceChecking || !serviceReady || config.isError) && (
+              <div
+                className={`service-alert ${serviceChecking ? "checking" : "error"}`}
+                role="status"
+              >
+                {serviceChecking ? (
+                  <LoaderCircle className="spin" size={18} />
+                ) : (
+                  <CircleAlert size={18} />
+                )}
+                <div>
+                  <strong>{serviceChecking ? "正在连接后端服务" : "问答服务未就绪"}</strong>
+                  <span>
+                    {serviceChecking
+                      ? "正在读取运行状态与公开配置"
+                      : readiness.isError
+                        ? "无法连接后端，请确认 FastAPI 服务已经启动。"
+                        : "Milvus、嵌入模型或语言模型仍有依赖未就绪。"}
+                  </span>
+                </div>
+                {!serviceChecking && (
+                  <button
+                    className="secondary-button compact"
+                    type="button"
+                    onClick={() => {
+                      void readiness.refetch();
+                      void config.refetch();
+                      void documents.refetch();
+                    }}
+                  >
+                    <RefreshCw size={14} />重新检查
+                  </button>
+                )}
+              </div>
+            )}
             <div className="message-list">
+              {messages.length === 0 && (
+                <div className="chat-empty">
+                  <div aria-hidden="true"><Bot size={22} /></div>
+                  <strong>暂无对话</strong>
+                  <span>
+                    {documentsTotal > 0
+                      ? `知识库中有 ${documentsTotal} 个文档`
+                      : "知识库暂无文档"}
+                  </span>
+                </div>
+              )}
               {messages.map((message) => (
                 <article key={message.id} className={`message message-${message.role}`}>
                   {message.role === "assistant" && (
                     <div className="assistant-avatar" aria-hidden="true"><Bot size={17} /></div>
                   )}
-                  <div className="message-body">
+                  <div className={`message-body ${message.stage === "error" ? "message-error" : ""}`}>
                     {message.role === "assistant" && message.stage !== "done" && !message.content && (
                       <div className="message-progress">
                         <LoaderCircle className="spin" size={16} />
@@ -838,12 +1244,30 @@ function App() {
           </section>
 
           {sourcesOpen && (
-            <aside className="sources-panel">
+            <button
+              className="sources-backdrop"
+              type="button"
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={() => setSourcesOpen(false)}
+            />
+          )}
+          {sourcesOpen && (
+            <aside className="sources-panel" aria-label="引用来源">
               <header>
                 <div>
                   <h2>引用来源</h2>
                   <span>{currentSourceCount ? `${currentSourceCount} 个检索片段` : "等待检索结果"}</span>
                 </div>
+                <button
+                  className="icon-button bordered sources-close"
+                  type="button"
+                  title="关闭引用来源"
+                  aria-label="关闭引用来源"
+                  onClick={() => setSourcesOpen(false)}
+                >
+                  <X size={16} />
+                </button>
               </header>
               <div className="sources-list">
                 {selectedSources.map((source) => (
@@ -852,7 +1276,8 @@ function App() {
                 {selectedSources.length === 0 && (
                   <div className="sources-empty">
                     <FileText size={26} />
-                    <span>暂无引用</span>
+                    <strong>暂无引用来源</strong>
+                    <span>当前对话还没有检索结果</span>
                   </div>
                 )}
               </div>
@@ -872,6 +1297,15 @@ function App() {
           onClose={() => setSelectedDocumentKey(null)}
           onReindex={() => reindex.mutate(selectedDocumentKey)}
           onDelete={() => removeDocument.mutate(selectedDocumentKey)}
+        />
+      )}
+      {conversationAction && (
+        <ConfirmationDialog
+          title={conversationActionCopy.title}
+          description={conversationActionCopy.description}
+          confirmLabel={conversationActionCopy.confirmLabel}
+          onCancel={() => setConversationAction(null)}
+          onConfirm={confirmConversationAction}
         />
       )}
     </>
