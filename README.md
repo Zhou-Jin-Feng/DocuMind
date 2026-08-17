@@ -116,7 +116,7 @@ DocuMind/
 ## 环境要求
 
 - Windows PowerShell（以下命令以 Windows 为例）
-- Python 3.11 或更高版本
+- Python 3.11（v2.0 Docker 与 CI 的正式验证基线）
 - 一个可访问的 Milvus Standalone 服务（默认 `http://127.0.0.1:19530`）
 - 至少配置一个 LLM Provider
 - 默认 Embedding 使用本地 Ollama，需要 Ollama 服务和对应模型
@@ -312,6 +312,10 @@ npm run build
 npm run test:e2e
 ```
 
+### 5B. 运行完整演示
+
+现场演示、录屏、典型问题、预期答案、Metrics 展示和故障备用方案见 [`DEMO_SCRIPT.md`](./DEMO_SCRIPT.md)。演示默认使用 `tests/knowledge_base.txt`，建议在正式展示前按脚本完整走场一次。
+
 ### 6. 启动 Gradio 兼容入口
 
 ```powershell
@@ -475,7 +479,7 @@ python -m compileall -q app evaluation web_app.py tests
 python -m pip check
 ```
 
-v1.9.1 最终本地回归结果为：Python `178 passed, 1 skipped`，前端 Vitest `5 passed`，Playwright `6 passed`，TypeScript 类型检查和生产构建通过。完整自动回归不需要真实 Milvus；`tests.test_milvus_integration` 仅在显式设置 `MILVUS_INTEGRATION_TEST=1` 时连接本机服务。
+v2.0 收尾回归结果为：Python 3.11 容器与本机兼容环境均为 `178 passed, 1 skipped, 11 subtests passed`，前端 Vitest `5 passed`，Playwright `6 passed`，Black、`compileall`、TypeScript 类型检查和生产构建通过。完整自动回归不需要真实 Milvus；`tests.test_milvus_integration` 仅在显式设置 `MILVUS_INTEGRATION_TEST=1` 时连接本机服务，完整 Compose 栈另行完成真实 Milvus 启动验证。
 
 ## 数据和索引
 
