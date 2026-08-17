@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.9.1）
+# DocuMind - RAG 知识库问答系统（v1.9.1 / v2.0 收尾中）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前开发版本：**v1.9.1 前后端分离工作台**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史。Gradio 入口仅作为兼容与回归入口保留。
+> 当前开发版本：**v1.9.1 前后端分离工作台，v2.0 收尾准备中**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史。v2.0 的重心是统一 Compose、CI、README 和演示材料；Gradio 入口仅作为兼容与回归入口保留。
 
 ## 当前能力
 
@@ -211,6 +211,69 @@ npm run dev
 ```
 
 默认工作台地址为 `http://127.0.0.1:5173`。前端默认请求 `http://127.0.0.1:8001`；跨主机或端口时可在 `frontend/.env.local` 设置 `VITE_API_BASE_URL`。
+
+### 5A. 使用统一 Docker Compose（v2.0 收尾链路）
+
+根目录 `compose.yaml` 会同时启动 FastAPI、React、Milvus、etcd 和 MinIO。该方式面向本地演示和收尾验收，仍需要宿主机 Ollama 服务和所选 LLM Provider 的 API Key。
+
+```powershell
+Copy-Item .env.example .env
+# 在 .env 中填写 DEFAULT_LLM_PROVIDER 与对应 API Key
+ollama serve
+ollama pull qwen3-embedding
+docker compose up --build
+```
+
+默认访问地址：
+
+- React 工作台：`http://127.0.0.1:5173`
+- FastAPI：`http://127.0.0.1:8001`
+- Swagger：`http://127.0.0.1:8001/docs`
+- Metrics：`http://127.0.0.1:8000/metrics`
+- Milvus：`http://127.0.0.1:19530`
+
+Docker 中的 API 默认通过 `http://host.docker.internal:11434` 访问宿主机 Ollama。若运行环境不支持该地址，可在 `.env` 中设置 `DOCKER_OLLAMA_BASE_URL`，不要复用本地 Python 进程使用的 `OLLAMA_BASE_URL=http://localhost:11434`。
+
+如果已经启动了 `infra/milvus/compose.yaml`，它会占用 `19530` 和 `9091`。可以先停止旧基础设施栈，或者为根级栈设置替代宿主端口：
+
+```dotenv
+MILVUS_HOST_PORT=19531
+MILVUS_HEALTH_HOST_PORT=9092
+```
+
+如果本地开发进程已经占用 API 或 Metrics 端口，也可以设置替代宿主端口。前端镜像的 API 地址默认会跟随 `API_HOST_PORT`：
+
+```dotenv
+API_HOST_PORT=8002
+METRICS_HOST_PORT=8003
+```
+
+如果 `docker compose up --build` 在拉取基础镜像或 Python 依赖时超时，说明当前 Docker Hub 或 PyPI 访问不稳定。先确认 Docker Desktop 可以正常联网，或配置可用的镜像加速源后重试；Compose 配置本身可用 `docker compose -f compose.yaml config --quiet` 做离线语法校验。
+
+也可以临时指定可访问的基础镜像源：
+
+```dotenv
+PYTHON_BASE_IMAGE=docker.m.daocloud.io/python:3.11-slim
+NODE_BASE_IMAGE=hub.rat.dev/node:22-alpine
+PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+TORCH_TRUSTED_HOST=download.pytorch.org
+```
+
+这些变量只影响 Docker 镜像构建。后端镜像默认从 PyTorch 官方 CPU wheel 源预装 `torch`，避免 Cross-Encoder 依赖引入数 GB 的 CUDA 运行库。使用 HTTPS 镜像时通常不需要 `PIP_TRUSTED_HOST` 或 `TORCH_TRUSTED_HOST`；仅在当前网络的证书校验确实失败且你信任对应镜像站时再设置。
+
+停止服务但保留数据：
+
+```powershell
+docker compose stop
+```
+
+移除容器但保留命名卷：
+
+```powershell
+docker compose down
+```
 
 主要 API：
 
@@ -437,11 +500,11 @@ v1.8 采用“新 Collection 全量重建”完成 Chroma 到 Milvus 的迁移�
 ## 已知限制
 
 - React 工作台当前是本地单用户界面；对话历史保存在浏览器 `localStorage`，不会进入后端，也不会参与历史感知检索。
-- FastAPI 与 React 已完成真实闭环和浏览器回归，但还没有认证、异步任务队列、正式应用部署配置或 API 兼容策略。
+- FastAPI 与 React 已完成真实闭环、浏览器回归和本地 Compose 收尾配置，但还没有认证、异步任务队列、生产部署策略或 API 兼容策略。
 - v1.4 之前写入的旧向量没有 `index_id`，当前检索会兼容保留；`audit` 会报告 legacy Chunk，后续可安排显式迁移。
 - 迁移前的 Chroma Collection 不受新适配器管理，需要在 Milvus 中使用新 Collection 全量重建。
 - 非空 Collection 禁止切换 Embedding Provider、模型或维度；当前版本不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
-- 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.0/v2.1。
+- 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.1 以后。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
 - 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.9.1。
 
