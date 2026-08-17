@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v1.9.1）
+# DocuMind - RAG 系统架构（v2.0）
 
 ## 1. 分层结构
 
@@ -42,7 +42,7 @@ flowchart TD
 
 `app/core` 保持业务能力，`app/observability` 提供横切能力。业务层只调用稳定封装，不直接依赖 Prometheus 注册表、OpenTelemetry 全局 Provider 或日志文件实现。
 
-v1.9.1 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。
+v2.0 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。
 
 ## 2. 文档索引流程
 
@@ -236,7 +236,7 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归，评估层和生命周期层仍不反向依赖具体 Web UI；样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、CI 门禁、演示脚本和发布文档；评估层和生命周期层仍不反向依赖具体 Web UI，样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
 
 ```text
 evaluation.runner / production_runner
@@ -251,7 +251,7 @@ evaluation.runner / production_runner
 
 当前仍不包含：
 
-- RAG 应用本身的 Docker/Compose 部署和可观测性后端容器（Milvus Standalone、etcd、MinIO 的基础设施 Compose 已提供）；
+- Prometheus、Grafana、Jaeger 与 OpenTelemetry Collector 等可观测性后端容器；
 - 历史感知检索，以及 Query Rewrite / Reranker 的 Web 默认接入；
 - Celery/Redis 异步摄取；
 - 认证、多租户、限流和生产高可用。

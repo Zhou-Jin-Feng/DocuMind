@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v1.9.1 / v2.0 收尾中）
+# DocuMind - RAG 知识库问答系统（v2.0）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前开发版本：**v1.9.1 前后端分离工作台，v2.0 收尾准备中**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史。v2.0 的重心是统一 Compose、CI、README 和演示材料；Gradio 入口仅作为兼容与回归入口保留。
+> 当前版本：**v2.0 收尾交付版（应用版本 `2.0.0`）**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史，并提供统一 Docker Compose、前后端镜像入口、CI 门禁和演示脚本。Gradio 入口仅作为兼容与回归入口保留。
 
 ## 当前能力
 
@@ -27,6 +27,7 @@
 - v1.8 完成 Chroma 到 Milvus 的向量存储迁移，并保留 Embedding 空间、维度和 Collection 兼容性校验。
 - v1.9 搭建 FastAPI 后端与 React/TypeScript 前端：统一错误响应、健康检查、公开配置、文档接口、SSE 问答和前端服务状态反馈。
 - v1.9.1 完成真实 RAG 闭环、Milvus/Ollama 探活、前端 E2E、文档详情/重建/删除、上传进度和本地对话历史。
+- v2.0 完成 FastAPI、React、Milvus、etcd、MinIO 统一 Compose，补齐前后端容器入口、GitHub Actions CI、回归口径和交付演示材料。
 
 ## 版本迭代记录
 
@@ -46,6 +47,7 @@ README 保留面向仓库用户的公开版本摘要；当前架构边界见 [AR
 | v1.8 | Chroma 到 Milvus 的向量数据迁移与运行时兼容性校验 |
 | v1.9 | FastAPI 后端基础、React 工作台、SSE 问答与前后端联调测试 |
 | v1.9.1 | 真实服务探活、RAG 闭环、浏览器 E2E、文档管理与工作台交互完善 |
+| v2.0 | 统一 Compose、前后端 Dockerfile、CI 自动回归、演示脚本与发布收口 |
 
 
 ## 项目结构
@@ -194,7 +196,7 @@ DEFAULT_LLM_PROVIDER=openai
 OPENAI_API_KEY=your-api-key
 ```
 
-### 5. 启动 FastAPI 后端与 React 工作台（v1.9.1 默认链路）
+### 5. 启动 FastAPI 后端与 React 工作台（本地开发链路）
 
 终端一启动 API：
 
@@ -212,9 +214,9 @@ npm run dev
 
 默认工作台地址为 `http://127.0.0.1:5173`。前端默认请求 `http://127.0.0.1:8001`；跨主机或端口时可在 `frontend/.env.local` 设置 `VITE_API_BASE_URL`。
 
-### 5A. 使用统一 Docker Compose（v2.0 收尾链路）
+### 5A. 使用统一 Docker Compose（v2.0 交付链路）
 
-根目录 `compose.yaml` 会同时启动 FastAPI、React、Milvus、etcd 和 MinIO。该方式面向本地演示和收尾验收，仍需要宿主机 Ollama 服务和所选 LLM Provider 的 API Key。
+根目录 `compose.yaml` 会同时启动 FastAPI、React、Milvus、etcd 和 MinIO。该方式面向本地演示和交付验收，仍需要宿主机 Ollama 服务和所选 LLM Provider 的 API Key。
 
 ```powershell
 Copy-Item .env.example .env
@@ -510,7 +512,18 @@ v1.8 采用“新 Collection 全量重建”完成 Chroma 到 Milvus 的迁移�
 - 非空 Collection 禁止切换 Embedding Provider、模型或维度；当前版本不提供跨向量空间的在线 shadow migration，更换模型需使用新 Collection 或清空后全量重建。
 - 当前是同步生命周期流程；Celery/Redis 异步摄取、认证和多租户授权属于 v2.1 以后。
 - 目前是本地单用户应用，没有认证、租户隔离和生产级限流。
-- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v1.9.1。
+- 当前仍只提供应用内 Metrics 和可选 OTLP Trace 导出；Prometheus、Grafana、Jaeger 与 Collector 的部署不属于 v2.0。
+
+## v2.1+ 路线
+
+v2.0 已完成“可演示、可部署、可验收”的交付目标。后续版本按系统边界分阶段推进：
+
+1. 在 v2.1 引入认证与用户边界，并基于认证上下文实现真实租户资源隔离；
+2. 在 v2.1-v2.2 评估 Celery/Redis 异步摄取、任务取消、失败重试和并发一致性；
+3. 按部署需要补充 Prometheus、Grafana、Jaeger/Collector 外部栈与告警；
+4. 扩大 holdout 数据后，继续验证 Query Rewrite 的可选质量模式，Reranker 保持受控实验。
+
+上述功能会引入新的安全、任务状态或运维边界，因此不回填到 v2.0。
 
 ## 常见问题
 

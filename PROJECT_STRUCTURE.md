@@ -1,4 +1,4 @@
-# 项目结构（v1.9.1）
+# 项目结构（v2.0）
 
 ```text
 DocuMind/
@@ -100,6 +100,8 @@ DocuMind/
 │   ├── baselines/
 │   └── reports/
 ├── frontend/
+│   ├── Dockerfile
+│   ├── .dockerignore
 │   ├── src/
 │   │   ├── App.tsx
 │   │   ├── api.ts
@@ -113,19 +115,27 @@ DocuMind/
 │   │   └── workbench.spec.ts
 │   ├── playwright.config.ts
 │   ├── vite.config.ts
-│   └── package.json
+│   ├── package.json
+│   └── package-lock.json
 ├── infra/
 │   └── milvus/
 │       └── compose.yaml
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── data/                  # 本地运行数据，Git 忽略
 ├── logs/                  # JSONL 日志，Git 忽略
 ├── .env                   # 本地密钥，Git 忽略
 ├── .env.example           # 无密钥配置模板
+├── .dockerignore
 ├── .gitignore
+├── compose.yaml
+├── Dockerfile
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── README.md
 ├── ARCHITECTURE.md
+├── DEMO_SCRIPT.md
 ├── DEPENDENCIES.md
 ├── OBSERVABILITY.md
 ├── EVALUATION.md
@@ -159,7 +169,13 @@ DocuMind/
 | `frontend/src/conversations.ts` | 对话标题、数量限制、`localStorage` 读取/校验/持久化 |
 | `frontend/e2e/mock-api.mjs` | 可控状态的本地 HTTP API，用于无真实 Provider 的浏览器回归 |
 | `frontend/e2e/workbench.spec.ts` | 服务恢复、上传、文档管理、流式问答、停止生成和历史管理 E2E |
+| `compose.yaml` | 编排 FastAPI、React、Milvus、etcd、MinIO，定义健康依赖、端口和持久卷 |
+| `Dockerfile` | Python 3.11 后端镜像入口，安装运行依赖并启动 `python -m app.api` |
+| `frontend/Dockerfile` | Node 22 前端构建与 `vite preview` 演示服务入口 |
+| `.dockerignore` / `frontend/.dockerignore` | 排除密钥、运行数据、缓存、依赖目录和测试产物 |
+| `.github/workflows/ci.yml` | Python、前端、Playwright 和 Compose 配置的自动回归门禁 |
 | `infra/milvus/compose.yaml` | Milvus Standalone、etcd、MinIO、健康检查和本地持久卷 |
+| `VERSION_HISTORY.md` | 版本边界、逐提交事实与发布验收记录 |
 | `app/lifecycle/models.py` | 文档、版本、索引清单、操作结果和审计报告模型 |
 | `app/lifecycle/registry.py` | SQLite 文档、索引、操作状态和 active 指针 |
 | `app/lifecycle/service.py` | 源文件持久化、同步构建、active 切换、清理、审计和重建 |
