@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v2.0.1）
+# DocuMind - RAG 知识库问答系统（v2.0.2）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前版本：**v2.0.1 质量加固版（应用版本 `2.0.1`）**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史，并提供统一 Docker Compose、前后端镜像入口、CI 门禁和演示脚本。Gradio 入口仅作为兼容与回归入口保留。
+> 当前版本：**v2.0.2 质量加固版（应用版本 `2.0.2`）**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史，并提供统一 Docker Compose、前后端镜像入口、CI 门禁和演示脚本。Gradio 入口仅作为兼容与回归入口保留。
 
 ## 当前能力
 
@@ -29,6 +29,7 @@
 - v1.9.1 完成真实 RAG 闭环、Milvus/Ollama 探活、前端 E2E、文档详情/重建/删除、上传进度和本地对话历史。
 - v2.0 完成 FastAPI、React、Milvus、etcd、MinIO 统一 Compose，补齐前后端容器入口、GitHub Actions CI、回归口径和交付演示材料。
 - v2.0.1 规范化评测文本的 BOM 与换行符指纹，并重建包含完整当前配置的确定性 Dense 基线。
+- v2.0.2 在 PR CI 中实时生成确定性 Dense 报告、执行质量回归门禁，并保留 JSON/Markdown Artifact。
 
 ## 版本迭代记录
 
@@ -50,6 +51,7 @@ README 保留面向仓库用户的公开版本摘要；当前架构边界见 [AR
 | v1.9.1 | 真实服务探活、RAG 闭环、浏览器 E2E、文档管理与工作台交互完善 |
 | v2.0 | 统一 Compose、前后端 Dockerfile、CI 自动回归、演示脚本与发布收口 |
 | v2.0.1 | 跨平台评测文本指纹、当前 Runner 配置兼容性与确定性 Dense 基线重建 |
+| v2.0.2 | PR CI 确定性检索质量门禁与实时评测报告 Artifact |
 
 
 ## 项目结构
@@ -483,9 +485,13 @@ python -m compileall -q app evaluation web_app.py tests
 python -m pip check
 ```
 
+GitHub Actions 的 Python Job 将单元测试与检索质量门禁作为独立步骤执行。单元测试通过后，CI 会使用仓库内黄金集和确定性本地 Embedding 实时生成 Dense JSON/Markdown 报告，再与 `evaluation/baselines/deterministic_dense_v2.json` 比较；两份实时报告无论门禁成功或失败都会作为 Artifact 保留 14 天。该门禁不连接 Ollama、Milvus、Hugging Face 或付费 LLM。
+
 v2.0 收尾回归结果为：Python 3.11 容器与本机兼容环境均为 `178 passed, 1 skipped, 11 subtests passed`，前端 Vitest `5 passed`，Playwright `6 passed`，Black、`compileall`、TypeScript 类型检查和生产构建通过。完整自动回归不需要真实 Milvus；`tests.test_milvus_integration` 仅在显式设置 `MILVUS_INTEGRATION_TEST=1` 时连接本机服务，完整 Compose 栈另行完成真实 Milvus 启动验证。
 
 v2.0.1 本地回归结果为：`181 passed, 1 skipped, 11 subtests passed`，前端 Vitest `5 passed`、Playwright `6 passed`，Black、`compileall`、`pip check`、TypeScript、生产构建和两份 Compose 配置解析通过。Windows 与本地 Linux 容器重新生成的确定性 Dense 报告均通过 `evaluation/baselines/deterministic_dense_v2.json`；该结果只证明输入可复现和现有检索质量未回退，不代表真实答案质量。
+
+v2.0.2 将上述确定性 Dense 回归接入 PR CI。本地受控故障验证保留全部输入指纹，只把 `recall_at_k` 从 `0.8333` 降至 `0.7`，门禁返回质量失败和退出码 `1`；恢复当前报告后重新返回 `PASS`，证明指标回退会阻止 CI，而不是依赖指纹不兼容制造失败。
 
 ## 数据和索引
 

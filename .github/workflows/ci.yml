@@ -6,7 +6,7 @@ on:
 
 jobs:
   python:
-    name: Python tests
+    name: Python tests and retrieval quality gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,28 @@ jobs:
         run: python -m compileall -q app evaluation web_app.py tests
       - name: Unit tests
         run: python -m pytest -q
+      - name: Run deterministic retrieval evaluation
+        run: |
+          python -m evaluation.runner \
+            --dataset evaluation/datasets/golden_dataset.jsonl \
+            --retrieval-mode dense \
+            --output-json "${{ runner.temp }}/rag-evaluation/current-evaluation.json" \
+            --output-markdown "${{ runner.temp }}/rag-evaluation/current-evaluation.md"
+      - name: Enforce retrieval quality regression gate
+        run: |
+          python -m evaluation.regression_runner \
+            --baseline evaluation/baselines/deterministic_dense_v2.json \
+            --current "${{ runner.temp }}/rag-evaluation/current-evaluation.json"
+      - name: Upload retrieval evaluation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-retrieval-evaluation
+          path: |
+            ${{ runner.temp }}/rag-evaluation/current-evaluation.json
+            ${{ runner.temp }}/rag-evaluation/current-evaluation.md
+          if-no-files-found: warn
+          retention-days: 14
 
   frontend:
     name: Frontend tests
