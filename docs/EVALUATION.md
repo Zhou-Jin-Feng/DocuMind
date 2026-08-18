@@ -1,6 +1,6 @@
 # DocuMind - RAG 评估
 
-v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI。
+v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立与旧检索报告隔离的答案质量契约和离线测试基础。
 
 ## 数据集
 
@@ -98,6 +98,32 @@ python -m evaluation.regression_runner \
 这条路径只使用仓库内 JSONL/TXT、确定性哈希 Embedding 和内存向量存储，不连接 Ollama、Milvus、Hugging Face 或付费 LLM。JSON/Markdown 实时报告使用 `actions/upload-artifact@v4` 和 `if: always()` 上传，保留 14 天；生成文件位于 GitHub Runner 临时目录，不提交回仓库。
 
 受控故障验证保留了全部配置和输入指纹，只把当前报告的 `recall_at_k` 从 `0.8333` 降到 `0.7`。`regression_runner` 返回 `FAIL` 和退出码 `1`；恢复原报告后返回 `PASS`。因此验证的是实际指标回退，而不是用不兼容指纹制造失败。
+
+### v2.0.3 答案质量评测契约
+
+`evaluation/answer_models.py` 定义与旧 `EvaluationReport` 独立的 `AnswerQualityCase`、`GeneratedAnswer`、`JudgeResult`、`AnswerCaseEvaluation` 和 `AnswerEvaluationReport`。旧 `evaluation.models.AnswerResult` 仍只服务检索 Runner 的拒答/关键词冒烟，没有被扩展或替换。
+
+数据集加载器强制检查完整字段集、重复 JSON 键、重复用例 ID、UTF-8、`train/validation/holdout` split、可回答/无答案字段约束，以及 `expected_document_ids` 与同级 `documents/*.txt` 文件名的对应关系。
+
+Judge 输出必须是单个严格 JSON 对象，字段全集固定为四项 `0..1` 分数、`unsupported_claims`、`invalid_citations` 和 `reason`。重复键、额外/缺失字段、布尔值冒充数字、NaN/Infinity、Markdown 代码块和 JSON 前后附加文字都会直接失败，不做自由文本修复。
+
+统一拒答文本为：
+
+```text
+根据提供的文档，未找到相关信息。
+```
+
+`outcome` 只允许 `answered/refused/no_context/error`：无检索结果时短路为 `no_context`，只有完整回答精确等于统一文本时才是 `refused`，不使用关键词猜测。指标聚合只对成功执行案例计算拒答准确率；四项 Judge 指标只纳入 `should_answer=true`、`outcome=answered` 且 Judge 成功的案例，并为每项指标单独记录分母。错误案例记录 `error_stage/error_type`，语义分数为 `null` 而不是 `0`。
+
+`evaluation/answer_adapters.py` 中的 Generator/Judge Protocol 同时约束 Fake 和后续真实适配器。当前测试只使用内存映射，不初始化 Ollama、Milvus 或云端 LLM：
+
+```powershell
+.\venv\Scripts\python.exe -m pytest tests/test_answer_evaluation.py -q
+```
+
+v2.0.3 验收时该独立文件为 `8 passed, 9 subtests passed`；全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`，Vitest 为 `5 passed`，Playwright 为 `6 passed`。同时通过 Black、compileall、`pip check`、前端生产构建和 `deterministic_dense_v2` 检索回归门禁。
+
+本阶段还没有实现 `answer_runner.py`、真实 Generator/Judge 适配器、28 条专用数据集或人工复核报告，因此它是离线评测基础，不是在线幻觉检测功能，也尚不能声明当前生产答案已通过 Faithfulness 验收。
 
 ### v1.6 检索对比
 
@@ -299,4 +325,4 @@ result.assert_passed()
 
 ## 范围
 
-当前 v2.0.2 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。
+当前 v2.0.3 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。

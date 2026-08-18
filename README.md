@@ -1,6 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v2.0.2）
+# DocuMind - RAG 知识库问答系统（v2.0.3）
 
 一个本地单用户 RAG 知识库问答系统。当前主链路采用 FastAPI、React/TypeScript、Milvus Standalone 和 SSE 流式响应，包含文档生命周期管理、真实依赖探活、引用来源、结构化可观测性、离线评测和自动质量回归门禁。
+
+> GitHub 已发布 tag 仍为 `v2.0`。`main` 已包含 v2.0.1 和 v2.0.2，当前代码版本为 v2.0.3；三个维护版本的 tag 均尚未创建。
 
 ## 核心能力
 
@@ -12,6 +14,7 @@
 - 默认 Web 检索保持 Dense-only；BM25、Hybrid/RRF、Query Rewrite 和 Reranker 保留为离线评测能力。
 - JSONL 日志、Prometheus Metrics、OpenTelemetry Tracing 和 Request/Trace ID 关联。
 - 确定性黄金集、JSON/Markdown 报告、输入兼容检查和 PR CI 质量门禁。
+- 独立的答案质量数据契约、严格 Judge JSON 校验、离线 Fake Generator/Judge 和指标分母记录。
 
 ## 文档导航
 
@@ -168,15 +171,13 @@ docker compose -f compose.yaml config --quiet
 docker compose -f infra/milvus/compose.yaml config --quiet
 ```
 
-v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests passed`、Vitest `5 passed`、Playwright `6 passed`，并通过格式、编译、依赖、TypeScript、构建和两份 Compose 校验。v2.0.2 进一步验证了正常确定性报告返回 `PASS`，仅降低兼容报告的 Recall 会返回质量失败码 `1`。
+v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests passed`、Vitest `5 passed`、Playwright `6 passed`，并通过格式、编译、依赖、TypeScript、构建和两份 Compose 校验。v2.0.2 进一步验证了正常确定性报告返回 `PASS`，仅降低兼容报告的 Recall 会返回质量失败码 `1`。v2.0.3 新增的答案契约测试为 `8 passed, 9 subtests passed`；全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`，Vitest `5 passed`，Playwright `6 passed`，并通过 Black、compileall、`pip check`、前端生产构建和既有确定性检索门禁。
 
 ## 版本摘要
 
 | 版本 | 主要内容 | 状态 |
 |---|---|---|
 | v2.0 | FastAPI/React/Milvus 统一 Compose、基础 CI、演示与发布收口 | 已发布并推送 tag |
-| v2.0.1 | BOM/换行规范化文本指纹、当前确定性 Dense 基线 | 本地 commit 完成，待 tag/push |
-| v2.0.2 | PR CI 实时评测、指标回归门禁、报告 Artifact | 本地完成，待 tag/push |
 
 完整历史和真实提交边界见[版本历史](docs/VERSION_HISTORY.md)。
 
@@ -187,4 +188,6 @@ v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests pa
 - 默认 LLM Provider 是 OpenAI；Embedding 默认使用本地 Ollama，普通 Web 闭环并非默认完全离线。
 - Query Rewrite、Hybrid 和 Reranker 尚未进入 Web 默认请求路径。
 - 当前 8 条确定性数据集只用于管线回归，不能代表生产答案质量。
+- 检索命中正确文档不等于最终回答忠实；Faithfulness 和引用质量必须由独立答案评测验证。
+- v2.0.3 只完成答案质量契约和离线测试；真实 Generator/Judge Runner、28 条数据集和人工复核报告尚未实现。
 - Prometheus、Grafana、Jaeger 和 Collector 等外部可观测性后端不在 Compose 中。

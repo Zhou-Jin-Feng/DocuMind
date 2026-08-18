@@ -5,6 +5,23 @@ from evaluation.adapters import (
     FakeRetrievalAdapter,
     RetrieverAdapter,
 )
+from evaluation.answer_adapters import (
+    AnswerGenerator,
+    AnswerJudge,
+    FakeAnswerGenerator,
+    FakeAnswerJudge,
+)
+from evaluation.answer_metrics import aggregate_answer_evaluations
+from evaluation.answer_models import (
+    ANSWER_EVALUATION_SCHEMA_VERSION,
+    REFUSAL_TEXT,
+    AnswerCaseEvaluation,
+    AnswerEvaluationReport,
+    AnswerQualityCase,
+    GeneratedAnswer,
+    JudgeResult,
+    load_answer_quality_dataset,
+)
 from evaluation.comparison import EvaluationComparison, build_evaluation_comparison
 from evaluation.models import (
     AnswerResult,
@@ -39,6 +56,13 @@ from evaluation.production import (
 )
 
 __all__ = [
+    "ANSWER_EVALUATION_SCHEMA_VERSION",
+    "REFUSAL_TEXT",
+    "AnswerCaseEvaluation",
+    "AnswerEvaluationReport",
+    "AnswerGenerator",
+    "AnswerJudge",
+    "AnswerQualityCase",
     "AnswerResult",
     "CaseEvaluation",
     "EvaluationReport",
@@ -46,9 +70,13 @@ __all__ = [
     "EvaluationSnapshot",
     "EvaluationRunner",
     "FakeAnswerAdapter",
+    "FakeAnswerGenerator",
+    "FakeAnswerJudge",
     "FakeRetrievalAdapter",
     "DeterministicEmbeddingClient",
     "GoldenCase",
+    "GeneratedAnswer",
+    "JudgeResult",
     "RegressionGate",
     "RegressionResult",
     "RetrievedDocument",
@@ -56,6 +84,7 @@ __all__ = [
     "InMemoryVectorStore",
     "IndexingSummary",
     "build_deterministic_retriever",
+    "aggregate_answer_evaluations",
     "build_evaluation_comparison",
     "build_deterministic_bm25_retriever",
     "build_deterministic_hybrid_retriever",
@@ -67,6 +96,7 @@ __all__ = [
     "enhance_retrieval_adapter",
     "load_text_documents",
     "load_golden_dataset",
+    "load_answer_quality_dataset",
     "load_evaluation_snapshot",
     "report_compatibility_issues",
 ]
