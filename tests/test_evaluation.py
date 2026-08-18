@@ -26,7 +26,12 @@ from evaluation.production import (
     load_text_documents,
 )
 from evaluation.production_runner import _default_report_stem, main as production_main
-from evaluation.fingerprints import file_sha256, text_corpus_sha256
+from evaluation.fingerprints import (
+    file_sha256,
+    text_corpus_sha256,
+    text_file_sha256,
+    text_sha256,
+)
 from app.core.document_chunker import DocumentChunker
 from app.core.query_rewriter import MappingQueryRewriter, QueryRewriteResult
 from app.core.reranker import CrossEncoderReranker
@@ -626,6 +631,50 @@ class EvaluationTests(unittest.TestCase):
             second.write_text("changed", encoding="utf-8")
             self.assertEqual(file_sha256(first), initial_file_hash)
             self.assertNotEqual(text_corpus_sha256(root), initial_corpus_hash)
+
+    def test_text_fingerprints_normalize_bom_and_line_endings(self):
+        canonical = "第一行\nsecond line\n"
+        self.assertEqual(
+            text_sha256(canonical), text_sha256(canonical.replace("\n", "\r\n"))
+        )
+        self.assertEqual(
+            text_sha256(canonical), text_sha256(canonical.replace("\n", "\r"))
+        )
+        self.assertEqual(text_sha256(canonical), text_sha256("\ufeff" + canonical))
+        self.assertNotEqual(text_sha256(canonical), text_sha256(canonical + "changed"))
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "dataset.jsonl"
+            path.write_bytes(canonical.encode("utf-8"))
+            expected = text_file_sha256(path)
+            path.write_bytes(
+                b"\xef\xbb\xbf" + canonical.replace("\n", "\r\n").encode("utf-8")
+            )
+            self.assertEqual(text_file_sha256(path), expected)
+            self.assertNotEqual(file_sha256(path), expected)
+
+    def test_text_corpus_fingerprint_normalizes_content_but_tracks_names(self):
+        with (
+            tempfile.TemporaryDirectory() as first_directory,
+            tempfile.TemporaryDirectory() as second_directory,
+        ):
+            first = Path(first_directory)
+            second = Path(second_directory)
+            (first / "document.txt").write_bytes("alpha\nbeta\n".encode("utf-8"))
+            (second / "document.txt").write_bytes(
+                b"\xef\xbb\xbf" + "alpha\r\nbeta\r\n".encode("utf-8")
+            )
+            self.assertEqual(text_corpus_sha256(first), text_corpus_sha256(second))
+
+            (second / "document.txt").rename(second / "renamed.txt")
+            self.assertNotEqual(text_corpus_sha256(first), text_corpus_sha256(second))
+
+    def test_text_file_fingerprint_rejects_non_utf8_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "dataset.jsonl"
+            path.write_bytes(b"\xff\xfe\x00")
+            with self.assertRaisesRegex(ValueError, "UTF-8"):
+                text_file_sha256(path)
 
     def test_report_compatibility_requires_matching_input_fingerprints(self):
         baseline = EvaluationSnapshot.from_dict(self._snapshot_payload())

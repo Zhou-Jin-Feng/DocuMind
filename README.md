@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v2.0）
+# DocuMind - RAG 知识库问答系统（v2.0.1）
 
 这是一个采用 Python Package 分层结构的本地单用户 RAG 本地单用户项目，支持文档加载、稳定分块、向量索引、语义检索、词法检索实验、流式生成、来源展示，以及结构化日志、Prometheus Metrics、OpenTelemetry Tracing、离线 RAG 评估和文档生命周期管理。
 
-> 当前版本：**v2.0 收尾交付版（应用版本 `2.0.0`）**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史，并提供统一 Docker Compose、前后端镜像入口、CI 门禁和演示脚本。Gradio 入口仅作为兼容与回归入口保留。
+> 当前版本：**v2.0.1 质量加固版（应用版本 `2.0.1`）**。默认链路为 FastAPI + React/TypeScript + Milvus Standalone，支持 SSE 流式问答、完整文档管理、真实依赖探活、引用来源、上传阶段反馈和本地对话历史，并提供统一 Docker Compose、前后端镜像入口、CI 门禁和演示脚本。Gradio 入口仅作为兼容与回归入口保留。
 
 ## 当前能力
 
@@ -28,6 +28,7 @@
 - v1.9 搭建 FastAPI 后端与 React/TypeScript 前端：统一错误响应、健康检查、公开配置、文档接口、SSE 问答和前端服务状态反馈。
 - v1.9.1 完成真实 RAG 闭环、Milvus/Ollama 探活、前端 E2E、文档详情/重建/删除、上传进度和本地对话历史。
 - v2.0 完成 FastAPI、React、Milvus、etcd、MinIO 统一 Compose，补齐前后端容器入口、GitHub Actions CI、回归口径和交付演示材料。
+- v2.0.1 规范化评测文本的 BOM 与换行符指纹，并重建包含完整当前配置的确定性 Dense 基线。
 
 ## 版本迭代记录
 
@@ -48,6 +49,7 @@ README 保留面向仓库用户的公开版本摘要；当前架构边界见 [AR
 | v1.9 | FastAPI 后端基础、React 工作台、SSE 问答与前后端联调测试 |
 | v1.9.1 | 真实服务探活、RAG 闭环、浏览器 E2E、文档管理与工作台交互完善 |
 | v2.0 | 统一 Compose、前后端 Dockerfile、CI 自动回归、演示脚本与发布收口 |
+| v2.0.1 | 跨平台评测文本指纹、当前 Runner 配置兼容性与确定性 Dense 基线重建 |
 
 
 ## 项目结构
@@ -482,6 +484,8 @@ python -m pip check
 ```
 
 v2.0 收尾回归结果为：Python 3.11 容器与本机兼容环境均为 `178 passed, 1 skipped, 11 subtests passed`，前端 Vitest `5 passed`，Playwright `6 passed`，Black、`compileall`、TypeScript 类型检查和生产构建通过。完整自动回归不需要真实 Milvus；`tests.test_milvus_integration` 仅在显式设置 `MILVUS_INTEGRATION_TEST=1` 时连接本机服务，完整 Compose 栈另行完成真实 Milvus 启动验证。
+
+v2.0.1 本地回归结果为：`181 passed, 1 skipped, 11 subtests passed`，前端 Vitest `5 passed`、Playwright `6 passed`，Black、`compileall`、`pip check`、TypeScript、生产构建和两份 Compose 配置解析通过。Windows 与本地 Linux 容器重新生成的确定性 Dense 报告均通过 `evaluation/baselines/deterministic_dense_v2.json`；该结果只证明输入可复现和现有检索质量未回退，不代表真实答案质量。
 
 ## 数据和索引
 

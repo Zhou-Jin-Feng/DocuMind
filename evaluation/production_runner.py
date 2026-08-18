@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from app.config import settings
-from evaluation.fingerprints import file_sha256, text_corpus_sha256
+from evaluation.fingerprints import file_sha256, text_corpus_sha256, text_file_sha256
 from evaluation.production import (
     build_configured_hybrid_retrieval_adapter,
     build_configured_retrieval_adapter,
@@ -244,7 +244,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     provider = args.provider or settings.default_embedding_provider
     dataset_path = Path(args.dataset)
     cases = load_golden_dataset(dataset_path)
-    dataset_sha256 = file_sha256(dataset_path)
+    dataset_sha256 = text_file_sha256(dataset_path)
     documents = load_text_documents(args.documents_dir)
     adapter = None
     rewrite_provider = None

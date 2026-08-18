@@ -23,7 +23,7 @@ from evaluation.integration import (
     build_deterministic_hybrid_retriever,
     build_deterministic_retriever,
 )
-from evaluation.fingerprints import file_sha256, text_corpus_sha256
+from evaluation.fingerprints import text_corpus_sha256, text_file_sha256
 from evaluation.metrics import (
     first_relevant_rank,
     hit_at_k,
@@ -320,7 +320,7 @@ def _build_demo_runner(
         "lexical_weight": lexical_weight,
         "rrf_k": rrf_k,
         "candidate_multiplier": candidate_multiplier,
-        "dataset_sha256": file_sha256(dataset_path),
+        "dataset_sha256": text_file_sha256(dataset_path),
     }
     if documents:
         metadata["documents_sha256"] = text_corpus_sha256(

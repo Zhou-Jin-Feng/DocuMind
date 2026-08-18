@@ -9,7 +9,7 @@ from typing import Sequence
 from app.config import settings
 from app.core.generator import UniversalLLMClient
 from app.core.query_rewriter import LLMQueryRewriter
-from evaluation.fingerprints import file_sha256
+from evaluation.fingerprints import text_file_sha256
 from evaluation.rewrite_artifacts import (
     build_rewrite_artifact,
     load_rewrite_artifact_file,
@@ -47,7 +47,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     dataset_path = Path(args.dataset)
     cases = load_golden_dataset(dataset_path)
-    dataset_sha256 = file_sha256(dataset_path)
+    dataset_sha256 = text_file_sha256(dataset_path)
     client = UniversalLLMClient(
         provider=args.provider or settings.default_llm_provider,
         model=args.model,

@@ -1,0 +1,486 @@
+{
+  "dataset_name": "demo-golden-dataset",
+  "top_k": 3,
+  "case_count": 8,
+  "metadata": {
+    "baseline_type": "deterministic-dense",
+    "retrieval_mode": "dense",
+    "document_count": 5,
+    "embedding_provider": "evaluation-fake",
+    "embedding_model": "sha256-token-hash-v1",
+    "embedding_dimension": 64,
+    "case_count": 8,
+    "case_top_k_values": [
+      3
+    ],
+    "score_threshold": null,
+    "lexical_score_threshold": null,
+    "dense_weight": 1.0,
+    "lexical_weight": 1.0,
+    "rrf_k": 60,
+    "candidate_multiplier": 5,
+    "dataset_sha256": "81741dfc4e4a59698b45ba2565558203aa0f7906c077f98749eb88ce512019a6",
+    "documents_sha256": "645e477edbcd6086226621abb76ddfa147b44acf56c632edf39e89e8220298b3"
+  },
+  "metrics": {
+    "recall_at_k": 0.8333333333333334,
+    "precision_at_k": 0.27777777777777773,
+    "mrr_at_k": 0.75,
+    "top_k_hit_rate": 0.8333333333333334,
+    "correct_document_avg_rank": 1.2,
+    "no_answer_retrieval_accuracy": 0.0,
+    "refusal_accuracy": 1.0,
+    "keyword_coverage": 1.0,
+    "successful_case_rate": 1.0,
+    "average_duration_ms": 0.6164999867905863,
+    "p50_duration_ms": 0.598849990637973,
+    "p95_duration_ms": 0.9421199734788387,
+    "maximum_duration_ms": 0.9871999500319362
+  },
+  "category_metrics": {
+    "general": {
+      "recall_at_k": 0.8333333333333334,
+      "precision_at_k": 0.27777777777777773,
+      "mrr_at_k": 0.75,
+      "top_k_hit_rate": 0.8333333333333334,
+      "correct_document_avg_rank": 1.2,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": 1.0,
+      "case_count": 8.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.6164999867905863,
+      "p50_duration_ms": 0.598849990637973,
+      "p95_duration_ms": 0.9421199734788387,
+      "maximum_duration_ms": 0.9871999500319362
+    }
+  },
+  "split_metrics": {
+    "all": {
+      "recall_at_k": 0.8333333333333334,
+      "precision_at_k": 0.27777777777777773,
+      "mrr_at_k": 0.75,
+      "top_k_hit_rate": 0.8333333333333334,
+      "correct_document_avg_rank": 1.2,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": 1.0,
+      "keyword_coverage": 1.0,
+      "case_count": 8.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 0.6164999867905863,
+      "p50_duration_ms": 0.598849990637973,
+      "p95_duration_ms": 0.9421199734788387,
+      "maximum_duration_ms": 0.9871999500319362
+    }
+  },
+  "cases": [
+    {
+      "case_id": "rag-core-components",
+      "question": "RAG 系统包含哪些核心组件？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "indexing-guide",
+        "retrieval-guide"
+      ],
+      "retrieved_distances": [
+        105.0,
+        110.0,
+        119.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 0.0,
+        "precision_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "top_k_hit_rate": 0.0,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.987,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    },
+    {
+      "case_id": "stable-indexing",
+      "question": "为什么要使用稳定的 document_id 和 chunk_id？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "indexing-guide",
+        "retrieval-guide"
+      ],
+      "retrieved_distances": [
+        92.0,
+        109.0,
+        112.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.5,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 2.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.417,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    },
+    {
+      "case_id": "observability-request",
+      "question": "结构化日志如何关联一次请求？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "retrieval-guide",
+        "indexing-guide"
+      ],
+      "retrieved_distances": [
+        75.0,
+        117.0,
+        120.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.299,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    },
+    {
+      "case_id": "metrics-listening",
+      "question": "Metrics 默认监听在哪个地址？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "deployment-guide",
+        "indexing-guide"
+      ],
+      "retrieved_distances": [
+        98.0,
+        119.0,
+        123.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.511,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    },
+    {
+      "case_id": "distance-direction",
+      "question": "Chroma 的 distance 数值越大越相关吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-guide",
+        "observability-guide",
+        "indexing-guide"
+      ],
+      "retrieved_distances": [
+        95.0,
+        101.0,
+        124.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.858,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    },
+    {
+      "case_id": "ollama-embedding",
+      "question": "本地 Embedding 使用什么服务和模型？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-guide",
+        "indexing-guide",
+        "observability-guide"
+      ],
+      "retrieved_distances": [
+        107.0,
+        109.0,
+        112.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": 1.0
+      },
+      "duration_ms": 0.819,
+      "status": "success",
+      "answered": true,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    },
+    {
+      "case_id": "unrelated-stock",
+      "question": "明天股票会涨吗？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "indexing-guide",
+        "retrieval-guide"
+      ],
+      "retrieved_distances": [
+        101.0,
+        122.0,
+        131.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.686,
+      "status": "success",
+      "answered": false,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    },
+    {
+      "case_id": "unrelated-recipe",
+      "question": "如何制作巧克力蛋糕？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-guide",
+        "retrieval-guide",
+        "indexing-guide"
+      ],
+      "retrieved_distances": [
+        109.0,
+        121.0,
+        126.0
+      ],
+      "retrieved_lexical_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        null,
+        null,
+        null
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": 1.0,
+        "keyword_coverage": null
+      },
+      "duration_ms": 0.353,
+      "status": "success",
+      "answered": false,
+      "error_type": null,
+      "category": "general",
+      "split": "all"
+    }
+  ]
+}
