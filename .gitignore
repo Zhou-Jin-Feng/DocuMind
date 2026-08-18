@@ -61,3 +61,4 @@ frontend/test-results/
 CLAUDE.md
 RAG系统工程化优化与版本演进指南.md
 local_docs/
+.kilo/
