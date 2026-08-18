@@ -1,6 +1,6 @@
-# 可观测性指南（v1.3）
+# 可观测性指南（v2.0.2）
 
-v1.3 为本地单用户 RAG 基线补齐 **Logs + Metrics + Traces**。本阶段只实现应用内埋点与可选导出，不包含 Prometheus、Grafana、Jaeger 或 OpenTelemetry Collector 的容器部署。
+Logs + Metrics + Traces 能力最初在 v1.3 引入，当前由 FastAPI 主入口和保留的 Gradio 兼容入口共用。应用实现内部埋点、Metrics HTTP 端口和可选 OTLP/HTTP Trace 导出；Prometheus、Grafana、Jaeger 和 OpenTelemetry Collector 等外部后端不在当前 Compose 内。
 
 ## 1. 设计目标
 
@@ -49,7 +49,7 @@ query_received
 
 异常时会出现 `query_embedding_failed`、`vector_search_failed`、`retrieval_failed`、`llm_stream_failed`、`generation_completed(status=error)` 或 `response_sent(status=error)`。
 
-Gradio 可能在不同执行上下文中恢复流式生成，因此问答流由固定的 `contextvars.Context` 驱动，确保整个流生命周期内 `request_id` / `trace_id` 不丢失。模型连接在已经返回部分文本后中断时，UI 会保留已收到的回答并追加中断提示，不会把部分回答覆盖成通用错误。 进入生成阶段后会立即显示等待提示，前端流刷新间隔由 Gradio 默认的 0.5 秒调整为 0.05 秒。
+FastAPI 中间件会验证或生成 `X-Request-ID`，把它写入请求上下文并在响应头中返回。SSE 问答由服务层产生结构化事件，已发送部分 Token 后如果 Provider 中断，前端保留已收到文本并显示错误状态。Gradio 兼容入口另外使用固定 `contextvars.Context` 保持整个流生命周期内的 `request_id` / `trace_id`。
 
 ### 2.4 文档摄取事件顺序
 
@@ -184,6 +184,6 @@ $env:PYTHONPYCACHEPREFIX = Join-Path $env:TEMP documind_pycache
 git diff --check
 ```
 
-## 8. v1.3 范围边界
+## 8. 当前范围边界
 
-本版本不包含 Docker/Compose、Prometheus/Grafana/Jaeger 容器、Collector 运维、Celery/Redis、认证、多租户、Query Rewrite、正式 Reranker、文档生命周期或黄金评估集。Docker 容器化按计划最后处理。
+当前仓库已包含 Docker Compose、文档生命周期、黄金评测集以及 Query Rewrite/Reranker 离线实验能力。可观测性边界仍是单实例应用端埋点：不部署 Prometheus/Grafana/Jaeger/Collector，不提供告警规则、长期指标存储或分布式 Trace 运维保证。认证、多租户、Celery/Redis 和生产高可用同样不在当前范围内。

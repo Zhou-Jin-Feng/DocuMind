@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v2.0）
+# DocuMind - RAG 系统架构（v2.0.2）
 
 ## 1. 分层结构
 
@@ -236,11 +236,13 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、CI 门禁、演示脚本和发布文档；评估层和生命周期层仍不反向依赖具体 Web UI，样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact。评估层和生命周期层仍不反向依赖具体 Web UI，样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
 
 ```text
 evaluation.runner / production_runner
 ├── evaluation.datasets       # v1.4 / v1.6 JSONL 黄金与 holdout 用例
+├── evaluation.fingerprints   # UTF-8 BOM/换行规范化后的逻辑文本指纹
+├── evaluation.baselines      # v2.0.1 当前确定性 Dense 回归基线
 ├── evaluation.rewrite_artifacts # 带 schema/Prompt/数据集指纹的 LLM 改写输入
 ├── evaluation.adapters       # Dense / BM25 / Hybrid / Rewrite / Rerank 边界
 ├── evaluation.metrics        # 纯函数检索/拒答指标
@@ -249,6 +251,8 @@ evaluation.runner / production_runner
 └── evaluation.regression     # 基线比较和下降门禁
 ```
 
+普通 PR CI 只执行确定性本地评测，不连接真实 Provider。真实 Ollama/云端报告仍是发布前人工证据，不进入每次 PR 的自动门禁。
+
 当前仍不包含：
 
 - Prometheus、Grafana、Jaeger 与 OpenTelemetry Collector 等可观测性后端容器；
@@ -256,7 +260,7 @@ evaluation.runner / production_runner
 - Celery/Redis 异步摄取；
 - 认证、多租户、限流和生产高可用。
 
-日志、指标、追踪和评估配置分别见 `OBSERVABILITY.md` 与 `EVALUATION.md`。
+日志、指标、追踪和评测配置分别见[可观测性指南](OBSERVABILITY.md)与[评测指南](EVALUATION.md)。
 
 ## 存储维护约束
 

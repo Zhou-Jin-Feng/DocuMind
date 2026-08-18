@@ -1,4 +1,4 @@
-# 项目结构（v2.0）
+# 项目结构（v2.0.2）
 
 ```text
 DocuMind/
@@ -98,6 +98,9 @@ DocuMind/
 │   │       └── documents/
 │   │   └── v1_7/                # 经数据集指纹绑定的 Rewrite artifact
 │   ├── baselines/
+│   │   ├── deterministic_dense_v2.json
+│   │   ├── deterministic_dense_v2.md
+│   │   └── README.md
 │   └── reports/
 ├── frontend/
 │   ├── Dockerfile
@@ -123,6 +126,15 @@ DocuMind/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── PROJECT_STRUCTURE.md
+│   ├── EVALUATION.md
+│   ├── OBSERVABILITY.md
+│   ├── DEPENDENCIES.md
+│   ├── DEMO_SCRIPT.md
+│   ├── VERSION_HISTORY.md
+│   └── plans/
 ├── data/                  # 本地运行数据，Git 忽略
 ├── logs/                  # JSONL 日志，Git 忽略
 ├── .env                   # 本地密钥，Git 忽略
@@ -134,13 +146,6 @@ DocuMind/
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── README.md
-├── ARCHITECTURE.md
-├── DEMO_SCRIPT.md
-├── DEPENDENCIES.md
-├── OBSERVABILITY.md
-├── EVALUATION.md
-├── PROJECT_STRUCTURE.md
-├── VERSION_HISTORY.md
 └── web_app.py
 ```
 
@@ -173,9 +178,9 @@ DocuMind/
 | `Dockerfile` | Python 3.11 后端镜像入口，安装运行依赖并启动 `python -m app.api` |
 | `frontend/Dockerfile` | Node 22 前端构建与 `vite preview` 演示服务入口 |
 | `.dockerignore` / `frontend/.dockerignore` | 排除密钥、运行数据、缓存、依赖目录和测试产物 |
-| `.github/workflows/ci.yml` | Python、前端、Playwright 和 Compose 配置的自动回归门禁 |
+| `.github/workflows/ci.yml` | Python 单测、确定性检索质量回归、报告 Artifact、前端/Playwright 和 Compose 自动门禁 |
 | `infra/milvus/compose.yaml` | Milvus Standalone、etcd、MinIO、健康检查和本地持久卷 |
-| `VERSION_HISTORY.md` | 版本边界、逐提交事实与发布验收记录 |
+| `docs/VERSION_HISTORY.md` | 版本边界、逐提交事实与发布验收记录 |
 | `app/lifecycle/models.py` | 文档、版本、索引清单、操作结果和审计报告模型 |
 | `app/lifecycle/registry.py` | SQLite 文档、索引、操作状态和 active 指针 |
 | `app/lifecycle/service.py` | 源文件持久化、同步构建、active 切换、清理、审计和重建 |
@@ -190,7 +195,7 @@ DocuMind/
 | `evaluation/metrics.py` | Recall@K、Precision@K、MRR、命中率和拒答指标 |
 | `evaluation/adapters.py` | Dense、BM25、Hybrid、Rewrite、Rerank 适配器与离线 Fake Adapter |
 | `evaluation/integration.py` | 确定性 Embedding、内存 Vector Store 和三种检索模式集成烟囱测试 |
-| `evaluation/fingerprints.py` | 黄金数据集和评估文档语料的稳定 SHA-256 指纹 |
+| `evaluation/fingerprints.py` | UTF-8 BOM/换行规范化后的黄金集和语料逻辑文本 SHA-256；保留独立原始字节哈希 |
 | `evaluation/production.py` | Dense、BM25、Hybrid 和 v1.7 实验组件评估装配 |
 | `evaluation/production_runner.py` | 真实 Provider 基线、Rewrite、Rerank 实验 CLI |
 | `evaluation/comparison.py` | 四种增强模式的同配置校验、质量/延迟矩阵和基线差值 |
@@ -201,6 +206,7 @@ DocuMind/
 | `evaluation/regression.py` | 报告输入兼容性、指标最低值和允许下降幅度门禁 |
 | `evaluation/regression_runner.py` | 报告兼容性校验和自动回归门禁 CLI |
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
+| `evaluation/baselines/deterministic_dense_v2.*` | v2.0.1 冻结、供 v2.0.2 PR CI 实时比较的 Dense 基线与可读报告 |
 
 ## 依赖方向
 
@@ -240,6 +246,7 @@ React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Pyt
 - `data/uploads/`
 - `data/document_registry.sqlite3`
 - `logs/`
+- `local_docs/`（本地学习资料与草稿）
 - `venv/`
 - `__pycache__/`
 - `.env`

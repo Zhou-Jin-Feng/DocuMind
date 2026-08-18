@@ -57,6 +57,7 @@ frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
 
-# 本地规划文档（不提交到仓库）
+# 本地工作与学习文档（不提交到仓库）
 CLAUDE.md
 RAG系统工程化优化与版本演进指南.md
+local_docs/
