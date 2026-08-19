@@ -1,0 +1,1197 @@
+{
+  "schema_version": 1,
+  "phase": "validation",
+  "generated_at": "2026-08-19T12:29:18.925314Z",
+  "source": {
+    "report_path": "evaluation/reports/v2_threshold_validation_raw.json",
+    "report_sha256": "4451fe92be78bb9d213e3e7b2435f4a308fa8675050f0691e03bbd7931e80de0",
+    "dataset_sha256": "8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210"
+  },
+  "configuration": {
+    "embedding_provider": "ollama",
+    "embedding_model": "qwen3-embedding",
+    "embedding_dimension": 4096,
+    "chunk_size": 500,
+    "chunk_overlap": 100,
+    "case_top_k_values": [
+      3
+    ],
+    "retrieval_mode": "dense",
+    "enhancement_mode": "baseline",
+    "distance_metric": "L2",
+    "dataset_sha256": "8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210",
+    "documents_sha256": "7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878103"
+  },
+  "constraints": {
+    "max_recall_drop": 0.02,
+    "min_no_answer_accuracy": 0.9,
+    "min_successful_case_rate": 1.0
+  },
+  "selection_policy": "largest-passing-adjacent-midpoint-v1",
+  "selection_rationale": "Only adjacent observed-distance midpoints are eligible; among rows meeting every constraint, choose the largest threshold to preserve the broadest answerable recall margin.",
+  "baseline_metrics": {
+    "answerable_recall_at_k": 1.0,
+    "answerable_mrr_at_k": 1.0,
+    "no_answer_retrieval_accuracy": 0.0,
+    "false_rejection_rate": 0.0,
+    "successful_case_rate": 1.0,
+    "average_retrieved_count": 3,
+    "answerable_case_count": 5,
+    "no_answer_case_count": 15
+  },
+  "distance_observations": [
+    {
+      "case_id": "threshold-val-positive-001",
+      "answerable": true,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "deployment-policy",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.6838839054107666,
+        0.9911333322525024,
+        1.032318353652954
+      ]
+    },
+    {
+      "case_id": "threshold-val-positive-002",
+      "answerable": true,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "evaluation-gates",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.7300397157669067,
+        0.966271162033081,
+        1.1390140056610107
+      ]
+    },
+    {
+      "case_id": "threshold-val-positive-003",
+      "answerable": true,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "retrieval-quality",
+        "injection-archive-notice"
+      ],
+      "retrieved_distances": [
+        0.6420018076896667,
+        0.9784140586853027,
+        1.0007305145263672
+      ]
+    },
+    {
+      "case_id": "threshold-val-positive-004",
+      "answerable": true,
+      "retrieved_document_ids": [
+        "observability-operations",
+        "security-boundaries",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        0.7754924297332764,
+        1.1791572570800781,
+        1.192103624343872
+      ]
+    },
+    {
+      "case_id": "threshold-val-positive-005",
+      "answerable": true,
+      "retrieved_document_ids": [
+        "deployment-policy",
+        "evaluation-gates",
+        "injection-archive-notice"
+      ],
+      "retrieved_distances": [
+        0.8902514576911926,
+        1.0916197299957275,
+        1.1805813312530518
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-001",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "change-records",
+        "injection-backup-notice",
+        "service-levels"
+      ],
+      "retrieved_distances": [
+        0.8527166843414307,
+        1.007385015487671,
+        1.012235164642334
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-002",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "change-records",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.7773351669311523,
+        0.9404816627502441,
+        0.9984328150749207
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-003",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "injection-backup-notice",
+        "lifecycle-operations",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.9421012997627258,
+        1.0895897150039673,
+        1.114454984664917
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-004",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "evaluation-gates",
+        "service-levels"
+      ],
+      "retrieved_distances": [
+        0.8679068088531494,
+        1.0165088176727295,
+        1.251621127128601
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-005",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "evaluation-gates",
+        "injection-support-notice"
+      ],
+      "retrieved_distances": [
+        0.9998178482055664,
+        1.0872160196304321,
+        1.1402864456176758
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-006",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "evaluation-gates",
+        "injection-support-notice"
+      ],
+      "retrieved_distances": [
+        1.0463727712631226,
+        1.2344019412994385,
+        1.2668907642364502
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-007",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "retrieval-quality",
+        "service-levels"
+      ],
+      "retrieved_distances": [
+        0.7049791812896729,
+        0.955080509185791,
+        1.1239778995513916
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-008",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "injection-backup-notice",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.8166117668151855,
+        1.0669245719909668,
+        1.0849909782409668
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-009",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "service-levels",
+        "observability-operations",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        0.8848155736923218,
+        0.9543114900588989,
+        1.1321721076965332
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-010",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "observability-operations",
+        "deployment-policy",
+        "service-levels"
+      ],
+      "retrieved_distances": [
+        1.023231029510498,
+        1.2417412996292114,
+        1.247781753540039
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-011",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "injection-backup-notice",
+        "change-records",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.9124919176101685,
+        1.0909905433654785,
+        1.114640235900879
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-012",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "deployment-policy",
+        "change-records",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        0.7748957872390747,
+        1.0150585174560547,
+        1.0405960083007812
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-013",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "security-boundaries",
+        "evaluation-gates",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.8734602332115173,
+        1.0924904346466064,
+        1.143097162246704
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-014",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "injection-backup-notice",
+        "injection-support-notice",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.911026120185852,
+        1.0791614055633545,
+        1.0904099941253662
+      ]
+    },
+    {
+      "case_id": "threshold-val-negative-015",
+      "answerable": false,
+      "retrieved_document_ids": [
+        "service-levels",
+        "evaluation-gates",
+        "injection-backup-notice"
+      ],
+      "retrieved_distances": [
+        0.9605231285095215,
+        1.3999710083007812,
+        1.4054362773895264
+      ]
+    }
+  ],
+  "distance_summaries": {
+    "answerable": {
+      "top1": {
+        "count": 5,
+        "minimum": 0.6420018076896667,
+        "mean": 0.7443338632583618,
+        "p50": 0.7300397157669067,
+        "p95": 0.8672996520996094,
+        "maximum": 0.8902514576911926
+      },
+      "all_top_k": {
+        "count": 15,
+        "minimum": 0.6420018076896667,
+        "mean": 0.9648675123850504,
+        "p50": 0.9911333322525024,
+        "p95": 1.184038019180298,
+        "maximum": 1.192103624343872
+      }
+    },
+    "no_answer": {
+      "top1": {
+        "count": 15,
+        "minimum": 0.7049791812896729,
+        "mean": 0.889885687828064,
+        "p50": 0.8848155736923218,
+        "p95": 1.0301735520362854,
+        "maximum": 1.0463727712631226
+      },
+      "all_top_k": {
+        "count": 45,
+        "minimum": 0.7049791812896729,
+        "mean": 1.039702710840437,
+        "p50": 1.0405960083007812,
+        "p95": 1.2638368368148802,
+        "maximum": 1.4054362773895264
+      }
+    }
+  },
+  "candidate_count": 59,
+  "candidates": [
+    {
+      "threshold": 0.6629428565502167,
+      "metrics": {
+        "answerable_recall_at_k": 0.2,
+        "answerable_mrr_at_k": 0.2,
+        "no_answer_retrieval_accuracy": 1.0,
+        "false_rejection_rate": 0.8,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.05,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.6944315433502197,
+      "metrics": {
+        "answerable_recall_at_k": 0.4,
+        "answerable_mrr_at_k": 0.4,
+        "no_answer_retrieval_accuracy": 1.0,
+        "false_rejection_rate": 0.6,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.1,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.7175094485282898,
+      "metrics": {
+        "answerable_recall_at_k": 0.4,
+        "answerable_mrr_at_k": 0.4,
+        "no_answer_retrieval_accuracy": 0.9333333333333333,
+        "false_rejection_rate": 0.6,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.15,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.7524677515029907,
+      "metrics": {
+        "answerable_recall_at_k": 0.6,
+        "answerable_mrr_at_k": 0.6,
+        "no_answer_retrieval_accuracy": 0.9333333333333333,
+        "false_rejection_rate": 0.4,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.2,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.7751941084861755,
+      "metrics": {
+        "answerable_recall_at_k": 0.6,
+        "answerable_mrr_at_k": 0.6,
+        "no_answer_retrieval_accuracy": 0.8666666666666667,
+        "false_rejection_rate": 0.4,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.25,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.7764137983322144,
+      "metrics": {
+        "answerable_recall_at_k": 0.8,
+        "answerable_mrr_at_k": 0.8,
+        "no_answer_retrieval_accuracy": 0.8666666666666667,
+        "false_rejection_rate": 0.2,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.3,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.796973466873169,
+      "metrics": {
+        "answerable_recall_at_k": 0.8,
+        "answerable_mrr_at_k": 0.8,
+        "no_answer_retrieval_accuracy": 0.8,
+        "false_rejection_rate": 0.2,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.35,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.8346642255783081,
+      "metrics": {
+        "answerable_recall_at_k": 0.8,
+        "answerable_mrr_at_k": 0.8,
+        "no_answer_retrieval_accuracy": 0.7333333333333333,
+        "false_rejection_rate": 0.2,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.4,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.86031174659729,
+      "metrics": {
+        "answerable_recall_at_k": 0.8,
+        "answerable_mrr_at_k": 0.8,
+        "no_answer_retrieval_accuracy": 0.6666666666666666,
+        "false_rejection_rate": 0.2,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.45,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.8706835210323334,
+      "metrics": {
+        "answerable_recall_at_k": 0.8,
+        "answerable_mrr_at_k": 0.8,
+        "no_answer_retrieval_accuracy": 0.6,
+        "false_rejection_rate": 0.2,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.5,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.8791379034519196,
+      "metrics": {
+        "answerable_recall_at_k": 0.8,
+        "answerable_mrr_at_k": 0.8,
+        "no_answer_retrieval_accuracy": 0.5333333333333333,
+        "false_rejection_rate": 0.2,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.55,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.8875335156917572,
+      "metrics": {
+        "answerable_recall_at_k": 0.8,
+        "answerable_mrr_at_k": 0.8,
+        "no_answer_retrieval_accuracy": 0.4666666666666667,
+        "false_rejection_rate": 0.2,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.6,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9006387889385223,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.4666666666666667,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.65,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9117590188980103,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.4,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.7,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9264867901802063,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.3333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.75,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.941291481256485,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.3333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.8,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9482063949108124,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.26666666666666666,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.85,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.954695999622345,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.26666666666666666,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.9,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9578018188476562,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.26666666666666666,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 0.95,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9633971452713013,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.2,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9723426103591919,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.2,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.05,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9847736954689026,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.2,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.1,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9947830736637115,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.2,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.15,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 0.9991253316402435,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.2,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.2,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0002741813659668,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.13333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.25,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.004057765007019,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.13333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.3,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0098100900650024,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.13333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.35,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0136468410491943,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.13333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.4,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.015783667564392,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.13333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.45,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0198699235916138,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.13333333333333333,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.5,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.027774691581726,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.06666666666666667,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.55,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0364571809768677,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.06666666666666667,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.6,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.043484389781952,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.06666666666666667,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.65,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0566486716270447,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.7,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0730429887771606,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.75,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0820761919021606,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.8,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0861034989356995,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.85,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0884028673171997,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.9,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0899998545646667,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 1.95,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.0907002687454224,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.091305136680603,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.05,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.092055082321167,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.1,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.1034727096557617,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.15,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.114547610282898,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.2,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.1193090677261353,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.25,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.1280750036239624,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.3,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.135593056678772,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.35,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.1396502256393433,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.4,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.14169180393219,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.45,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.1611272096633911,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.5,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.179869294166565,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.55,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.186342477798462,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.6,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.2132527828216553,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.65,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.238071620464325,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.7,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.2447615265846252,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.75,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.24970144033432,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.8,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.2592559456825256,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.85,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.3334308862686157,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.9,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    },
+    {
+      "threshold": 1.4027036428451538,
+      "metrics": {
+        "answerable_recall_at_k": 1.0,
+        "answerable_mrr_at_k": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "false_rejection_rate": 0.0,
+        "successful_case_rate": 1.0,
+        "average_retrieved_count": 2.95,
+        "answerable_case_count": 5,
+        "no_answer_case_count": 15
+      },
+      "passes_constraints": false
+    }
+  ],
+  "selected_threshold": null,
+  "validation_passed": false,
+  "holdout_status": "not_run_no_validation_candidate",
+  "enable_reference_threshold": false,
+  "code_default_remains_none": true,
+  "decision": "do_not_enable"
+}

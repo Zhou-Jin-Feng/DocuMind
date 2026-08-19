@@ -10,6 +10,7 @@ from typing import Sequence
 
 from app.config import settings
 from evaluation.fingerprints import file_sha256, text_corpus_sha256, text_file_sha256
+from evaluation.models import GoldenCase
 from evaluation.production import (
     build_configured_hybrid_retrieval_adapter,
     build_configured_retrieval_adapter,
@@ -19,6 +20,19 @@ from evaluation.production import (
 )
 from evaluation.reports import write_json_report, write_markdown_report
 from evaluation.runner import EvaluationRunner, load_golden_dataset
+
+
+def _select_cases_by_split(cases: Sequence[GoldenCase], split: str) -> list[GoldenCase]:
+    if split not in {"all", "validation", "holdout"}:
+        raise ValueError(f"不支持的评测 split: {split}")
+    selected = (
+        list(cases)
+        if split == "all"
+        else [case for case in cases if case.split == split]
+    )
+    if not selected:
+        raise ValueError(f"数据集没有 {split} 案例")
+    return selected
 
 
 def _default_report_stem(
@@ -140,6 +154,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="TXT fixture directory; filename stem becomes document_id",
     )
     parser.add_argument(
+        "--split",
+        choices=("all", "validation", "holdout"),
+        default="all",
+        help="Run only one frozen dataset split; defaults to all cases",
+    )
+    parser.add_argument(
         "--provider",
         default=None,
         help="Embedding provider; defaults to DEFAULT_EMBEDDING_PROVIDER",
@@ -243,7 +263,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     provider = args.provider or settings.default_embedding_provider
     dataset_path = Path(args.dataset)
-    cases = load_golden_dataset(dataset_path)
+    all_cases = load_golden_dataset(dataset_path)
+    try:
+        cases = _select_cases_by_split(all_cases, args.split)
+    except ValueError as exc:
+        parser.error(str(exc))
     dataset_sha256 = text_file_sha256(dataset_path)
     documents = load_text_documents(args.documents_dir)
     adapter = None
@@ -365,6 +389,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "candidate_multiplier": args.candidate_multiplier,
                 "retrieval_mode": args.retrieval_mode,
                 "enhancement_mode": args.enhancement_mode,
+                "distance_metric": "L2" if args.retrieval_mode == "dense" else None,
+                "evaluation_split": args.split,
                 "rewrite_provider": rewrite_provider,
                 "rewrite_model": rewrite_model,
                 "rewrite_map_path": (

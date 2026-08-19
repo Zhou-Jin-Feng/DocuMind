@@ -1,4 +1,4 @@
-# 项目结构（v2.0.6）
+# 项目结构（v2.0.7）
 
 ```text
 DocuMind/
@@ -67,6 +67,7 @@ DocuMind/
 │   ├── test_evaluation.py
 │   ├── test_answer_evaluation.py
 │   ├── test_answer_runner.py
+│   ├── test_threshold_calibration.py
 │   ├── test_lifecycle.py
 │   ├── test_lifecycle_cli.py
 │   ├── test_application.py
@@ -86,6 +87,8 @@ DocuMind/
 │   ├── fingerprints.py
 │   ├── production.py
 │   ├── production_runner.py
+│   ├── threshold_calibration.py
+│   ├── threshold_runner.py
 │   ├── comparison.py
 │   ├── comparison_runner.py
 │   ├── rewrite_artifacts.py
@@ -116,7 +119,10 @@ DocuMind/
 │   └── reports/
 │       ├── v2_answer_pre_hardening.json
 │       ├── v2_answer_pre_hardening.md
-│       └── v2_answer_pre_hardening_review.md
+│       ├── v2_answer_pre_hardening_review.md
+│       ├── v2_threshold_validation_raw.json / .md
+│       ├── v2_threshold_validation_scan.json / .md
+│       └── v2_threshold_validation_review.md
 ├── frontend/
 │   ├── Dockerfile
 │   ├── .dockerignore
@@ -218,7 +224,9 @@ DocuMind/
 | `evaluation/integration.py` | 确定性 Embedding、内存 Vector Store 和三种检索模式集成烟囱测试 |
 | `evaluation/fingerprints.py` | UTF-8 BOM/换行规范化后的黄金集和语料逻辑文本 SHA-256；保留独立原始字节哈希 |
 | `evaluation/production.py` | Dense、BM25、Hybrid 和 v1.7 实验组件评估装配 |
-| `evaluation/production_runner.py` | 真实 Provider 基线、Rewrite、Rerank 实验 CLI |
+| `evaluation/production_runner.py` | 真实 Provider 基线、split 隔离、Rewrite、Rerank 实验 CLI |
+| `evaluation/threshold_calibration.py` | 从无阈值 Dense 报告生成相邻中点候选、约束评估和 holdout 决策 |
+| `evaluation/threshold_runner.py` | validation-only 扫描与冻结候选 holdout 评估 CLI |
 | `evaluation/comparison.py` | 四种增强模式的同配置校验、质量/延迟矩阵和基线差值 |
 | `evaluation/comparison_runner.py` | 生成 v1.7.1 四模式 JSON/Markdown 对照报告的 CLI |
 | `evaluation/rewrite_artifacts.py` | 严格 Rewrite artifact 生成、读取和数据集指纹校验 |
@@ -229,6 +237,7 @@ DocuMind/
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
 | `evaluation/baselines/deterministic_dense_v2.*` | v2.0.1 冻结、供 v2.0.2 PR CI 实时比较的 Dense 基线与可读报告 |
 | `evaluation/reports/v2_answer_pre_hardening.*` | v2.0.6 固化的旧 Prompt 真实 JSON/Markdown 对照与逐案人工复核记录 |
+| `evaluation/reports/v2_threshold_validation_*` | v2.0.7 无阈值 validation 原始结果、59 候选扫描与不启用复核记录 |
 
 ## 依赖方向
 
@@ -268,7 +277,7 @@ evaluation.answer_adapters / answer_metrics
 
 React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。浏览器对话历史通过 `frontend/src/conversations.ts` 独立保存，不进入 API。`web_app.py` 仍保留为兼容入口。
 
-答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`；v2.0.5 冻结全 `holdout` 的专用答案集、独立阈值 validation/holdout 和共用语料；v2.0.6 固化旧 Prompt 真实报告，并让 Judge 只按确定性解析出的精确 `[文档N]` 评分。Judge Prompt 与生产 Prompt 分离，评测器加固不改变线上生成或 SSE。
+答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`；v2.0.5 冻结全 `holdout` 的专用答案集、独立阈值 validation/holdout 和共用语料；v2.0.6 固化旧 Prompt 真实报告，并让 Judge 只按确定性解析出的精确 `[文档N]` 评分；v2.0.7 在独立 validation 上校准 Dense L2 阈值，没有合格候选，因此封存 holdout 并保持默认阈值为空。Judge Prompt 与生产 Prompt 分离，评测器和阈值实验不改变线上生成或 SSE。
 
 可观测性模块不得反向导入 Web UI 或具体 RAG 组件，避免循环依赖。
 

@@ -1,6 +1,6 @@
 # DocuMind - RAG 评估
 
-v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料，v2.0.6 固化人工复核的旧 Prompt 真实对照。
+v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料，v2.0.6 固化人工复核的旧 Prompt 真实对照，v2.0.7 完成 validation-only Dense L2 阈值校准并记录不启用决策。
 
 ## 数据集
 
@@ -220,6 +220,24 @@ Judge: deepseek / deepseek-chat / temperature=0.0 / max_tokens=1000
 
 v2.0.6 验收结果为全量 Python `205 passed, 1 skipped, 124 subtests passed`、答案专项 `23 passed, 113 subtests passed`、Vitest `5 passed`、Playwright `6 passed`。Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、32 份 Markdown UTF-8/本地链接检查和 `deterministic_dense_v2` 回归门禁均通过。
 
+### v2.0.7 Dense L2 阈值校准
+
+`production_runner --split validation|holdout` 可以隔离冻结 split，并在报告中记录 `evaluation_split` 与 `distance_metric=L2`。`evaluation.threshold_runner scan` 只接受无阈值、Dense、baseline、L2 且数据集指纹一致的 validation 报告；它重新计算指标，不信任输入报告中的聚合值，只使用实际观测 distance 的相邻中点作为候选。固定选择规则是：先满足 Recall@3 下降不超过 `0.02`、无答案准确率不低于 `0.90`、成功率等于 `1.00`，再取数值最大的通过候选以尽量保留正常召回。
+
+正式配置为 Ollama `qwen3-embedding`、4096 维、Dense、Milvus L2、Top-K=3、Chunk 500/100、11 份专用语料。validation 的 5 条正样本与 15 条困难负样本 20/20 成功；无阈值时正样本 Recall@3/MRR@3 均为 `1.0000`，无答案准确率为 `0.0000`。59 个候选全部失败：
+
+| 候选 | Recall@3 | 无答案准确率 | 错误拒答率 | 结论 |
+|---:|---:|---:|---:|---|
+| `0.717509448528` | 0.4000 | 0.9333 | 0.6000 | 无答案目标通过，召回失败 |
+| `0.752467751503` | 0.6000 | 0.9333 | 0.4000 | 无答案目标通过，召回失败 |
+| `0.900638788939` | 1.0000 | 0.4667 | 0.0000 | 召回通过，无答案目标失败 |
+
+正样本 Top-1 L2 范围为 `0.6420` 至 `0.8903`，困难负样本为 `0.7050` 至 `1.0464`，两者重叠明显。因为 validation 没有冻结候选，协议要求保持 holdout 未运行，不能查看 holdout 后再调约束。正式工件为 `v2_threshold_validation_raw.{json,md}`、`v2_threshold_validation_scan.{json,md}` 和 `v2_threshold_validation_review.md`；机器可读状态明确记录 `selected_threshold=null`、`holdout_status=not_run_no_validation_candidate` 与 `enable_reference_threshold=false`。
+
+最终决策是 `Settings.retrieval_score_threshold=None` 和 `.env.example` 空值均保持不变。系统仍支持用户显式配置最大 L2 distance，但当前结果不能外推为 `qwen3-embedding`、参考部署或任意上传语料的推荐阈值，也不能声称 Web 已通过检索阈值实现可靠拒答。无上下文响应、Metrics、日志和 SSE 行为未修改。
+
+v2.0.7 验收结果为全量 Python `215 passed, 1 skipped, 124 subtests passed`、阈值专项 `10 passed`、Vitest `5 passed`、Playwright `6 passed`。Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、35 份 Markdown UTF-8/本地链接检查、正式工件密钥扫描和 `deterministic_dense_v2` 回归门禁均通过。
+
 ### v1.6 检索对比
 
 扩展的数据集存储在 `evaluation/datasets/v1_6/` 中，包含 9 个工程文档的 32 个案例。使用 `--retrieval-mode dense`、`bm25` 或 `hybrid` 运行三种确定性对比。已签入的报告是 `evaluation/reports/v1_6_{dense,bm25,hybrid}.{json,md}`。
@@ -420,4 +438,4 @@ result.assert_passed()
 
 ## 范围
 
-当前 v2.0.6 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。旧 Prompt 对照已完成，但阈值校准和 Prompt/引用加固尚未执行。
+当前 v2.0.7 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。旧 Prompt 对照和阈值校准已完成；阈值结论是不启用，Prompt/引用加固尚未执行。
