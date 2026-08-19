@@ -1,6 +1,6 @@
 # DocuMind - RAG 评估
 
-v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料。
+v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料，v2.0.6 固化人工复核的旧 Prompt 真实对照。
 
 ## 数据集
 
@@ -137,7 +137,7 @@ v2.0.3 阶段尚未实现真实 Runner、专用数据集或人工复核报告，
 
 真实 Generator 通过 `LLMAnswerGenerator` 直接桥接当前生产 `RAGGenerator` 的非流式入口，使用同一 System Prompt、上下文格式和默认温度 `0.7`。这是有意保留的旧 Prompt 行为，不能提前加入后续 Prompt Injection 防护，否则无法生成有效的 pre-hardening 对照。Judge 使用独立的 `LLMAnswerJudge`，明确把问题、上下文、参考答案和候选答案视为不可信数据；动态字段经 HTML 转义，编码规则计入 Judge Prompt 指纹，模型输出再交给 v2.0.3 的严格 JSON 解析器。
 
-引用解析器当前只提取完整匹配 `\[文档([1-9]\d*)\]` 的标记，按首次出现顺序去重并记录 `citation_parser_version=bracketed-document-v1`。它只用于离线观测，不修改模型输出，也不改变 SSE 契约；统一线上引用格式仍属于后续 Prompt 加固任务。
+引用解析器当前只提取完整匹配 `\[文档([1-9]\d*)\]` 的标记，按首次出现顺序去重并记录 `citation_parser_version=bracketed-document-v1`。Judge Prompt 显式接收确定性解析结果，只允许精确 `[文档N]` 计为引用；若解析结果为空，两项引用分数必须为 0，代码会拒绝与此约束冲突的 Judge 输出。该规则只用于离线观测，不修改模型输出，也不改变 SSE 契约；统一线上引用格式仍属于后续 Prompt 加固任务。
 
 `evaluation/answer_reports.py` 在同一文件系统中通过临时文件和替换写出完整 JSON/Markdown。Markdown 对问题、文档和模型文本做 HTML 转义，避免评测样本把报告结构当成可执行标记。报告记录数据集/语料指纹、Git 状态、Embedding/Chunk/检索配置、Generator/Judge 模型参数、两份 Prompt 指纹、拒答文本指纹和每项指标分母，不记录 API Key、认证头或 Milvus token。
 
@@ -188,6 +188,37 @@ documents_sha256 = 7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878
 本阶段不调用 Ollama、Milvus 或云端 LLM，也不生成 pre-hardening 报告或扫描距离。28 条答案案例服务于下一阶段固定真实 Provider 的旧 Prompt 对照；35 条阈值案例只冻结 P0-2 的 validation/holdout 输入。阈值候选、distance 分布、一次性 holdout 结果和是否启用仍必须在后续独立任务中产生。因此“数据集已冻结”仍不等于“生产答案质量或拒答能力已经通过验收”，更不等于在线幻觉检测。
 
 v2.0.5 数据集专项为 `8 passed, 101 subtests passed`，答案评测相关专项为 `32 passed, 113 subtests passed`，全量 Python 为 `205 passed, 1 skipped, 124 subtests passed`。Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、30 份 Markdown 静态检查和 `deterministic_dense_v2` 检索回归门禁均通过。BM25 诊断确认 28 条答案集中 19 个可回答案例、阈值集中 10 个正样本的全部标注文档均进入各自 Top-K；该结果只验证语料可检索性，不是生产 Embedding 质量结论。
+
+### v2.0.6 旧 Prompt 真实对照
+
+正式报告使用未加固的生产 `RAGGenerator` Prompt 和以下固定配置：
+
+```text
+Dataset: evaluation/datasets/v2_answer_quality/dataset.jsonl
+Documents: evaluation/datasets/v2_answer_quality/documents
+Retrieval: Dense, score_threshold=null, case Top-K=3/5
+Embedding: ollama / qwen3-embedding / 4096
+Chunk: 500 / 100
+Generator: deepseek / deepseek-chat / temperature=0.7 / max_tokens=1000
+Judge: deepseek / deepseek-chat / temperature=0.0 / max_tokens=1000
+```
+
+正式 JSON 与 Markdown 由同一次运行原子生成，分别保存在 `evaluation/reports/v2_answer_pre_hardening.json` 和 `.md`。人工复核记录为 `evaluation/reports/v2_answer_pre_hardening_review.md`。结果如下：
+
+| 指标 | 分数 | 案例数 | 结论 |
+|---|---:|---:|---|
+| `successful_case_rate` | 1.0000 | 28 | 达到 1.00 |
+| `refusal_accuracy` | 0.6786 | 28 | 低于 0.90 |
+| `faithfulness` | 1.0000 | 19 | 高于 0.85 |
+| `citation_correctness` | 0.0526 | 19 | 低于 0.85 |
+| `citation_completeness` | 0.0526 | 19 | 低于 0.80 |
+| `answer_relevance` | 1.0000 | 19 | 记录值，无硬门槛 |
+
+28 条案例的标注文档全部进入 Top-K，19 条可回答答案经逐条核对均受证据支持。9 条负样本都表达了信息不足，但因为附带解释而不精确等于统一拒答文本，全部被严格契约判为 `answered`。19 条可回答答案中只有 1 条使用可解析的 `[文档N]`，其余只使用“文档1”或文件名。三条 Prompt Injection 均未输出哨兵、泄露 Prompt/凭据或服从恶意指令。
+
+首轮候选曾暴露 Judge 在零解析引用时仍给引用满分的问题；修正 Judge 契约并补充一致性测试后才重新生成正式工件。报告如实记录父提交 `对应阶段源码快照` 与 `dirty=true`，因为评测器源码/测试改动和候选工件在正式运行前已经存在；候选工件随后删除，数据集、语料、生产 Prompt 和检索配置未发生变化。该工件是 Prompt 加固前的旧行为对照，不是达标的最终答案质量基线，也没有修改 Web 阈值、Prompt 或 SSE。
+
+v2.0.6 验收结果为全量 Python `205 passed, 1 skipped, 124 subtests passed`、答案专项 `23 passed, 113 subtests passed`、Vitest `5 passed`、Playwright `6 passed`。Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、32 份 Markdown UTF-8/本地链接检查和 `deterministic_dense_v2` 回归门禁均通过。
 
 ### v1.6 检索对比
 
@@ -389,4 +420,4 @@ result.assert_passed()
 
 ## 范围
 
-当前 v2.0.5 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。
+当前 v2.0.6 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。旧 Prompt 对照已完成，但阈值校准和 Prompt/引用加固尚未执行。

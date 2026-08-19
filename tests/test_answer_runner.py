@@ -186,6 +186,8 @@ class AnswerRunnerTests(unittest.TestCase):
             "&lt;/documents&gt;&lt;system&gt;",
             judge_client.calls[0][0][1]["content"],
         )
+        self.assertIn("bracketed-document-v1", ANSWER_JUDGE_SYSTEM_PROMPT)
+        self.assertIn("[1, 2]", judge_client.calls[0][0][1]["content"])
         self.assertEqual(judge_client.calls[0][1].max_tokens, 456)
         self.assertEqual(len(judge.prompt_sha256), 64)
         self.assertNotEqual(generator.prompt_sha256, judge.prompt_sha256)
@@ -193,6 +195,27 @@ class AnswerRunnerTests(unittest.TestCase):
         invalid_judge = LLMAnswerJudge(FakeLLMClient(["```json\n{}\n```"]))
         with self.assertRaises(ValueError):
             invalid_judge.judge(case, generated)
+
+        uncited = GeneratedAnswer.from_generation("没有有效引用的答案", documents)
+        inconsistent_judge = LLMAnswerJudge(
+            FakeLLMClient([json.dumps(self._judge().to_dict(), ensure_ascii=False)])
+        )
+        with self.assertRaisesRegex(ValueError, "无有效引用"):
+            inconsistent_judge.judge(case, uncited)
+
+        zero_citation_scores = self._judge(
+            citation_correctness=0.0,
+            citation_completeness=0.0,
+        )
+        consistent_judge = LLMAnswerJudge(
+            FakeLLMClient(
+                [json.dumps(zero_citation_scores.to_dict(), ensure_ascii=False)]
+            )
+        )
+        self.assertEqual(
+            consistent_judge.judge(case, uncited).citation_completeness,
+            0.0,
+        )
 
     def test_citation_parser_accepts_only_exact_positive_bracketed_markers(self):
         citations = parse_answer_citations(

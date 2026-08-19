@@ -1,4 +1,4 @@
-# 项目结构（v2.0.5）
+# 项目结构（v2.0.6）
 
 ```text
 DocuMind/
@@ -100,15 +100,23 @@ DocuMind/
 │   │   ├── golden_dataset.jsonl
 │   │   ├── documents/
 │   │   ├── v1_6/
-│   │       ├── golden_dataset.jsonl
-│   │       ├── holdout_dataset.jsonl
-│   │       └── documents/
-│   │   └── v1_7/                # 经数据集指纹绑定的 Rewrite artifact
+│   │   │   ├── golden_dataset.jsonl
+│   │   │   ├── holdout_dataset.jsonl
+│   │   │   └── documents/
+│   │   ├── v1_7/                # 经数据集指纹绑定的 Rewrite artifact
+│   │   └── v2_answer_quality/
+│   │       ├── dataset.jsonl
+│   │       ├── threshold_dataset.jsonl
+│   │       ├── documents/
+│   │       └── README.md
 │   ├── baselines/
 │   │   ├── deterministic_dense_v2.json
 │   │   ├── deterministic_dense_v2.md
 │   │   └── README.md
 │   └── reports/
+│       ├── v2_answer_pre_hardening.json
+│       ├── v2_answer_pre_hardening.md
+│       └── v2_answer_pre_hardening_review.md
 ├── frontend/
 │   ├── Dockerfile
 │   ├── .dockerignore
@@ -220,6 +228,7 @@ DocuMind/
 | `evaluation/regression_runner.py` | 报告兼容性校验和自动回归门禁 CLI |
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
 | `evaluation/baselines/deterministic_dense_v2.*` | v2.0.1 冻结、供 v2.0.2 PR CI 实时比较的 Dense 基线与可读报告 |
+| `evaluation/reports/v2_answer_pre_hardening.*` | v2.0.6 固化的旧 Prompt 真实 JSON/Markdown 对照与逐案人工复核记录 |
 
 ## 依赖方向
 
@@ -259,7 +268,7 @@ evaluation.answer_adapters / answer_metrics
 
 React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。浏览器对话历史通过 `frontend/src/conversations.ts` 独立保存，不进入 API。`web_app.py` 仍保留为兼容入口。
 
-答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`；v2.0.5 冻结全 `holdout` 的专用答案集、独立阈值 validation/holdout 和共用语料。Judge Prompt 与生产 Prompt 分离。
+答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`；v2.0.5 冻结全 `holdout` 的专用答案集、独立阈值 validation/holdout 和共用语料；v2.0.6 固化旧 Prompt 真实报告，并让 Judge 只按确定性解析出的精确 `[文档N]` 评分。Judge Prompt 与生产 Prompt 分离，评测器加固不改变线上生成或 SSE。
 
 可观测性模块不得反向导入 Web UI 或具体 RAG 组件，避免循环依赖。
 

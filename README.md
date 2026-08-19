@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v2.0.5）
+# DocuMind - RAG 知识库问答系统（v2.0.6）
 
 一个本地单用户 RAG 知识库问答系统。当前主链路采用 FastAPI、React/TypeScript、Milvus Standalone 和 SSE 流式响应，包含文档生命周期管理、真实依赖探活、引用来源、结构化可观测性、离线评测和自动质量回归门禁。
 
-> GitHub 已发布 tag 仍为 `v2.0`。本地 `main` 已包含 v2.0.4，当前代码版本为 v2.0.5；v2.0.1 至 v2.0.5 的维护版本 tag 均尚未创建。
+> GitHub 已发布 tag 仍为 `v2.0`。本地 `main` 已包含 v2.0.5，当前代码版本为 v2.0.6；v2.0.1 至 v2.0.6 的维护版本 tag 均尚未创建。
 
 ## 核心能力
 
@@ -15,6 +15,7 @@
 - JSONL 日志、Prometheus Metrics、OpenTelemetry Tracing 和 Request/Trace ID 关联。
 - 确定性黄金集、JSON/Markdown 报告、输入兼容检查和 PR CI 质量门禁。
 - 独立的答案质量数据契约、28 条 holdout 黄金集、真实/Fake Generator/Judge、严格 Judge JSON、逐案例失败隔离和原子 JSON/Markdown 报告。
+- 人工逐案复核的旧 Prompt 真实对照，明确记录当前拒答和统一引用格式的失败边界。
 
 ## 文档导航
 
@@ -174,6 +175,8 @@ python -m app.lifecycle rebuild --document-key <document_key> --retry
 
 v2.0.5 的专用数据集包含 28 条人工编写的答案质量 `holdout`：8 条直接事实、5 条多片段综合、6 条无答案、3 条信息不足或冲突、3 条 Prompt Injection、3 条引用边界。独立阈值集另含 validation 5 正/15 负和 holdout 5 正/10 负，共 35 条；它只冻结后续校准输入，尚未执行阈值扫描。11 份 TXT 语料均为仓库内合成材料，不含私人文档或真实凭据；规范化指纹为答案集 `f5eb00ddc448772e6369f8e2b8ae798cecf4736e2f7dc6619df49a728108055d`、阈值集 `8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210`、语料 `7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878103`。
 
+v2.0.6 使用 Ollama `qwen3-embedding`（4096 维）、DeepSeek `deepseek-chat` Generator/Judge、Dense 检索、空距离阈值和未加固生产 Prompt 生成并人工复核了 [pre-hardening JSON 报告](evaluation/reports/v2_answer_pre_hardening.json)及[可读报告](evaluation/reports/v2_answer_pre_hardening.md)。28 条均成功执行，19 条可回答案例的标注文档全部进入 Top-K；Faithfulness 和回答相关性均为 `1.0000`，但拒答准确率仅为 `0.6786`，引用正确性与完整性均为 `0.0526`。三条 Prompt Injection 未输出哨兵或服从恶意指令。这是旧行为对照，不代表当前答案质量已经通过验收；完整人工结论见[复核记录](evaluation/reports/v2_answer_pre_hardening_review.md)。
+
 ## 测试与检查
 
 ```powershell
@@ -193,7 +196,7 @@ docker compose -f compose.yaml config --quiet
 docker compose -f infra/milvus/compose.yaml config --quiet
 ```
 
-v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests passed`、Vitest `5 passed`、Playwright `6 passed`，并通过格式、编译、依赖、TypeScript、构建和两份 Compose 校验。v2.0.2 进一步验证了正常确定性报告返回 `PASS`，仅降低兼容报告的 Recall 会返回质量失败码 `1`。v2.0.3 全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`。v2.0.4 全量 Python 回归为 `197 passed, 1 skipped, 23 subtests passed`。v2.0.5 全量 Python 回归为 `205 passed, 1 skipped, 124 subtests passed`，数据集专项为 `8 passed, 101 subtests passed`，Vitest `5 passed`，Playwright `6 passed`，并通过 Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 和既有确定性检索门禁。
+v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests passed`、Vitest `5 passed`、Playwright `6 passed`，并通过格式、编译、依赖、TypeScript、构建和两份 Compose 校验。v2.0.2 进一步验证了正常确定性报告返回 `PASS`，仅降低兼容报告的 Recall 会返回质量失败码 `1`。v2.0.3 全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`。v2.0.4 全量 Python 回归为 `197 passed, 1 skipped, 23 subtests passed`。v2.0.5 全量 Python 回归为 `205 passed, 1 skipped, 124 subtests passed`，数据集专项为 `8 passed, 101 subtests passed`。v2.0.6 全量 Python 仍为 `205 passed, 1 skipped, 124 subtests passed`，答案专项为 `23 passed, 113 subtests passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、32 份 Markdown 检查和既有确定性检索门禁均通过。
 
 ## 版本摘要
 
@@ -211,6 +214,6 @@ v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests pa
 - Query Rewrite、Hybrid 和 Reranker 尚未进入 Web 默认请求路径。
 - 当前 8 条确定性数据集只用于管线回归，不能代表生产答案质量。
 - 检索命中正确文档不等于最终回答忠实；Faithfulness 和引用质量必须由独立答案评测验证。
-- v2.0.5 已冻结答案与阈值数据集和 11 份专用语料，但尚未运行和人工复核真实模型报告，也未扫描或启用检索阈值，因此不能声明当前生产答案或拒答能力已通过验收。
+- v2.0.6 已固化真实旧 Prompt 对照；它通过了执行成功率、Faithfulness 和 Injection 人工检查，但拒答与统一引用指标未达目标，因此不能声明当前生产答案质量已通过验收。
 - 当前 Generator 刻意复用未加固的生产 Prompt；Prompt Injection 防护、统一 `[文档N]` 约束和温度对照必须在旧 Prompt 基线完成后单独实施。
 - Prometheus、Grafana、Jaeger 和 Collector 等外部可观测性后端不在 Compose 中。
