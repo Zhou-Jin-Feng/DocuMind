@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v2.0.7）
+# DocuMind - RAG 系统架构（v2.0.8）
 
 ## 1. 分层结构
 
@@ -141,8 +141,11 @@ Web 默认问答链路保持 Dense-only：
 → 最大距离阈值过滤
 → 构建带来源和页码的上下文
 → LLM 流式生成
+→ 完成后确定性解析引用（不改写已发送 Token）
 → UI 展示回答和引用来源
 ```
+
+`RAGGenerator` 把问题和检索资料都放在 `user` 消息中，使用 `<user_question>`、`<retrieved_context>` 和按列表位置生成的 `<document id="N">` 边界。正文、来源和页码属性统一进行 XML 转义；资料被声明为不可信数据，不能升级为系统指令。回答只接受精确 `[文档N]` 引用。`app.core.citations` 同时服务生产观测和离线评测，解析结果只进入 Metrics/日志和报告，不修改流式回答文本或 SSE 事件。
 
 问答 Trace：
 
@@ -202,6 +205,7 @@ v1.7 仅在评估编排中增加可选链路：
 - `configure_metrics()` 只配置内存注册表。
 - `start_metrics_server()` 只由 Web 主入口显式调用。
 - 标签限制为 `provider`、`operation`、`status`、`error_type`。
+- 问答完成后记录引用数量、非法引用数量和无引用状态；不记录回答正文、检索正文或引用集合。
 - 关闭后所有操作 no-op，不监听端口。
 
 ### 6.4 Tracing
@@ -236,7 +240,7 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加答案质量严格契约；v2.0.4 增加真实 Generator/Judge 装配、逐案例 Runner 和原子 JSON/Markdown 报告；v2.0.5 冻结 28 条答案质量 holdout、35 条阈值正负样本与 11 份专用语料；v2.0.6 使用固定 Ollama/DeepSeek 配置生成并人工复核旧 Prompt 对照；v2.0.7 只使用 validation 扫描 Dense L2 阈值，因正负 distance 明显重叠而冻结“不启用”决策。评估层仍只依赖生产 Provider、`RAGGenerator` 和检索组件，生产 `app` 不反向依赖 `evaluation`。正式答案对照证明当前答案事实忠实且三条 Injection 未被执行，但严格拒答准确率为 `0.6786`，引用正确性和完整性均为 `0.0526`；阈值实验又证明当前语料不存在兼顾 Recall@3 与无答案过滤目标的单一全局值。这些失败是后续 Prompt 加固的输入，不改变 Web 默认 Dense-only 链路，也不能声明答案质量或阈值拒答达标。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加答案质量严格契约；v2.0.4 增加真实 Generator/Judge 装配、逐案例 Runner 和原子 JSON/Markdown 报告；v2.0.5 冻结 28 条答案质量 holdout、35 条阈值正负样本与 11 份专用语料；v2.0.6 使用固定 Ollama/DeepSeek 配置生成并人工复核旧 Prompt 对照；v2.0.7 只使用 validation 扫描 Dense L2 阈值，因正负 distance 明显重叠而冻结“不启用”决策；v2.0.8 加固不可信上下文 Prompt、统一 `[文档N]` 引用并增加流结束后的低基数观测，固定真实 Provider 对照显示 0.7 温度优于预选 0.1 候选。评估层仍只依赖生产 Provider、`RAGGenerator` 和检索组件，生产 `app` 不反向依赖 `evaluation`。正式报告和复核记录证明加固后 3 条 Injection 均未执行恶意指令，且固定数据集的引用正确性/完整性为 `1.0000`；这些结果不能外推为所有模型或用户语料的质量承诺。
 
 ```text
 evaluation.runner / production_runner
@@ -261,7 +265,7 @@ evaluation.runner / production_runner
 
 普通 PR CI 只执行确定性本地评测，不连接真实 Provider。真实 Ollama/云端报告仍是发布前人工证据，不进入每次 PR 的自动门禁。
 
-答案 Runner 的 Generator 复用当前生产 `RAGGenerator` Prompt，Judge 使用独立抗注入 Prompt。该边界用于先生成旧行为对照；生产 Prompt 加固、统一 `[文档N]` 输出和线上引用观测仍是后续独立阶段。
+答案 Runner 的 Generator 复用当前生产 `RAGGenerator` Prompt，Judge 使用独立抗注入 Prompt。v2.0.8 已完成生产 Prompt 加固、统一 `[文档N]` 输出和线上引用观测；Judge 仍与生产 Prompt 分离，避免评测指令反向进入线上生成。
 
 当前仍不包含：
 

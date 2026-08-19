@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import html
 import json
-import re
 from collections.abc import Mapping, Sequence
 from types import SimpleNamespace
 from typing import Protocol, runtime_checkable
 
 from app.core.generator import GenerationConfig, RAGGenerator
+from app.core.citations import CITATION_PARSER_VERSION, parse_answer_citations
 from evaluation.answer_models import (
     AnswerQualityCase,
     GeneratedAnswer,
@@ -18,14 +18,12 @@ from evaluation.answer_models import (
 from evaluation.fingerprints import text_sha256
 from evaluation.models import RetrievedDocument
 
-CITATION_PARSER_VERSION = "bracketed-document-v1"
-_CITATION_PATTERN = re.compile(r"\[文档([1-9]\d*)\]")
-
 ANSWER_GENERATOR_SYSTEM_PROMPT = RAGGenerator.SYSTEM_PROMPT
 ANSWER_GENERATOR_USER_PROMPT_TEMPLATE = "\n".join(
     (
         RAGGenerator.CONTEXT_HEADER,
         RAGGenerator.DOCUMENT_CONTEXT_TEMPLATE,
+        RAGGenerator.CONTEXT_FOOTER,
         RAGGenerator.USER_MESSAGE_TEMPLATE,
     )
 )
@@ -93,19 +91,6 @@ class LLMClient(Protocol):
 
 def _prompt_sha256(system_prompt: str, user_template: str) -> str:
     return text_sha256(f"{system_prompt}\n\n{user_template}")
-
-
-def parse_answer_citations(text: str) -> tuple[int, ...]:
-    """Return unique citation numbers in first-occurrence order."""
-
-    if not isinstance(text, str):
-        raise TypeError("引用解析输入必须是字符串")
-    citations: list[int] = []
-    for match in _CITATION_PATTERN.finditer(text):
-        citation = int(match.group(1))
-        if citation not in citations:
-            citations.append(citation)
-    return tuple(citations)
 
 
 def _render_documents(documents: Sequence[RetrievedDocument]) -> str:

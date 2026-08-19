@@ -8,6 +8,7 @@ from time import perf_counter
 from typing import Any, Callable, Iterator, Literal
 
 from app.config import Settings
+from app.core.citations import analyze_answer_citations
 from app.core.generator import GenerationConfig
 from app.observability.context import request_context
 from app.observability.logging import get_logger
@@ -34,14 +35,14 @@ class SourceReference:
     chunk_id: str | None = None
 
     @classmethod
-    def from_result(cls, result: Any) -> "SourceReference":
+    def from_result(cls, result: Any, *, rank: int | None = None) -> "SourceReference":
         metadata = getattr(result, "metadata", {}) or {}
         content = str(getattr(result, "content", ""))
         excerpt = " ".join(content.split())
         if len(excerpt) > 240:
             excerpt = f"{excerpt[:237]}..."
         return cls(
-            rank=int(getattr(result, "rank", 0) or 0),
+            rank=int(rank if rank is not None else (getattr(result, "rank", 0) or 0)),
             source=str(getattr(result, "source", "") or "未知来源"),
             page_number=getattr(result, "page_number", None),
             excerpt=excerpt,
@@ -196,8 +197,8 @@ class RAGService:
                     attributes={"result.count": len(retrieval_results)},
                 ):
                     sources = [
-                        SourceReference.from_result(result).to_dict()
-                        for result in retrieval_results
+                        SourceReference.from_result(result, rank=index).to_dict()
+                        for index, result in enumerate(retrieval_results, 1)
                     ]
                     context_chars = sum(
                         len(result.content) for result in retrieval_results
@@ -268,6 +269,24 @@ class RAGService:
                     status="success",
                     provider=llm_provider,
                     response_chars=len("".join(answer_parts)),
+                )
+                citation_analysis = analyze_answer_citations(
+                    "".join(answer_parts), len(retrieval_results)
+                )
+                metrics.observe_citations(
+                    llm_provider,
+                    citation_count=len(citation_analysis.citations),
+                    invalid_count=len(citation_analysis.invalid_citations),
+                    has_citations=citation_analysis.has_citations,
+                )
+                logger.info(
+                    "回答引用校验完成",
+                    event="citations_validated",
+                    operation="rag.citations",
+                    status="success",
+                    citation_count=len(citation_analysis.citations),
+                    invalid_citation_count=len(citation_analysis.invalid_citations),
+                    missing_citations=not citation_analysis.has_citations,
                 )
                 elapsed = perf_counter() - total_started
                 metrics.record_query(llm_provider, "success", elapsed)

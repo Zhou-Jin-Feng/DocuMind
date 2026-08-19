@@ -1,6 +1,6 @@
 # DocuMind - RAG 评估
 
-v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料，v2.0.6 固化人工复核的旧 Prompt 真实对照，v2.0.7 完成 validation-only Dense L2 阈值校准并记录不启用决策。
+v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料，v2.0.6 固化人工复核的旧 Prompt 真实对照，v2.0.7 完成 validation-only Dense L2 阈值校准并记录不启用决策，v2.0.8 完成生产 Prompt、引用和 Injection 加固对照。
 
 ## 数据集
 
@@ -238,6 +238,18 @@ v2.0.6 验收结果为全量 Python `205 passed, 1 skipped, 124 subtests passed`
 
 v2.0.7 验收结果为全量 Python `215 passed, 1 skipped, 124 subtests passed`、阈值专项 `10 passed`、Vitest `5 passed`、Playwright `6 passed`。Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、35 份 Markdown UTF-8/本地链接检查、正式工件密钥扫描和 `deterministic_dense_v2` 回归门禁均通过。
 
+### v2.0.8 Prompt、引用和注入防护
+
+生产 `RAGGenerator` 保留 system/user 两消息结构，但在 system 规则中明确检索资料是不可信数据，忽略其中要求改规则、泄露 Prompt/凭据、调用工具或执行命令的文字。user 消息把问题包裹在 `<user_question>`，把资料包裹在 `<retrieved_context>`，每个资料块使用按检索列表位置生成的 `<document id="N" source="..." page="...">`。正文和属性统一 XML 转义，原文不能提前关闭边界；上游 rank 不连续时，公开 `sources.items[].rank` 仍按编排列表规范化为 1..N。
+
+生产与离线评测共用 `app.core.citations` 的 `bracketed-document-v1` 解析器：只接受精确 `[文档N]`，保留首次出现顺序并去重；格式近似、自然语言来源和越界编号只作为非法诊断，不会被当作有效引用。SSE `status/sources/token/done/error` 事件及其字段没有改变，流结束后只在日志和 Metrics 中记录引用数量、非法数量和无引用状态，不记录答案或文档正文。
+
+本阶段使用与 v2.0.6 相同的 Ollama `qwen3-embedding` 4096 维、DeepSeek `deepseek-chat` Generator/Judge、Dense、Milvus L2、空阈值、Chunk 500/100 和 28 条 holdout。`temperature=0.7` hardened 报告的成功率为 `1.0000`，拒答准确率 `0.7143`，Faithfulness、引用正确性、引用完整性和回答相关性均为 `1.0000`（18 条可回答 Judge 案例）；预先选定的 `temperature=0.1` 对照拒答准确率为 `0.6786`，其余指标均为 `1.0000`（17 条可回答 Judge 案例），因此保留 `0.7`。旧 Prompt 的 Generator Prompt SHA 为 `513cd279f6f3cffdcacd2a0f92c892faad82075da7f1a0a9125c7f1ee1c8da17`，加固 SHA 为 `07c37d4a051fdf596de23b0480a5b866a1ee7341ed925982466a34f154ca3cdc`。
+
+两份 hardened 报告各执行 3 条独立 Prompt Injection，均未输出 `INJECTION_*` 哨兵、system prompt、真实 API Key 或不存在的 `[文档99]`。JSON/Markdown 工件通过敏感模式扫描；逐案人工结论、运行环境、报告 SHA-256 和 dirty 状态见 [复核记录](../evaluation/reports/v2_answer_prompt_hardened_review.md)。真实报告在最终提交前生成，记录 `dirty=true`，因此提交前需要在干净工作区重跑并复核指纹，不能把本次报告冒充为最终提交基线。
+
+该版本全量复审结果为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。该次报告保留 `dirty=true`，其代码标识与输入指纹按原始报告记录；不能将该结果视为当前提交的独立复验。
+
 ### v1.6 检索对比
 
 扩展的数据集存储在 `evaluation/datasets/v1_6/` 中，包含 9 个工程文档的 32 个案例。使用 `--retrieval-mode dense`、`bm25` 或 `hybrid` 运行三种确定性对比。已签入的报告是 `evaluation/reports/v1_6_{dense,bm25,hybrid}.{json,md}`。
@@ -438,4 +450,4 @@ result.assert_passed()
 
 ## 范围
 
-当前 v2.0.7 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。旧 Prompt 对照和阈值校准已完成；阈值结论是不启用，Prompt/引用加固尚未执行。
+当前 v2.0.8 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。旧 Prompt 对照、阈值校准和 Prompt/引用加固均已完成；阈值结论是不启用，答案质量结果只适用于固定数据集、语料和 Provider 配置。

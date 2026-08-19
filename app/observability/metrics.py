@@ -121,6 +121,25 @@ class RAGMetrics:
             buckets=_DEFAULT_BUCKETS,
             registry=self.registry,
         )
+        self.answer_citation_count = Histogram(
+            "rag_answer_citation_count",
+            "Number of unique exact document citations in completed answers.",
+            ("provider",),
+            buckets=(0, 1, 2, 3, 5, 8, 10),
+            registry=self.registry,
+        )
+        self.invalid_citations_total = Counter(
+            "rag_invalid_citations_total",
+            "Malformed or out-of-range document citation markers.",
+            ("provider",),
+            registry=self.registry,
+        )
+        self.answers_without_citations_total = Counter(
+            "rag_answers_without_citations_total",
+            "Completed answers without an exact document citation.",
+            ("provider",),
+            registry=self.registry,
+        )
 
     def record_query(self, provider: str, status: str, duration_seconds: float) -> None:
         if not self.enabled:
@@ -213,6 +232,27 @@ class RAGMetrics:
             self.llm_total_duration.labels(_label(provider), _label(status)).observe(
                 max(duration_seconds, 0.0)
             )
+
+    def observe_citations(
+        self,
+        provider: str,
+        *,
+        citation_count: int,
+        invalid_count: int,
+        has_citations: bool,
+    ) -> None:
+        """Record only aggregate citation states; never expose answer text."""
+
+        if not self.enabled:
+            return
+        normalized_provider = _label(provider)
+        self.answer_citation_count.labels(normalized_provider).observe(
+            max(citation_count, 0)
+        )
+        if invalid_count > 0:
+            self.invalid_citations_total.labels(normalized_provider).inc(invalid_count)
+        if not has_citations:
+            self.answers_without_citations_total.labels(normalized_provider).inc()
 
 
 _METRICS_LOCK = RLock()

@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v2.0.7）
+# DocuMind - RAG 知识库问答系统（v2.0.8）
 
 一个本地单用户 RAG 知识库问答系统。当前主链路采用 FastAPI、React/TypeScript、Milvus Standalone 和 SSE 流式响应，包含文档生命周期管理、真实依赖探活、引用来源、结构化可观测性、离线评测和自动质量回归门禁。
 
-> GitHub 已发布 tag 仍为 `v2.0`。当前代码版本为 v2.0.7；v2.0.1 至 v2.0.7 的维护版本 tag 均尚未创建。
+> GitHub 已发布 tag 仍为 `v2.0`。当前代码版本为 v2.0.8；v2.0.1 至 v2.0.8 的维护版本 tag 均尚未创建。
 
 ## 核心能力
 
@@ -17,6 +17,7 @@
 - 独立的答案质量数据契约、28 条 holdout 黄金集、真实/Fake Generator/Judge、严格 Judge JSON、逐案例失败隔离和原子 JSON/Markdown 报告。
 - 人工逐案复核的旧 Prompt 真实对照，明确记录当前拒答和统一引用格式的失败边界。
 - 基于独立 validation/holdout 协议的 Dense L2 阈值校准；当前证据明确支持“不启用全局默认阈值”。
+- 加固后的不可信上下文 Prompt、XML 边界、统一 `[文档N]` 引用解析，以及低基数线上引用观测。
 
 ## 文档导航
 
@@ -180,6 +181,8 @@ v2.0.6 使用 Ollama `qwen3-embedding`（4096 维）、DeepSeek `deepseek-chat` 
 
 v2.0.7 使用相同的 Ollama Embedding、Dense、Milvus L2、Top-K=3 和 11 份专用语料，只在 validation 的 5 条正样本与 15 条困难负样本上运行无阈值检索并扫描 59 个相邻 distance 中点。没有候选同时满足 Recall@3 下降不超过 `0.02`、无答案检索准确率不低于 `0.90` 和执行成功率 `1.00`：约 `0.7175` 的候选可达到 `0.9333` 无答案准确率，但 Recall@3 仅 `0.4000`；保持 Recall@3=`1.0000` 的约 `0.9006` 候选，无答案准确率仅 `0.4667`。因此按预设协议不运行 holdout、不启用参考阈值，代码与 `.env.example` 继续保持空值。机器可读结论见[扫描报告](evaluation/reports/v2_threshold_validation_scan.json)，完整依据见[复核记录](evaluation/reports/v2_threshold_validation_review.md)。
 
+v2.0.8 在同一固定配置下将生产 Prompt 加固为不可信数据边界，并新增生产引用解析/观测。加固报告使用 DeepSeek `deepseek-chat` Generator/Judge、Ollama `qwen3-embedding` 4096 维、Dense、Milvus L2、空阈值和 28 条 holdout：`temperature=0.7` 时成功率 `1.0000`、拒答准确率 `0.7143`、Faithfulness/引用正确性/完整性/相关性均为 `1.0000`；预先选定的 `temperature=0.1` 对照拒答准确率为 `0.6786`，其余指标相同，因此保留 `0.7`。三条 Injection 在两种温度下均未输出哨兵、system prompt、真实凭据或越界引用。报告与人工复核见 [hardened JSON](evaluation/reports/v2_answer_prompt_hardened.json)、[hardened Markdown](evaluation/reports/v2_answer_prompt_hardened.md)、[低温对照](evaluation/reports/v2_answer_prompt_hardened_low_temp.json) 和 [复核记录](evaluation/reports/v2_answer_prompt_hardened_review.md)。
+
 ## 测试与检查
 
 ```powershell
@@ -203,11 +206,14 @@ v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests pa
 
 v2.0.7 全量 Python 为 `215 passed, 1 skipped, 124 subtests passed`，阈值专项为 `10 passed`，Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、35 份 Markdown UTF-8/本地链接检查、正式工件密钥扫描和既有确定性检索门禁均通过。
 
+v2.0.8 该版本复审为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。该次报告记录 `dirty=true`，结果对应当时工作树，不代表干净提交的独立复验。
+
 ## 版本摘要
 
 | 版本 | 主要内容 | 状态 |
 |---|---|---|
 | v2.0 | FastAPI/React/Milvus 统一 Compose、基础 CI、演示与发布收口 | 已发布并推送 tag |
+| v2.0.8 | 不可信上下文 Prompt、统一引用解析、线上引用观测和 Injection 对照 | 实现已完成 |
 
 完整历史和真实提交边界见[版本历史](docs/VERSION_HISTORY.md)。
 
@@ -221,5 +227,5 @@ v2.0.7 全量 Python 为 `215 passed, 1 skipped, 124 subtests passed`，阈值�
 - 检索命中正确文档不等于最终回答忠实；Faithfulness 和引用质量必须由独立答案评测验证。
 - v2.0.6 已固化真实旧 Prompt 对照；它通过了执行成功率、Faithfulness 和 Injection 人工检查，但拒答与统一引用指标未达目标，因此不能声明当前生产答案质量已通过验收。
 - v2.0.7 已完成阈值校准，但结果是不启用全局默认值；项目只能声明“支持显式阈值并有不启用证据”，不能声明参考部署已通过检索阈值实现可靠拒答。
-- 当前 Generator 刻意复用未加固的生产 Prompt；Prompt Injection 防护、统一 `[文档N]` 约束和温度对照必须在旧 Prompt 基线完成后单独实施。
+- 当前 Generator 已使用不可信上下文边界和统一 `[文档N]` 约束；真实评测结果仍只适用于固定数据集、语料和 Provider，不能外推为所有模型或用户文档的质量承诺。
 - Prometheus、Grafana、Jaeger 和 Collector 等外部可观测性后端不在 Compose 中。

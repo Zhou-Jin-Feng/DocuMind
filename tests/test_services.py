@@ -28,6 +28,29 @@ class CapturingGenerator:
             raise self.error
 
 
+class CapturingMetrics:
+    def __init__(self):
+        self.citation_calls = []
+
+    def record_no_context(self, provider):
+        del provider
+
+    def record_query(self, provider, status, elapsed):
+        del provider, status, elapsed
+
+    def observe_first_token(self, provider, status, elapsed):
+        del provider, status, elapsed
+
+    def observe_llm_total(self, provider, status, elapsed):
+        del provider, status, elapsed
+
+    def record_component_error(self, operation, error_type):
+        del operation, error_type
+
+    def observe_citations(self, provider, **kwargs):
+        self.citation_calls.append((provider, kwargs))
+
+
 def result():
     return RetrievalResult(
         content="Milvus 保存 RAG 向量。",
@@ -91,6 +114,44 @@ class RAGServiceTests(unittest.TestCase):
         self.assertEqual(events[-1].data["code"], "generation_interrupted")
         self.assertTrue(events[-1].data["partial"])
         self.assertNotIn("provider down", events[-1].data["message"])
+
+    def test_sources_are_renumbered_and_citations_are_observed_after_stream(self):
+        first = result()
+        second = RetrievalResult(
+            content="第二份资料",
+            metadata={"source_file": "other.txt"},
+            distance=0.3,
+            rank=42,
+        )
+        metrics = CapturingMetrics()
+        service = RAGService(
+            retriever=CapturingRetriever([first, second]),
+            rag_generator=CapturingGenerator(["结论 [文档1] [文档3]"]),
+            settings=self.settings(),
+            metrics_getter=lambda: metrics,
+        )
+
+        events = list(service.stream_answer("请回答"))
+
+        self.assertEqual(
+            [item["rank"] for item in events[1].data["items"]],
+            [1, 2],
+        )
+        self.assertEqual(
+            metrics.citation_calls,
+            [
+                (
+                    "openai",
+                    {
+                        "citation_count": 2,
+                        "invalid_count": 1,
+                        "has_citations": True,
+                    },
+                )
+            ],
+        )
+        self.assertEqual(events[-1].type, "done")
+        self.assertEqual(events[-1].data, {"status": "success"})
 
 
 class DocumentServiceTests(unittest.TestCase):

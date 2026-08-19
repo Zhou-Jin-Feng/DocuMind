@@ -154,12 +154,12 @@ class AnswerRunnerTests(unittest.TestCase):
         )
 
         self.assertEqual(generated.citations, (1, 2))
-        self.assertNotIn("不可信数据", ANSWER_GENERATOR_SYSTEM_PROMPT)
+        self.assertIn("不可信数据", ANSWER_GENERATOR_SYSTEM_PROMPT)
         self.assertEqual(
             generator_client.calls[0][0][0]["content"],
             ANSWER_GENERATOR_SYSTEM_PROMPT,
         )
-        self.assertIn("[文档1]", generator_client.calls[0][0][1]["content"])
+        self.assertIn('<document id="1"', generator_client.calls[0][0][1]["content"])
         self.assertIn(
             "lifecycle-operations.txt",
             generator_client.calls[0][0][1]["content"],

@@ -1,4 +1,4 @@
-# 项目结构（v2.0.7）
+# 项目结构（v2.0.8）
 
 ```text
 DocuMind/
@@ -14,6 +14,7 @@ DocuMind/
 │   │   ├── retriever.py
 │   │   ├── query_rewriter.py
 │   │   ├── reranker.py
+│   │   ├── citations.py
 │   │   └── generator.py
 │   ├── observability/
 │   │   ├── __init__.py
@@ -67,6 +68,7 @@ DocuMind/
 │   ├── test_evaluation.py
 │   ├── test_answer_evaluation.py
 │   ├── test_answer_runner.py
+│   ├── test_citations.py
 │   ├── test_threshold_calibration.py
 │   ├── test_lifecycle.py
 │   ├── test_lifecycle_cli.py
@@ -122,7 +124,10 @@ DocuMind/
 │       ├── v2_answer_pre_hardening_review.md
 │       ├── v2_threshold_validation_raw.json / .md
 │       ├── v2_threshold_validation_scan.json / .md
-│       └── v2_threshold_validation_review.md
+│       ├── v2_threshold_validation_review.md
+│       ├── v2_answer_prompt_hardened.json / .md
+│       ├── v2_answer_prompt_hardened_low_temp.json / .md
+│       └── v2_answer_prompt_hardened_review.md
 ├── frontend/
 │   ├── Dockerfile
 │   ├── .dockerignore
@@ -190,6 +195,7 @@ DocuMind/
 | `app/api/schemas.py` | 健康、配置、文档详情/删除、上传和聊天请求/响应模型 |
 | `app/api/routers/*.py` | health、system、documents、chat HTTP 路由 |
 | `app/api/sse.py` | 将结构化 ChatEvent 编码为 SSE 帧 |
+| `app/core/citations.py` | 生产与离线共用的精确 `[文档N]` 引用解析和非法标记分析 |
 | `frontend/src/App.tsx` | React 工作台状态、问答流、文档管理、上传阶段、来源抽屉和本地历史 |
 | `frontend/src/api.ts` | REST/XHR 请求、上传进度、错误映射和 SSE 流解析 |
 | `frontend/src/conversations.ts` | 对话标题、数量限制、`localStorage` 读取/校验/持久化 |
@@ -220,6 +226,9 @@ DocuMind/
 | `evaluation/answer_metrics.py` | 按成功案例和 Judge 适用案例分别聚合指标及实际分母 |
 | `evaluation/answer_reports.py` | 对不可信文本转义并原子写出答案质量 JSON/Markdown 报告 |
 | `evaluation/answer_runner.py` | 真实检索、当前生产 Generator、独立 Judge、案例失败隔离和 CLI 退出码 |
+| `evaluation/reports/v2_answer_prompt_hardened.*` | v2.0.8 加固 Prompt 的 0.7 真实 Provider 对照工件 |
+| `evaluation/reports/v2_answer_prompt_hardened_low_temp.*` | v2.0.8 预选 0.1 温度对照工件 |
+| `evaluation/reports/v2_answer_prompt_hardened_review.md` | Prompt、引用和三条 Injection 的人工复核记录 |
 | `evaluation/datasets/v2_answer_quality/` | 28 条答案 holdout、35 条阈值正负样本和 11 份合成 TXT 语料 |
 | `evaluation/integration.py` | 确定性 Embedding、内存 Vector Store 和三种检索模式集成烟囱测试 |
 | `evaluation/fingerprints.py` | UTF-8 BOM/换行规范化后的黄金集和语料逻辑文本 SHA-256；保留独立原始字节哈希 |
@@ -277,7 +286,7 @@ evaluation.answer_adapters / answer_metrics
 
 React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。浏览器对话历史通过 `frontend/src/conversations.ts` 独立保存，不进入 API。`web_app.py` 仍保留为兼容入口。
 
-答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`；v2.0.5 冻结全 `holdout` 的专用答案集、独立阈值 validation/holdout 和共用语料；v2.0.6 固化旧 Prompt 真实报告，并让 Judge 只按确定性解析出的精确 `[文档N]` 评分；v2.0.7 在独立 validation 上校准 Dense L2 阈值，没有合格候选，因此封存 holdout 并保持默认阈值为空。Judge Prompt 与生产 Prompt 分离，评测器和阈值实验不改变线上生成或 SSE。
+答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`；v2.0.5 冻结全 `holdout` 的专用答案集、独立阈值 validation/holdout 和共用语料；v2.0.6 固化旧 Prompt 真实报告，并让 Judge 只按确定性解析出的精确 `[文档N]` 评分；v2.0.7 在独立 validation 上校准 Dense L2 阈值，没有合格候选，因此封存 holdout 并保持默认阈值为空；v2.0.8 将生产 Prompt 与离线评测桥接到 XML 边界和共享 `app.core.citations`，并在 SSE 完成后做不改写文本的低基数引用观测。Judge Prompt 与生产 Prompt 分离，评测器和阈值实验不改变线上生成或 SSE。
 
 可观测性模块不得反向导入 Web UI 或具体 RAG 组件，避免循环依赖。
 

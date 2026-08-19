@@ -48,6 +48,12 @@ class MetricsTests(unittest.TestCase):
         metrics.observe_retrieval("OpenAI", "success", 0.2, result_count=3)
         metrics.observe_first_token("OpenAI", "success", 0.15)
         metrics.observe_llm_total("OpenAI", "success", 0.4)
+        metrics.observe_citations(
+            "OpenAI",
+            citation_count=2,
+            invalid_count=1,
+            has_citations=True,
+        )
 
         output = self._output(metrics)
         self.assertIn(
@@ -65,6 +71,14 @@ class MetricsTests(unittest.TestCase):
         )
         self.assertIn(
             'rag_retrieval_result_count_count{provider="openai"} 1.0',
+            output,
+        )
+        self.assertIn(
+            'rag_invalid_citations_total{provider="openai"} 1.0',
+            output,
+        )
+        self.assertIn(
+            'rag_answer_citation_count_count{provider="openai"} 1.0',
             output,
         )
 

@@ -1,4 +1,4 @@
-# 可观测性指南（v2.0.7）
+# 可观测性指南（v2.0.8）
 
 Logs + Metrics + Traces 能力最初在 v1.3 引入，当前由 FastAPI 主入口和保留的 Gradio 兼容入口共用。应用实现内部埋点、Metrics HTTP 端口和可选 OTLP/HTTP Trace 导出；Prometheus、Grafana、Jaeger 和 OpenTelemetry Collector 等外部后端不在当前 Compose 内。
 
@@ -44,6 +44,7 @@ query_received
 → generation_started
 → first_token_received
 → generation_completed
+→ citations_validated
 → response_sent
 ```
 
@@ -93,8 +94,11 @@ Web 主入口会显式启动 Metrics HTTP 服务。默认地址为 `http://127.0
 | `rag_retrieval_result_count` | Histogram | 检索结果数量 |
 | `rag_llm_first_token_duration_seconds` | Histogram | 首 Token 延迟 |
 | `rag_llm_total_duration_seconds` | Histogram | LLM 流式生成总耗时 |
+| `rag_answer_citation_count` | Histogram | 完成回答中的精确引用数量 |
+| `rag_invalid_citations_total` | Counter | 格式非法或越界引用数量 |
+| `rag_answers_without_citations_total` | Counter | 没有精确引用的完成回答数量 |
 
-允许的标签只有：`provider`、`operation`、`status`、`error_type`。禁止使用 `request_id`、`trace_id`、问题、文件名、文档 ID 或 API Key 作为指标标签。
+允许的标签只有：`provider`、`operation`、`status`、`error_type`。引用指标只使用 `provider`。禁止使用 `request_id`、`trace_id`、问题、文件名、文档 ID、引用集合或 API Key 作为指标标签。
 
 ### 3.3 本地检查
 
