@@ -1,0 +1,7 @@
+检索质量规范
+
+Dense 检索使用 Milvus L2 distance，数值越小表示越接近。score_threshold 表示允许返回的最大距离；超过阈值的候选被过滤。阈值只对固定的 Embedding Provider、模型、实际维度、距离度量、Chunk 参数和代表性语料有效，不能跨模型照搬。
+
+BM25 擅长错误码、配置名和产品代号等精确词项，Dense 更适合语义改写。两种检索器的原始分数方向和量纲不同，不能直接相加或比较。混合检索先分别排序，再使用 Reciprocal Rank Fusion；单个候选的融合贡献为 1/(k + rank_i)。RRF 之后可以对候选集运行 Cross-Encoder Reranker。
+
+没有任何检索模式被规定为所有问题上的固定赢家。模式实验必须保持语料、数据集、Embedding 和 Chunk 配置一致，并同时查看 Recall、MRR、无答案检索准确率和延迟，不能只依据单个案例作结论。

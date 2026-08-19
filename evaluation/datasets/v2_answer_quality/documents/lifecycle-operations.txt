@@ -1,0 +1,7 @@
+文档生命周期操作规范
+
+每次上传先构建候选索引。只有候选索引完成分块、向量写入和完整性校验后，系统才把 active 指针切换到候选索引。任一步骤失败都不得切换；旧 active 索引继续提供检索。切换成功后，旧索引进入可清理状态，但不会在同一事务中立即删除。
+
+旧索引清理的状态顺序固定为 deleting、删除向量、deleted。若进程在删除向量后、写入 deleted 前中断，下一次 cleanup 根据 deleting 状态继续收敛。cleanup 只能处理当前 tenant 和 collection 作用域内的目标；带 --include-orphans 时，也只能删除整个作用域中没有注册记录的索引。
+
+更换 Embedding 模型时，即使新旧向量维度相同，也必须建立新 Collection。新 Collection 完成构建和校验后才能切换 active，旧 Collection 保留到回滚观察期结束。规范没有指定回滚观察期的固定天数，也没有指定某位个人负责人。

@@ -170,7 +170,7 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === "/api/v1/health/ready" && request.method === "GET") {
     sendJson(response, 200, {
       status: "ready",
-      version: "2.0.4",
+      version: "2.0.5",
       ready: true,
       components: readyComponents(),
       error_type: null,

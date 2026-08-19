@@ -1,4 +1,4 @@
-# 可观测性指南（v2.0.4）
+# 可观测性指南（v2.0.5）
 
 Logs + Metrics + Traces 能力最初在 v1.3 引入，当前由 FastAPI 主入口和保留的 Gradio 兼容入口共用。应用实现内部埋点、Metrics HTTP 端口和可选 OTLP/HTTP Trace 导出；Prometheus、Grafana、Jaeger 和 OpenTelemetry Collector 等外部后端不在当前 Compose 内。
 

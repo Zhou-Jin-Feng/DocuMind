@@ -1,0 +1,7 @@
+评测与回归门禁规范
+
+两份检索报告只有在 dataset_sha256、documents_sha256、Embedding Provider、模型、实际维度、Chunk size、Chunk overlap、检索模式、Top-K、阈值和融合参数一致时才允许比较。输入不兼容必须报告 INCOMPATIBLE，不能解释为质量上升或下降。
+
+确定性检索门禁同时检查 Recall@K、MRR@K、无答案检索准确率和 successful_case_rate。答案质量报告另外记录 Faithfulness、引用正确性、引用完整性、回答相关性和拒答准确率；每项均值必须同时展示实际案例数。keyword_coverage 只用于诊断，不进入答案质量通过条件。
+
+真实答案评测报告固定保留 30 天，供发布前人工复核。报告中的数据集、语料、生成 Prompt 和 Judge Prompt 都使用规范化文本 SHA-256；规范化会移除 UTF-8 BOM，并把 CRLF 和 CR 转换为 LF。真实模型结果不能作为普通 PR 的确定性门禁。

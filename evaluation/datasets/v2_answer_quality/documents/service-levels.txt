@@ -1,0 +1,7 @@
+服务等级与支持目录
+
+Aurora Standard 每个 Collection 最多保存 200,000 个 Chunk，Aurora Premium 每个 Collection 最多保存 1,000,000 个 Chunk。两个等级都要求调用方提供 tenant_id；文档没有定义 Aurora Plus 等级。
+
+P1 事件要求值班人员在 15 分钟内首次响应，并在确认影响范围后 30 分钟内通知发布审批角色。这两个时间是响应与通知目标，不是恢复完成时间。P2 事件的首次响应目标为 4 小时。
+
+正式支持渠道是内部队列 rag-support；紧急安全事件使用 security-oncall。服务目录没有承诺任何事件的固定解决时长。

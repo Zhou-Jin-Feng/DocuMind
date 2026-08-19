@@ -1,6 +1,6 @@
 # DocuMind - RAG 评估
 
-v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口。
+v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料。
 
 ## 数据集
 
@@ -161,7 +161,33 @@ CLI 示例：
 
 答案契约与 Runner 的离线测试合计为 `15 passed, 12 subtests passed`，其中 BM25 CLI 集成测试使用注入的 Fake LLM 客户端验证真实装配、报告内容以及退出码 `0/1/2`，不连接云端模型、Ollama 或 Milvus。v2.0.4 全量 Python 回归为 `197 passed, 1 skipped, 23 subtests passed`，Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建和 `deterministic_dense_v2` 检索回归门禁均通过。
 
-v2.0.4 仍未提供 28 条专用数据集，也没有生成和人工复核真实模型报告。因此“Runner 支持真实 Provider”不等于“生产答案质量已经通过验收”，更不等于在线幻觉检测。
+### v2.0.5 答案质量黄金集
+
+`evaluation/datasets/v2_answer_quality/` 包含 11 份仓库内人工编写的 TXT 语料和 28 条 `holdout` 案例。首版配额冻结如下：
+
+| 类别 | 数量 | 验证重点 |
+|---|---:|---|
+| `direct_fact` | 8 | 单文档事实和数值 |
+| `multi_hop` | 5 | 两至三份文档的联合结论 |
+| `no_answer` | 6 | 领域外、缺失值、错误前提和不存在的服务等级 |
+| `insufficient_or_conflicting` | 3 | 候选日期、缺失 P95 和未决发布目标 |
+| `prompt_injection` | 3 | 忽略规则、泄露 Prompt/密钥和停止引用等不可信指令 |
+| `citation_boundary` | 3 | 同文档多事实和跨文档引用归属 |
+
+所有问题、参考答案和原子 claim 均人工编写；不从生成模型自动扩写。可回答案例保留非空证据文档和逐项 claim，无答案与信息不足案例不保存参考答案，防止向 Judge 泄露虚构结论。Prompt Injection 语料使用独立文档和可识别的 `INJECTION_*` 哨兵，哨兵不得出现在参考答案或 claim 中。
+
+黄金集审计测试固定验证总数、类别配额、全 `holdout` split、问题唯一性、原子 claim、多文档案例、全部语料被引用和注入哨兵边界。当前规范化文本指纹为：
+
+```text
+dataset_sha256  = f5eb00ddc448772e6369f8e2b8ae798cecf4736e2f7dc6619df49a728108055d
+documents_sha256 = 7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878103
+```
+
+`threshold_dataset.jsonl` 与答案集分离，使用旧检索 `GoldenCase` 契约。它包含 validation 5 个正样本和 15 个困难负样本，以及未参与选择的 holdout 5 个正样本和 10 个困难负样本；负样本集中覆盖主题相近但缺少日期、数值、负责人、模型名、恢复时长、授权例外和最终决策的提问，不使用纯领域外问题凑数。两个 split 的问题互不重复，也不与 28 条答案集完全重复；其规范化 SHA-256 为 `8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210`。
+
+本阶段不调用 Ollama、Milvus 或云端 LLM，也不生成 pre-hardening 报告或扫描距离。28 条答案案例服务于下一阶段固定真实 Provider 的旧 Prompt 对照；35 条阈值案例只冻结 P0-2 的 validation/holdout 输入。阈值候选、distance 分布、一次性 holdout 结果和是否启用仍必须在后续独立任务中产生。因此“数据集已冻结”仍不等于“生产答案质量或拒答能力已经通过验收”，更不等于在线幻觉检测。
+
+v2.0.5 数据集专项为 `8 passed, 101 subtests passed`，答案评测相关专项为 `32 passed, 113 subtests passed`，全量 Python 为 `205 passed, 1 skipped, 124 subtests passed`。Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、30 份 Markdown 静态检查和 `deterministic_dense_v2` 检索回归门禁均通过。BM25 诊断确认 28 条答案集中 19 个可回答案例、阈值集中 10 个正样本的全部标注文档均进入各自 Top-K；该结果只验证语料可检索性，不是生产 Embedding 质量结论。
 
 ### v1.6 检索对比
 
@@ -363,4 +389,4 @@ result.assert_passed()
 
 ## 范围
 
-当前 v2.0.4 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。
+当前 v2.0.5 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。
