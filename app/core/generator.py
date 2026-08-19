@@ -272,6 +272,9 @@ class RAGGenerator:
 - 完整：综合多个文档片段
 - 可追溯：标注信息来源
 """
+    CONTEXT_HEADER = "以下是相关文档内容：\n"
+    DOCUMENT_CONTEXT_TEMPLATE = "[文档{index}] 来源: {source}\n{content}\n"
+    USER_MESSAGE_TEMPLATE = "{context}\n\n用户问题：{query}\n\n请基于上述文档回答："
 
     def __init__(self, llm_client: UniversalLLMClient):
         self.llm_client = llm_client
@@ -282,13 +285,17 @@ class RAGGenerator:
         if not retrieval_results:
             return "未找到相关文档。"
 
-        context_parts = ["以下是相关文档内容：\n"]
+        context_parts = [self.CONTEXT_HEADER]
         for index, result in enumerate(retrieval_results, 1):
             source_info = result.source or "未知来源"
             if result.page_number:
                 source_info += f" 第{result.page_number}页"
             context_parts.append(
-                f"[文档{index}] 来源: {source_info}\n" f"{result.content}\n"
+                self.DOCUMENT_CONTEXT_TEMPLATE.format(
+                    index=index,
+                    source=source_info,
+                    content=result.content,
+                )
             )
         return "\n".join(context_parts)
 
@@ -296,8 +303,9 @@ class RAGGenerator:
         normalized_query = (query or "").strip()
         if not normalized_query:
             raise ValueError("query 不能为空")
-        user_message = (
-            f"{context}\n\n用户问题：{normalized_query}\n\n请基于上述文档回答："
+        user_message = self.USER_MESSAGE_TEMPLATE.format(
+            context=context,
+            query=normalized_query,
         )
         return [
             {"role": "system", "content": self.SYSTEM_PROMPT},

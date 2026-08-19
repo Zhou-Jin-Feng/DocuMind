@@ -55,6 +55,28 @@ class GeneratorTests(unittest.TestCase):
         context = generator._build_context_from_retrieval([result])
         self.assertIn("manual.pdf 第3页", context)
 
+    def test_rag_generator_prompt_templates_preserve_current_format(self):
+        generator = RAGGenerator.__new__(RAGGenerator)
+        result = RetrievalResult(
+            content="正文",
+            metadata={"source_file": "manual.pdf", "page_number": 3},
+            distance=0.2,
+            rank=1,
+        )
+
+        context = generator._build_context_from_retrieval([result])
+        messages = generator._build_prompt("问题", context)
+
+        self.assertEqual(
+            context,
+            "以下是相关文档内容：\n\n[文档1] 来源: manual.pdf 第3页\n正文\n",
+        )
+        self.assertEqual(messages[0]["content"], RAGGenerator.SYSTEM_PROMPT)
+        self.assertEqual(
+            messages[1]["content"],
+            f"{context}\n\n用户问题：问题\n\n请基于上述文档回答：",
+        )
+
     def test_streaming_error_propagates(self):
         class BrokenLLM:
             def generate_stream(self, messages, config):

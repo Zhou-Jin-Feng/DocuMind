@@ -6,10 +6,14 @@ from evaluation.adapters import (
     RetrieverAdapter,
 )
 from evaluation.answer_adapters import (
+    CITATION_PARSER_VERSION,
     AnswerGenerator,
     AnswerJudge,
     FakeAnswerGenerator,
     FakeAnswerJudge,
+    LLMAnswerGenerator,
+    LLMAnswerJudge,
+    parse_answer_citations,
 )
 from evaluation.answer_metrics import aggregate_answer_evaluations
 from evaluation.answer_models import (
@@ -22,6 +26,7 @@ from evaluation.answer_models import (
     JudgeResult,
     load_answer_quality_dataset,
 )
+from evaluation.answer_reports import write_answer_reports
 from evaluation.comparison import EvaluationComparison, build_evaluation_comparison
 from evaluation.models import (
     AnswerResult,
@@ -57,9 +62,11 @@ from evaluation.production import (
 
 __all__ = [
     "ANSWER_EVALUATION_SCHEMA_VERSION",
+    "CITATION_PARSER_VERSION",
     "REFUSAL_TEXT",
     "AnswerCaseEvaluation",
     "AnswerEvaluationReport",
+    "AnswerEvaluationRunner",
     "AnswerGenerator",
     "AnswerJudge",
     "AnswerQualityCase",
@@ -77,6 +84,8 @@ __all__ = [
     "GoldenCase",
     "GeneratedAnswer",
     "JudgeResult",
+    "LLMAnswerGenerator",
+    "LLMAnswerJudge",
     "RegressionGate",
     "RegressionResult",
     "RetrievedDocument",
@@ -98,13 +107,19 @@ __all__ = [
     "load_golden_dataset",
     "load_answer_quality_dataset",
     "load_evaluation_snapshot",
+    "parse_answer_citations",
     "report_compatibility_issues",
+    "write_answer_reports",
 ]
 
 
 def __getattr__(name: str):
     """Lazy-load runner symbols so ``python -m evaluation.runner`` stays quiet."""
 
+    if name == "AnswerEvaluationRunner":
+        from evaluation.answer_runner import AnswerEvaluationRunner
+
+        return AnswerEvaluationRunner
     if name in {"EvaluationRunner", "load_golden_dataset"}:
         from evaluation.runner import EvaluationRunner, load_golden_dataset
 

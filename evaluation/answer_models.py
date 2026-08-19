@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -733,3 +734,135 @@ class AnswerEvaluationReport:
             )
             + "\n"
         )
+
+    def to_markdown(self) -> str:
+        """Render a human-reviewable report without trusting model text as markup."""
+
+        def table_cell(value: Any) -> str:
+            if value is None:
+                return "-"
+            if isinstance(value, bool):
+                return "true" if value else "false"
+            if isinstance(value, float):
+                return f"{value:.4f}"
+            if isinstance(value, (list, tuple, dict)):
+                value = json.dumps(value, ensure_ascii=False, sort_keys=True)
+            escaped = html.escape(str(value)).replace("\n", "<br>")
+            for token in ("\\", "|", "*", "_", "[", "]", "`"):
+                escaped = escaped.replace(token, f"\\{token}")
+            return escaped
+
+        lines = [
+            "# Answer Quality Evaluation Report",
+            "",
+            f"- Dataset: `{table_cell(self.dataset_name)}`",
+            f"- Generated at: `{table_cell(self.generated_at)}`",
+            f"- Cases: `{len(self.case_results)}`",
+            "",
+            "## Metrics",
+            "",
+            "| Metric | Score | Evaluated cases |",
+            "|---|---:|---:|",
+        ]
+        for name in ANSWER_METRIC_NAMES:
+            lines.append(
+                f"| `{name}` | {table_cell(self.metrics[name])} | "
+                f"{self.metric_case_counts[name]} |"
+            )
+
+        lines.extend(
+            [
+                "",
+                "## Reproducibility Metadata",
+                "",
+                "| Field | Value |",
+                "|---|---|",
+            ]
+        )
+        for name in sorted(self.metadata):
+            lines.append(f"| `{name}` | {table_cell(self.metadata[name])} |")
+
+        lines.extend(
+            [
+                "",
+                "## Cases",
+                "",
+                "| Case | Split | Category | Status | Outcome | Refusal correct | Error |",
+                "|---|---|---|---|---|---|---|",
+            ]
+        )
+        for result in self.case_results:
+            generated = result.generated_answer
+            error = (
+                f"{result.error_stage}:{result.error_type}"
+                if result.status == "error"
+                else None
+            )
+            lines.append(
+                f"| `{table_cell(result.case_id)}` | {table_cell(result.split)} | "
+                f"{table_cell(result.category)} | {result.status} | "
+                f"{table_cell(generated.outcome if generated else None)} | "
+                f"{table_cell(result.refusal_correct)} | {table_cell(error)} |"
+            )
+
+        lines.extend(["", "## Case Details", ""])
+        for result in self.case_results:
+            generated = result.generated_answer
+            lines.extend(
+                [
+                    f"### {table_cell(result.case_id)}",
+                    "",
+                    "**Question**",
+                    "",
+                    f"<pre>{html.escape(result.question)}</pre>",
+                    "",
+                ]
+            )
+            if generated is not None:
+                lines.extend(
+                    [
+                        "**Generated answer**",
+                        "",
+                        f"<pre>{html.escape(generated.text)}</pre>",
+                        "",
+                        f"Citations: `{table_cell(list(generated.citations))}`",
+                        "",
+                        "**Retrieved documents**",
+                        "",
+                    ]
+                )
+                for index, document in enumerate(generated.retrieved_documents, 1):
+                    lines.extend(
+                        [
+                            f"<details><summary>文档{index}: "
+                            f"{html.escape(document.document_id)}</summary>",
+                            "",
+                            f"<pre>{html.escape(document.content)}</pre>",
+                            "",
+                            "</details>",
+                            "",
+                        ]
+                    )
+            if result.judge_result is not None:
+                judge_json = json.dumps(
+                    result.judge_result.to_dict(),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                lines.extend(
+                    [
+                        "**Judge result**",
+                        "",
+                        f"<pre>{html.escape(judge_json)}</pre>",
+                        "",
+                    ]
+                )
+            if result.status == "error":
+                lines.extend(
+                    [
+                        f"Error: `{table_cell(result.error_stage)}` / "
+                        f"`{table_cell(result.error_type)}`",
+                        "",
+                    ]
+                )
+        return "\n".join(lines).rstrip() + "\n"

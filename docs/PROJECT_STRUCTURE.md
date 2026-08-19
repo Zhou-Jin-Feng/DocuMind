@@ -1,4 +1,4 @@
-# 项目结构（v2.0.3）
+# 项目结构（v2.0.4）
 
 ```text
 DocuMind/
@@ -66,6 +66,7 @@ DocuMind/
 │   ├── test_tracing.py
 │   ├── test_evaluation.py
 │   ├── test_answer_evaluation.py
+│   ├── test_answer_runner.py
 │   ├── test_lifecycle.py
 │   ├── test_lifecycle_cli.py
 │   ├── test_application.py
@@ -79,6 +80,8 @@ DocuMind/
 │   ├── answer_models.py
 │   ├── answer_adapters.py
 │   ├── answer_metrics.py
+│   ├── answer_reports.py
+│   ├── answer_runner.py
 │   ├── integration.py
 │   ├── fingerprints.py
 │   ├── production.py
@@ -201,6 +204,8 @@ DocuMind/
 | `evaluation/answer_models.py` | 答案用例、生成结果、严格 Judge JSON、案例失败和独立报告契约 |
 | `evaluation/answer_adapters.py` | 真实/Fake Generator 与 Judge 共用的 Protocol 及无网络 Fake 实现 |
 | `evaluation/answer_metrics.py` | 按成功案例和 Judge 适用案例分别聚合指标及实际分母 |
+| `evaluation/answer_reports.py` | 对不可信文本转义并原子写出答案质量 JSON/Markdown 报告 |
+| `evaluation/answer_runner.py` | 真实检索、当前生产 Generator、独立 Judge、案例失败隔离和 CLI 退出码 |
 | `evaluation/integration.py` | 确定性 Embedding、内存 Vector Store 和三种检索模式集成烟囱测试 |
 | `evaluation/fingerprints.py` | UTF-8 BOM/换行规范化后的黄金集和语料逻辑文本 SHA-256；保留独立原始字节哈希 |
 | `evaluation/production.py` | Dense、BM25、Hybrid 和 v1.7 实验组件评估装配 |
@@ -240,6 +245,12 @@ app.core.retriever
 ├── app.observability.metrics
 └── app.observability.tracing
 
+evaluation.answer_runner
+├── app.core.generator.RAGGenerator / UniversalLLMClient
+├── evaluation.production / adapters
+├── evaluation.answer_adapters / answer_metrics / answer_reports
+└── evaluation.answer_models
+
 evaluation.answer_adapters / answer_metrics
 ├── evaluation.answer_models
 └── evaluation.models.RetrievedDocument
@@ -247,7 +258,7 @@ evaluation.answer_adapters / answer_metrics
 
 React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。浏览器对话历史通过 `frontend/src/conversations.ts` 独立保存，不进入 API。`web_app.py` 仍保留为兼容入口。
 
-答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.3 尚未增加真实答案 Runner 或 Provider 装配。
+答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`，以便后续先生成旧 Prompt 基线；Judge Prompt 与生产 Prompt 分离。
 
 可观测性模块不得反向导入 Web UI 或具体 RAG 组件，避免循环依赖。
 

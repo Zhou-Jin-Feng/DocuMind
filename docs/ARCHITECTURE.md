@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v2.0.3）
+# DocuMind - RAG 系统架构（v2.0.4）
 
 ## 1. 分层结构
 
@@ -236,7 +236,7 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加独立答案质量契约、严格 Judge JSON 解析、离线 Fake 适配器和指标分母聚合。评估层和生命周期层仍不反向依赖具体 Web UI，答案 Runner/真实报告尚未实现，样本规模和延迟证据仍不足以自动改变 Web 默认 Dense-only 链路。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加答案质量严格契约；v2.0.4 增加真实 Generator/Judge 装配、逐案例 Runner 和原子 JSON/Markdown 报告。评估层仍只依赖生产 Provider、`RAGGenerator` 和检索组件，生产 `app` 不反向依赖 `evaluation`。专用答案数据集和真实人工复核报告尚未完成，现有证据不足以改变 Web 默认 Dense-only 链路或声明答案质量达标。
 
 ```text
 evaluation.runner / production_runner
@@ -249,12 +249,16 @@ evaluation.runner / production_runner
 ├── evaluation.answer_models  # 独立答案用例、Judge 和报告契约
 ├── evaluation.answer_adapters # Generator/Judge Protocol 与离线 Fake
 ├── evaluation.answer_metrics # 拒答和语义指标的固定分母聚合
+├── evaluation.answer_reports # 转义后的原子 JSON/Markdown 答案报告
+├── evaluation.answer_runner  # 真实 Provider 端到端答案评测 CLI
 ├── evaluation.reports        # JSON/Markdown 报告
 ├── evaluation.comparison     # 四模式同配置质量/延迟矩阵
 └── evaluation.regression     # 基线比较和下降门禁
 ```
 
 普通 PR CI 只执行确定性本地评测，不连接真实 Provider。真实 Ollama/云端报告仍是发布前人工证据，不进入每次 PR 的自动门禁。
+
+答案 Runner 的 Generator 复用当前生产 `RAGGenerator` Prompt，Judge 使用独立抗注入 Prompt。该边界用于先生成旧行为对照；生产 Prompt 加固、统一 `[文档N]` 输出和线上引用观测仍是后续独立阶段。
 
 当前仍不包含：
 

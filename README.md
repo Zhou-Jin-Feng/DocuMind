@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v2.0.3）
+# DocuMind - RAG 知识库问答系统（v2.0.4）
 
 一个本地单用户 RAG 知识库问答系统。当前主链路采用 FastAPI、React/TypeScript、Milvus Standalone 和 SSE 流式响应，包含文档生命周期管理、真实依赖探活、引用来源、结构化可观测性、离线评测和自动质量回归门禁。
 
-> GitHub 已发布 tag 仍为 `v2.0`。`main` 已包含 v2.0.1 和 v2.0.2，当前代码版本为 v2.0.3；三个维护版本的 tag 均尚未创建。
+> GitHub 已发布 tag 仍为 `v2.0`。本地 `main` 已包含 v2.0.3，当前代码版本为 v2.0.4；v2.0.1 至 v2.0.4 的维护版本 tag 均尚未创建。
 
 ## 核心能力
 
@@ -14,7 +14,7 @@
 - 默认 Web 检索保持 Dense-only；BM25、Hybrid/RRF、Query Rewrite 和 Reranker 保留为离线评测能力。
 - JSONL 日志、Prometheus Metrics、OpenTelemetry Tracing 和 Request/Trace ID 关联。
 - 确定性黄金集、JSON/Markdown 报告、输入兼容检查和 PR CI 质量门禁。
-- 独立的答案质量数据契约、严格 Judge JSON 校验、离线 Fake Generator/Judge 和指标分母记录。
+- 独立的答案质量数据契约、真实/Fake Generator/Judge、严格 Judge JSON、逐案例失败隔离和原子 JSON/Markdown 报告。
 
 ## 文档导航
 
@@ -152,6 +152,26 @@ python -m app.lifecycle rebuild --document-key <document_key> --retry
 
 普通 PR CI 只使用仓库内数据、确定性哈希 Embedding 和内存向量存储，不连接 Ollama、Milvus、Hugging Face 或付费 LLM。JSON/Markdown 报告无论门禁成功或失败都会作为 Artifact 保留 14 天。详细指标语义和基线边界见[评测指南](docs/EVALUATION.md)。
 
+## 答案质量 Runner
+
+答案质量 CLI 使用当前生产 `RAGGenerator` Prompt 生成候选答案，并使用独立 Judge Prompt 评估 Faithfulness、引用质量和回答相关性。生成模型与 Judge 必须分别指定并记录：
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.answer_runner `
+  --dataset path/to/dataset.jsonl `
+  --documents-dir path/to/documents `
+  --retrieval-mode dense `
+  --embedding-provider ollama `
+  --generator-provider openai `
+  --generator-model gpt-4-turbo `
+  --judge-provider openai `
+  --judge-model gpt-4-turbo `
+  --output-json evaluation/reports/answer-quality-current.json `
+  --output-markdown evaluation/reports/answer-quality-current.md
+```
+
+退出码 `0` 表示所有案例执行成功并写出报告，`1` 表示报告已写出但存在案例错误，`2` 表示数据集、配置、Provider 初始化或输出路径错误。真实答案评测不进入普通 PR CI；运行前必须冻结模型名、参数、数据集和语料，且不得把 API Key 写入命令或报告。
+
 ## 测试与检查
 
 ```powershell
@@ -171,7 +191,7 @@ docker compose -f compose.yaml config --quiet
 docker compose -f infra/milvus/compose.yaml config --quiet
 ```
 
-v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests passed`、Vitest `5 passed`、Playwright `6 passed`，并通过格式、编译、依赖、TypeScript、构建和两份 Compose 校验。v2.0.2 进一步验证了正常确定性报告返回 `PASS`，仅降低兼容报告的 Recall 会返回质量失败码 `1`。v2.0.3 新增的答案契约测试为 `8 passed, 9 subtests passed`；全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`，Vitest `5 passed`，Playwright `6 passed`，并通过 Black、compileall、`pip check`、前端生产构建和既有确定性检索门禁。
+v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests passed`、Vitest `5 passed`、Playwright `6 passed`，并通过格式、编译、依赖、TypeScript、构建和两份 Compose 校验。v2.0.2 进一步验证了正常确定性报告返回 `PASS`，仅降低兼容报告的 Recall 会返回质量失败码 `1`。v2.0.3 全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`。v2.0.4 全量 Python 回归为 `197 passed, 1 skipped, 23 subtests passed`，Vitest `5 passed`，Playwright `6 passed`，并通过 Black、compileall、`pip check`、TypeScript、前端生产构建和既有确定性检索门禁。
 
 ## 版本摘要
 
@@ -189,5 +209,6 @@ v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests pa
 - Query Rewrite、Hybrid 和 Reranker 尚未进入 Web 默认请求路径。
 - 当前 8 条确定性数据集只用于管线回归，不能代表生产答案质量。
 - 检索命中正确文档不等于最终回答忠实；Faithfulness 和引用质量必须由独立答案评测验证。
-- v2.0.3 只完成答案质量契约和离线测试；真实 Generator/Judge Runner、28 条数据集和人工复核报告尚未实现。
+- v2.0.4 已完成真实 Provider Runner 的代码能力，但尚未提交 28 条答案数据集，也没有生成和人工复核真实模型报告，因此不能声明当前生产答案已通过 Faithfulness 验收。
+- 当前 Generator 刻意复用未加固的生产 Prompt；Prompt Injection 防护、统一 `[文档N]` 约束和温度对照必须在旧 Prompt 基线完成后单独实施。
 - Prometheus、Grafana、Jaeger 和 Collector 等外部可观测性后端不在 Compose 中。

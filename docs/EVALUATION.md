@@ -1,6 +1,6 @@
 # DocuMind - RAG 评估
 
-v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立与旧检索报告隔离的答案质量契约和离线测试基础。
+v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口。
 
 ## 数据集
 
@@ -123,7 +123,45 @@ Judge 输出必须是单个严格 JSON 对象，字段全集固定为四项 `0..
 
 v2.0.3 验收时该独立文件为 `8 passed, 9 subtests passed`；全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`，Vitest 为 `5 passed`，Playwright 为 `6 passed`。同时通过 Black、compileall、`pip check`、前端生产构建和 `deterministic_dense_v2` 检索回归门禁。
 
-本阶段还没有实现 `answer_runner.py`、真实 Generator/Judge 适配器、28 条专用数据集或人工复核报告，因此它是离线评测基础，不是在线幻觉检测功能，也尚不能声明当前生产答案已通过 Faithfulness 验收。
+v2.0.3 阶段尚未实现真实 Runner、专用数据集或人工复核报告，因此当时只是离线评测基础。
+
+### v2.0.4 真实答案 Runner
+
+`evaluation/answer_runner.py` 按固定顺序执行每个案例：
+
+```text
+检索 -> 无上下文短路或生成 -> 确定性引用解析 -> Judge -> 聚合报告
+```
+
+检索为空时生成 `no_context`，不调用 Generator 或 Judge。检索、生成和 Judge 异常分别记录为 `retrieval/generation/judge` 阶段错误，只影响当前案例；Runner 继续处理剩余案例，失败内容不被伪装成拒答或 `0` 分。
+
+真实 Generator 通过 `LLMAnswerGenerator` 直接桥接当前生产 `RAGGenerator` 的非流式入口，使用同一 System Prompt、上下文格式和默认温度 `0.7`。这是有意保留的旧 Prompt 行为，不能提前加入后续 Prompt Injection 防护，否则无法生成有效的 pre-hardening 对照。Judge 使用独立的 `LLMAnswerJudge`，明确把问题、上下文、参考答案和候选答案视为不可信数据；动态字段经 HTML 转义，编码规则计入 Judge Prompt 指纹，模型输出再交给 v2.0.3 的严格 JSON 解析器。
+
+引用解析器当前只提取完整匹配 `\[文档([1-9]\d*)\]` 的标记，按首次出现顺序去重并记录 `citation_parser_version=bracketed-document-v1`。它只用于离线观测，不修改模型输出，也不改变 SSE 契约；统一线上引用格式仍属于后续 Prompt 加固任务。
+
+`evaluation/answer_reports.py` 在同一文件系统中通过临时文件和替换写出完整 JSON/Markdown。Markdown 对问题、文档和模型文本做 HTML 转义，避免评测样本把报告结构当成可执行标记。报告记录数据集/语料指纹、Git 状态、Embedding/Chunk/检索配置、Generator/Judge 模型参数、两份 Prompt 指纹、拒答文本指纹和每项指标分母，不记录 API Key、认证头或 Milvus token。
+
+CLI 示例：
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.answer_runner `
+  --dataset path/to/dataset.jsonl `
+  --documents-dir path/to/documents `
+  --retrieval-mode dense `
+  --embedding-provider ollama `
+  --generator-provider openai `
+  --generator-model gpt-4-turbo `
+  --judge-provider openai `
+  --judge-model gpt-4-turbo `
+  --output-json evaluation/reports/answer-quality-current.json `
+  --output-markdown evaluation/reports/answer-quality-current.md
+```
+
+退出语义固定为：`0` 表示所有案例成功且报告已写出；`1` 表示报告已写出但至少一个案例失败；`2` 表示输入、配置、Provider 初始化或报告路径错误。普通 PR CI 不调用真实 Provider。
+
+答案契约与 Runner 的离线测试合计为 `15 passed, 12 subtests passed`，其中 BM25 CLI 集成测试使用注入的 Fake LLM 客户端验证真实装配、报告内容以及退出码 `0/1/2`，不连接云端模型、Ollama 或 Milvus。v2.0.4 全量 Python 回归为 `197 passed, 1 skipped, 23 subtests passed`，Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建和 `deterministic_dense_v2` 检索回归门禁均通过。
+
+v2.0.4 仍未提供 28 条专用数据集，也没有生成和人工复核真实模型报告。因此“Runner 支持真实 Provider”不等于“生产答案质量已经通过验收”，更不等于在线幻觉检测。
 
 ### v1.6 检索对比
 
@@ -325,4 +363,4 @@ result.assert_passed()
 
 ## 范围
 
-当前 v2.0.3 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。
+当前 v2.0.4 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。

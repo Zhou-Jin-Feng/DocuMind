@@ -10,7 +10,7 @@ from app.config import Settings
 
 class SettingsTests(unittest.TestCase):
     def test_application_version_matches_current_release(self):
-        self.assertEqual(__version__, "2.0.3")
+        self.assertEqual(__version__, "2.0.4")
 
     def test_chunk_overlap_must_be_smaller_than_chunk_size(self):
         with self.assertRaises(ValidationError):
