@@ -213,7 +213,6 @@ v2.0.8 当前代码复审为 Python `220 passed, 1 skipped`，专项测试 `35 p
 | 版本 | 主要内容 | 状态 |
 |---|---|---|
 | v2.0 | FastAPI/React/Milvus 统一 Compose、基础 CI、演示与发布收口 | 已发布并推送 tag |
-| v2.0.8 | 不可信上下文 Prompt、统一引用解析、线上引用观测和 Injection 对照 | 实现已完成 |
 
 完整历史和真实提交边界见[版本历史](docs/VERSION_HISTORY.md)。
 
