@@ -244,11 +244,11 @@ v2.0.7 验收结果为全量 Python `215 passed, 1 skipped, 124 subtests passed`
 
 生产与离线评测共用 `app.core.citations` 的 `bracketed-document-v1` 解析器：只接受精确 `[文档N]`，保留首次出现顺序并去重；格式近似、自然语言来源和越界编号只作为非法诊断，不会被当作有效引用。SSE `status/sources/token/done/error` 事件及其字段没有改变，流结束后只在日志和 Metrics 中记录引用数量、非法数量和无引用状态，不记录答案或文档正文。
 
-本阶段使用与 v2.0.6 相同的 Ollama `qwen3-embedding` 4096 维、DeepSeek `deepseek-chat` Generator/Judge、Dense、Milvus L2、空阈值、Chunk 500/100 和 28 条 holdout。`temperature=0.7` hardened 报告的成功率为 `1.0000`，拒答准确率 `0.7143`，Faithfulness、引用正确性、引用完整性和回答相关性均为 `1.0000`（18 条可回答 Judge 案例）；预先选定的 `temperature=0.1` 对照拒答准确率为 `0.6786`，其余指标均为 `1.0000`（17 条可回答 Judge 案例），因此保留 `0.7`。旧 Prompt 的 Generator Prompt SHA 为 `513cd279f6f3cffdcacd2a0f92c892faad82075da7f1a0a9125c7f1ee1c8da17`，加固 SHA 为 `07c37d4a051fdf596de23b0480a5b866a1ee7341ed925982466a34f154ca3cdc`。
+本阶段使用与 v2.0.6 相同的 Ollama `qwen3-embedding` 4096 维、DeepSeek `deepseek-chat` Generator/Judge、Dense、Milvus L2、空阈值、Chunk 500/100 和 28 条 holdout。最新干净提交上的 `temperature=0.7` hardened 报告成功率为 `1.0000`，拒答准确率 `0.7500`，Faithfulness、引用正确性、引用完整性和回答相关性均为 `0.9474`（19 条可回答 Judge 案例）；预先选定的 `temperature=0.1` 对照成功率为 `0.9643`、拒答准确率为 `0.7037`，已评估的四项质量指标均为 `1.0000`（17 条案例），但有 1 条案例在 Judge 阶段返回 `ValueError`。因此保留 `0.7`。旧 Prompt 的 Generator Prompt SHA 为 `513cd279f6f3cffdcacd2a0f92c892faad82075da7f1a0a9125c7f1ee1c8da17`，加固 SHA 为 `07c37d4a051fdf596de23b0480a5b866a1ee7341ed925982466a34f154ca3cdc`。
 
-两份 hardened 报告各执行 3 条独立 Prompt Injection，均未输出 `INJECTION_*` 哨兵、system prompt、真实 API Key 或不存在的 `[文档99]`。JSON/Markdown 工件通过敏感模式扫描；逐案人工结论、运行环境、报告 SHA-256 和 dirty 状态见 [复核记录](../evaluation/reports/v2_answer_prompt_hardened_review.md)。真实报告在最终提交前生成，记录 `dirty=true`，因此提交前需要在干净工作区重跑并复核指纹，不能把本次报告冒充为最终提交基线。
+两份 hardened 报告各执行 3 条独立 Prompt Injection，均未输出 `INJECTION_*` 哨兵、system prompt、真实 API Key 或不存在的 `[文档99]`。低温对照连续三次均有 1 条 Judge 严格 JSON 解析失败；失败发生在评测 Judge，不是生成答案或 Injection 防护失败。JSON/Markdown 工件通过敏感模式扫描；逐案人工结论、运行环境、报告 SHA-256 和 `dirty=false` 状态见 [复核记录](../evaluation/reports/v2_answer_prompt_hardened_review.md)。
 
-该版本全量复审结果为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。该次报告保留 `dirty=true`，其代码标识与输入指纹按原始报告记录；不能将该结果视为当前提交的独立复验。
+当前代码复审结果为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。两份真实报告均在 `对应阶段源码快照` 干净提交上生成并记录 `dirty=false`。使用本机缓存基础镜像重建后的主 Compose API/前端均报告版本 `2.0.8` 并健康；真实冒烟完成 TXT 上传、可回答问题、无答案问题、`status -> sources -> token* -> done` SSE 事件、文档详情和删除闭环，删除后文档列表恢复为空。
 
 ### v1.6 检索对比
 

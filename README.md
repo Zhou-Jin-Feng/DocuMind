@@ -181,7 +181,7 @@ v2.0.6 使用 Ollama `qwen3-embedding`（4096 维）、DeepSeek `deepseek-chat` 
 
 v2.0.7 使用相同的 Ollama Embedding、Dense、Milvus L2、Top-K=3 和 11 份专用语料，只在 validation 的 5 条正样本与 15 条困难负样本上运行无阈值检索并扫描 59 个相邻 distance 中点。没有候选同时满足 Recall@3 下降不超过 `0.02`、无答案检索准确率不低于 `0.90` 和执行成功率 `1.00`：约 `0.7175` 的候选可达到 `0.9333` 无答案准确率，但 Recall@3 仅 `0.4000`；保持 Recall@3=`1.0000` 的约 `0.9006` 候选，无答案准确率仅 `0.4667`。因此按预设协议不运行 holdout、不启用参考阈值，代码与 `.env.example` 继续保持空值。机器可读结论见[扫描报告](evaluation/reports/v2_threshold_validation_scan.json)，完整依据见[复核记录](evaluation/reports/v2_threshold_validation_review.md)。
 
-v2.0.8 在同一固定配置下将生产 Prompt 加固为不可信数据边界，并新增生产引用解析/观测。加固报告使用 DeepSeek `deepseek-chat` Generator/Judge、Ollama `qwen3-embedding` 4096 维、Dense、Milvus L2、空阈值和 28 条 holdout：`temperature=0.7` 时成功率 `1.0000`、拒答准确率 `0.7143`、Faithfulness/引用正确性/完整性/相关性均为 `1.0000`；预先选定的 `temperature=0.1` 对照拒答准确率为 `0.6786`，其余指标相同，因此保留 `0.7`。三条 Injection 在两种温度下均未输出哨兵、system prompt、真实凭据或越界引用。报告与人工复核见 [hardened JSON](evaluation/reports/v2_answer_prompt_hardened.json)、[hardened Markdown](evaluation/reports/v2_answer_prompt_hardened.md)、[低温对照](evaluation/reports/v2_answer_prompt_hardened_low_temp.json) 和 [复核记录](evaluation/reports/v2_answer_prompt_hardened_review.md)。
+v2.0.8 在同一固定配置下将生产 Prompt 加固为不可信数据边界，并新增生产引用解析/观测。最新干净提交上的加固报告使用 DeepSeek `deepseek-chat` Generator/Judge、Ollama `qwen3-embedding` 4096 维、Dense、Milvus L2、空阈值和 28 条 holdout：`temperature=0.7` 时成功率 `1.0000`、拒答准确率 `0.7500`、Faithfulness/引用正确性/完整性/相关性均为 `0.9474`；预先选定的 `temperature=0.1` 对照成功率为 `0.9643`、拒答准确率为 `0.7037`，其已评估质量指标为 `1.0000`，但有 1 条案例在 Judge 阶段发生 `ValueError`，因此保留生产温度 `0.7`。三条 Injection 在两种温度下均未输出哨兵、system prompt、真实凭据或越界引用。报告与人工复核见 [hardened JSON](evaluation/reports/v2_answer_prompt_hardened.json)、[hardened Markdown](evaluation/reports/v2_answer_prompt_hardened.md)、[低温对照](evaluation/reports/v2_answer_prompt_hardened_low_temp.json) 和 [复核记录](evaluation/reports/v2_answer_prompt_hardened_review.md)。真实 Provider 指标只适用于本次固定数据集、语料和运行配置，不能外推为普遍质量承诺。
 
 ## 测试与检查
 
@@ -206,7 +206,7 @@ v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests pa
 
 v2.0.7 全量 Python 为 `215 passed, 1 skipped, 124 subtests passed`，阈值专项为 `10 passed`，Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、35 份 Markdown UTF-8/本地链接检查、正式工件密钥扫描和既有确定性检索门禁均通过。
 
-v2.0.8 该版本复审为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。该次报告记录 `dirty=true`，结果对应当时工作树，不代表干净提交的独立复验。
+v2.0.8 当前代码复审为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。两份真实报告均在 `对应阶段源码快照` 干净提交上生成并记录 `dirty=false`；当前源码 API/前端镜像已重建，真实 Compose 冒烟通过 `2.0.8` 健康检查、TXT 上传、可回答/无答案 SSE、详情和删除闭环。
 
 ## 版本摘要
 
