@@ -1,8 +1,8 @@
-# DocuMind - RAG 知识库问答系统（v2.1.0）
+# DocuMind - RAG 知识库问答系统（v2.2.0）
 
 一个本地单用户 RAG 知识库问答系统。当前主链路采用 FastAPI、React/TypeScript、Milvus Standalone 和 SSE 流式响应，包含文档生命周期管理、单文档纯检索、真实依赖探活、引用来源、结构化可观测性、离线评测和自动质量回归门禁。
 
-> GitHub 已发布 tag 仍为 `v2.0`。当前代码版本为 v2.1.0；v2.0.1 至 v2.1.0 的后续版本 tag 均尚未创建。
+> GitHub 已发布 tag 仍为 `v2.0`。当前代码版本为 v2.2.0；v2.0.1 至 v2.2.0 的后续版本 tag 均尚未创建。
 
 ## 核心能力
 
@@ -13,6 +13,7 @@
 - React 工作台提供上传进度、文档详情、引用来源和本地对话历史。
 - 默认 Web 检索保持 Dense-only；BM25、Hybrid/RRF、Query Rewrite 和 Reranker 保留为离线评测能力。
 - JSONL 日志、Prometheus Metrics、OpenTelemetry Tracing 和 Request/Trace ID 关联。
+- 纯检索独立 readiness、依赖超时、有限重试、进程内并发上限和 W3C Trace Context。
 - 确定性黄金集、JSON/Markdown 报告、输入兼容检查和 PR CI 质量门禁。
 - 独立的答案质量数据契约、28 条 holdout 黄金集、真实/Fake Generator/Judge、严格 Judge JSON、逐案例失败隔离和原子 JSON/Markdown 报告。
 - 人工逐案复核的旧 Prompt 真实对照，明确记录当前拒答和统一引用格式的失败边界。
@@ -28,6 +29,7 @@
 | [评测指南](docs/EVALUATION.md) | 数据集、指标、基线、Runner 和 CI 回归门禁 |
 | [可观测性指南](docs/OBSERVABILITY.md) | 日志、Metrics、Tracing 和隐私边界 |
 | [纯检索 API](docs/RETRIEVE_API.md) | 单文档 Dense 请求、证据响应、错误码和兼容规则 |
+| [ScholarTrace 接入](docs/SCHOLARTRACE_INTEGRATION.md) | Consumer 调用、错误处理、冒烟、升级回滚和服务边界 |
 | [依赖说明](docs/DEPENDENCIES.md) | 直接依赖、安装边界和可复现性 |
 | [运行示例](docs/DEMO_SCRIPT.md) | 启动、端到端流程和故障处理 |
 | [版本历史](docs/VERSION_HISTORY.md) | 主要版本与架构变化 |
@@ -115,7 +117,7 @@ Gradio 兼容入口仍可通过 `python web_app.py` 启动，但不再是主要�
 | 方法与路径 | 用途 |
 |---|---|
 | `GET /api/v1/health/live` | API 进程存活检查 |
-| `GET /api/v1/health/ready` | Milvus、Embedding、LLM 和 Registry 就绪检查 |
+| `GET /api/v1/health/ready` | Milvus、Embedding、LLM、Registry 和纯检索能力就绪检查 |
 | `GET /api/v1/system/config` | 返回前端需要的非敏感配置 |
 | `GET /api/v1/documents` | 文档列表 |
 | `POST /api/v1/documents` | 上传并同步建立索引 |
@@ -127,7 +129,7 @@ Gradio 兼容入口仍可通过 `python web_app.py` 启动，但不再是主要�
 
 `/retrieve` 使用独立 Schema `1.0`，要求调用方提供 `document_key` 和当前
 `expected_index_id`。接口仅承诺 Dense L2 检索，正文不截断，单次 `top_k`
-范围为 1-20，请求体上限为 16 KiB。完整契约和错误语义见[纯检索 API](docs/RETRIEVE_API.md)。
+范围为 1-20，请求体上限为 16 KiB。完整契约和错误语义见[纯检索 API](docs/RETRIEVE_API.md)，跨仓调用和运维流程见[ScholarTrace 接入](docs/SCHOLARTRACE_INTEGRATION.md)。
 
 ## 生命周期运维
 
@@ -160,6 +162,25 @@ python -m app.lifecycle rebuild --document-key <document_key> --retry
 ```
 
 普通 PR CI 只使用仓库内数据、确定性哈希 Embedding 和内存向量存储，不连接 Ollama、Milvus、Hugging Face 或付费 LLM。JSON/Markdown 报告无论门禁成功或失败都会作为 Artifact 保留 14 天。详细指标语义和基线边界见[评测指南](docs/EVALUATION.md)。
+
+单文档 `/retrieve` 另有 Chunk 级契约基线：
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.retrieve_quality_runner `
+  --json-output evaluation/reports/retrieve_quality_current.json `
+  --markdown-output evaluation/reports/retrieve_quality_current.md
+
+.\venv\Scripts\python.exe -m evaluation.regression_runner `
+  --baseline evaluation/baselines/retrieve_quality_v1.json `
+  --current evaluation/reports/retrieve_quality_current.json `
+  --allowed-drop ndcg_at_k=0 `
+  --minimum api_bottom_parity_rate=1 `
+  --minimum contamination_free_rate=1 `
+  --minimum no_answer_empty_accuracy=1
+```
+
+该基线通过生产 `RetrievalService` 运行 5 个仓库内确定性案例，只验证 Chunk
+排序、空结果、公共/底层一致和跨文档污染，不代表真实 Embedding/Milvus 质量。
 
 ## 答案质量 Runner
 
@@ -215,6 +236,8 @@ v2.0.7 全量 Python 为 `215 passed, 1 skipped, 124 subtests passed`，阈值�
 v2.0.8 当前代码复审为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。两份真实报告均在 `对应阶段源码快照` 干净提交上生成并记录 `dirty=false`；当前源码 API/前端镜像已重建，真实 Compose 冒烟通过 `2.0.8` 健康检查、TXT 上传、可回答/无答案 SSE、详情和删除闭环。
 
 v2.1.0 P0 本地复审为 Python `241 passed, 1 skipped, 149 subtests passed`、Vitest `5 passed`、Playwright `6 passed`；Black 检查 99 个 Python 文件，compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、40 份已跟踪 Markdown、全部已跟踪 JSON、版本对齐和 `deterministic_dense_v2` 回归门禁均通过。跳过项仍是需要显式启用的真实 Milvus 集成测试；本次没有生成新的真实 Provider 质量结论。
+
+v2.2.0 P1 本地复审为 Python `266 passed, 1 skipped, 168 subtests passed`、Vitest `5 passed`、Playwright `6 passed`；Black 检查 102 个 Python 文件，compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、34 份 JSON、42 份 Markdown、本地链接、版本对齐、`deterministic_dense_v2` 和 `retrieve_quality_v1` 回归门禁均通过。当前源码还通过真实 Ollama/Milvus 的 `2.2.0` 独立 API 冒烟：retrieval readiness、TXT 上传、active 状态、W3C Trace Context、3 个 Chunk 纯检索、证据哈希/排序及文档删除闭环均正常。跳过项仍是需显式环境开关的独立 Milvus 集成测试；本次真实冒烟验证装配与协议，不产生通用语义质量或阈值结论。
 
 ## 版本摘要
 

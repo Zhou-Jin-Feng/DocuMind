@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v2.1.0）
+# DocuMind - RAG 系统架构（v2.2.0）
 
 ## 1. 分层结构
 
@@ -259,7 +259,7 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 
 ## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加答案质量严格契约；v2.0.4 增加真实 Generator/Judge 装配、逐案例 Runner 和原子 JSON/Markdown 报告；v2.0.5 冻结 28 条答案质量 holdout、35 条阈值正负样本与 11 份专用语料；v2.0.6 使用固定 Ollama/DeepSeek 配置生成并人工复核旧 Prompt 对照；v2.0.7 只使用 validation 扫描 Dense L2 阈值，因正负 distance 明显重叠而冻结“不启用”决策；v2.0.8 加固不可信上下文 Prompt、统一 `[文档N]` 引用并增加流结束后的低基数观测；v2.1.0 新增单文档纯检索 API、证据哈希、active index 隔离和稳定错误语义。评估层仍只依赖生产 Provider、`RAGGenerator` 和检索组件，生产 `app` 不反向依赖 `evaluation`。固定真实 Provider 评测结果不能外推为所有模型或用户语料的质量承诺。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加答案质量严格契约；v2.0.4 增加真实 Generator/Judge 装配、逐案例 Runner 和原子 JSON/Markdown 报告；v2.0.5 冻结 28 条答案质量 holdout、35 条阈值正负样本与 11 份专用语料；v2.0.6 使用固定 Ollama/DeepSeek 配置生成并人工复核旧 Prompt 对照；v2.0.7 只使用 validation 扫描 Dense L2 阈值，因正负 distance 明显重叠而冻结“不启用”决策；v2.0.8 加固不可信上下文 Prompt、统一 `[文档N]` 引用并增加流结束后的低基数观测；v2.1.0 新增单文档纯检索 API、证据哈希、active index 隔离和稳定错误语义；v2.2.0 增加检索超时/重试/并发策略、独立 readiness、跨服务 Trace Context 和 Chunk 级质量基线。评估层仍只依赖生产 Provider、`RAGGenerator` 和检索组件，生产 `app` 不反向依赖 `evaluation`。固定真实 Provider 评测结果不能外推为所有模型或用户语料的质量承诺。
 
 ```text
 evaluation.runner / production_runner

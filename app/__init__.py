@@ -2,5 +2,5 @@
 
 from app.config import settings, get_settings
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 __all__ = ["settings", "get_settings"]

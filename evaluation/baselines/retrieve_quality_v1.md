@@ -37,7 +37,7 @@
 | `chunk_overlap` | `null` |
 | `schema_version` | `"1.0"` |
 | `retrieval_version` | `"dense-v1"` |
-| `service_version` | `"2.1.0"` |
+| `service_version` | `"2.2.0"` |
 | `python_version` | `"3.14.6"` |
 | `python_implementation` | `"CPython"` |
 | `platform` | `"windows"` |

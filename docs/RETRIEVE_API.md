@@ -3,7 +3,7 @@
 ## Status
 
 This document defines the released Schema `1.0` contract for the DocuMind
-v2.1.0 single-document Dense retrieval Provider.
+v2.2.0 single-document Dense retrieval Provider.
 
 ## Endpoint
 
@@ -45,7 +45,7 @@ reused without evaluation.
 ```json
 {
   "schema_version": "1.0",
-  "service_version": "2.1.0",
+  "service_version": "2.2.0",
   "retrieval_version": "dense-v1",
   "retrieval_mode": "dense",
   "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -103,22 +103,34 @@ semantics, or accepting multiple documents requires a new major Schema version.
 A Consumer must reject unsupported Schema versions and must not fall back to
 `/chat/stream`.
 
+## Retrieval Readiness
+
+Read `GET /api/v1/health/ready` and inspect `components.retrieval`. The endpoint
+can return HTTP 503 because generation is unavailable while retrieval remains
+`ready`; this state permits `/retrieve` but not `/chat/stream`. Consumers must
+fail closed when the retrieval component is absent or not ready.
+
 ## Upgrade And Rollback
 
-Upgrading from v2.0.8 requires no data migration and does not alter existing
-document, lifecycle, health or chat contracts. Deploy the v2.1.0 application and
-confirm `/api/v1/health/ready` before enabling a Consumer.
+Upgrading from v2.1.0 to v2.2.0 requires no Registry or Milvus migration and
+does not alter existing request or response fields. Deploy the candidate, check
+retrieval readiness, run an upload/status/retrieve smoke path, then enable
+Consumer traffic.
 
-To roll back, stop v2.1.0 and start the previous v2.0.8 application against the
-same Registry and Milvus data. Disable `/retrieve` Consumers first because the
-older service does not provide that route. No new persistent Schema must be
-removed during rollback.
+Rolling back to v2.1.0 retains Schema `1.0` but loses the v2.2.0 bounded
+execution policy, retrieval-specific readiness and observability. Drain
+retrieval traffic before switching versions. Rolling back to v2.0.8 removes the
+route entirely, so disable `/retrieve` Consumers first. Both rollback targets
+reuse the same Registry and Milvus data; no persistent Schema removal is needed.
 
 The checked-in Provider/Consumer artifacts are
 `docs/contracts/retrieve-v1.schema.json` and
 `docs/contracts/retrieve-v1.fixtures.json`. Consumers should validate the
 shared valid and invalid fixtures directly against the JSON Schema rather than
 importing DocuMind Python models.
+
+The end-to-end ScholarTrace sequence, Consumer example, smoke test and service
+boundary are documented in [ScholarTrace Integration](SCHOLARTRACE_INTEGRATION.md).
 
 ## Resource Controls
 

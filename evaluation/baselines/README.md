@@ -80,8 +80,8 @@ Logical input fingerprints:
 
 Reviewed artifact fingerprints:
 
-- JSON report: `c764135cff0ce3f48d89c5b9dce9878f0e42c40b2c52ad229d333a46f8dc082f`
-- Markdown report: `4daacf8d52816b277a811cc39f566d51999e15589a1b40b83df03a270d8a9c0f`
+- JSON report: `da64533970ab54344994b9b405d9f59befec2f911ef73dd1e475de0d2ca849f4`
+- Markdown report: `a49ed6afc9f7fb8d9bf2a76ba21c9932342020d3a5d661880099c1cce12d22d3`
 
 All invariant and positive quality metrics are `1.0`, except Precision@2 is
 `0.5` because each positive case labels one relevant chunk. This is an offline

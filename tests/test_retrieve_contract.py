@@ -35,7 +35,7 @@ def request_payload(**overrides):
 def response_payload(**overrides):
     payload = {
         "schema_version": RETRIEVE_SCHEMA_VERSION,
-        "service_version": "2.1.0",
+        "service_version": "2.2.0",
         "retrieval_version": RETRIEVAL_VERSION,
         "retrieval_mode": "dense",
         "document_key": "a" * 64,

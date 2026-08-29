@@ -1,4 +1,4 @@
-# 项目结构（v2.1.0）
+# 项目结构（v2.2.0）
 
 ```text
 DocuMind/
@@ -103,10 +103,13 @@ DocuMind/
 │   ├── models.py
 │   ├── regression.py
 │   ├── regression_runner.py
+│   ├── retrieve_quality.py
+│   ├── retrieve_quality_runner.py
 │   ├── reports.py
 │   ├── runner.py
 │   ├── datasets/
 │   │   ├── golden_dataset.jsonl
+│   │   ├── retrieve_quality_v1.json
 │   │   ├── documents/
 │   │   ├── v1_6/
 │   │   │   ├── golden_dataset.jsonl
@@ -121,6 +124,7 @@ DocuMind/
 │   ├── baselines/
 │   │   ├── deterministic_dense_v2.json
 │   │   ├── deterministic_dense_v2.md
+│   │   ├── retrieve_quality_v1.json / .md
 │   │   └── README.md
 │   └── reports/
 │       ├── v2_answer_pre_hardening.json
@@ -161,6 +165,8 @@ DocuMind/
 │   ├── PROJECT_STRUCTURE.md
 │   ├── EVALUATION.md
 │   ├── OBSERVABILITY.md
+│   ├── RETRIEVE_API.md
+│   ├── SCHOLARTRACE_INTEGRATION.md
 │   ├── DEPENDENCIES.md
 │   ├── DEMO_SCRIPT.md
 │   ├── VERSION_HISTORY.md
@@ -248,8 +254,11 @@ DocuMind/
 | `evaluation/runner.py` | JSONL 黄金评估集加载、分类汇总、延迟分位数和确定性三模式执行 |
 | `evaluation/regression.py` | 报告输入兼容性、指标最低值和允许下降幅度门禁 |
 | `evaluation/regression_runner.py` | 报告兼容性校验和自动回归门禁 CLI |
+| `evaluation/retrieve_quality.py` | 单文档 Chunk 级数据集校验、生产 RetrievalService 评测和隔离指标 |
+| `evaluation/retrieve_quality_runner.py` | 原子生成纯检索 JSON/Markdown 报告并强制契约不变量 |
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
 | `evaluation/baselines/deterministic_dense_v2.*` | v2.0.1 冻结、供 v2.0.2 PR CI 实时比较的 Dense 基线与可读报告 |
+| `evaluation/baselines/retrieve_quality_v1.*` | v2.2.0 单文档纯检索 API、底层排序一致和污染清零基线 |
 | `evaluation/reports/v2_answer_pre_hardening.*` | v2.0.6 固化的旧 Prompt 真实 JSON/Markdown 对照与逐案人工复核记录 |
 | `evaluation/reports/v2_threshold_validation_*` | v2.0.7 无阈值 validation 原始结果、59 候选扫描与不启用复核记录 |
 

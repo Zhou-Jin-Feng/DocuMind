@@ -23,7 +23,7 @@
     "chunk_overlap": null,
     "schema_version": "1.0",
     "retrieval_version": "dense-v1",
-    "service_version": "2.1.0",
+    "service_version": "2.2.0",
     "python_version": "3.14.6",
     "python_implementation": "CPython",
     "platform": "windows"
@@ -66,7 +66,7 @@
         "api_bottom_parity": 1.0
       },
       "contamination_count": 0,
-      "duration_ms": 1.437,
+      "duration_ms": 1.382,
       "status": "success",
       "error_type": null
     },
@@ -96,7 +96,7 @@
         "api_bottom_parity": 1.0
       },
       "contamination_count": 0,
-      "duration_ms": 1.682,
+      "duration_ms": 0.624,
       "status": "success",
       "error_type": null
     },
@@ -126,7 +126,7 @@
         "api_bottom_parity": 1.0
       },
       "contamination_count": 0,
-      "duration_ms": 0.885,
+      "duration_ms": 0.564,
       "status": "success",
       "error_type": null
     },
@@ -156,7 +156,7 @@
         "api_bottom_parity": 1.0
       },
       "contamination_count": 0,
-      "duration_ms": 1.095,
+      "duration_ms": 0.629,
       "status": "success",
       "error_type": null
     },
@@ -175,7 +175,7 @@
         "api_bottom_parity": 1.0
       },
       "contamination_count": 0,
-      "duration_ms": 0.887,
+      "duration_ms": 0.53,
       "status": "success",
       "error_type": null
     }
