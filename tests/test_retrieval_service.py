@@ -5,6 +5,7 @@ from app.core.retriever import RetrievalResult
 from app.services.retrieval_service import (
     DocumentIndexUnavailableError,
     DocumentNotFoundError,
+    DocumentOperationInProgressError,
     InvalidRetrievalEvidenceError,
     RetrievalScopeViolationError,
     RetrievalService,
@@ -17,15 +18,20 @@ SOURCE_SHA256 = "c" * 64
 
 
 class FakeRegistry:
-    def __init__(self, *, document=None, index=None):
+    def __init__(self, *, document=None, index=None, indexes=None):
         self.document = document
         self.index = index
+        self.indexes = list(indexes or ([] if index is None else [index]))
 
     def get_document(self, document_key):
         return self.document if document_key == DOCUMENT_KEY else None
 
     def get_index(self, index_id):
         return self.index if index_id == INDEX_ID else None
+
+    def list_indexes(self, **kwargs):
+        del kwargs
+        return tuple(self.indexes)
 
 
 class CapturingRetriever:
@@ -161,6 +167,22 @@ class RetrievalServiceTests(unittest.TestCase):
                 DocumentNotFoundError,
             ),
             (
+                FakeRegistry(
+                    document=document(tenant_id="another-tenant"),
+                    index=index(tenant_id="another-tenant"),
+                ),
+                INDEX_ID,
+                DocumentNotFoundError,
+            ),
+            (
+                FakeRegistry(
+                    document=document(collection_id="another-collection"),
+                    index=index(collection_id="another-collection"),
+                ),
+                INDEX_ID,
+                DocumentNotFoundError,
+            ),
+            (
                 FakeRegistry(document=document(active_index_id=None), index=None),
                 INDEX_ID,
                 DocumentIndexUnavailableError,
@@ -173,7 +195,7 @@ class RetrievalServiceTests(unittest.TestCase):
             (
                 FakeRegistry(document=document(), index=index(status="indexing")),
                 INDEX_ID,
-                DocumentIndexUnavailableError,
+                DocumentOperationInProgressError,
             ),
         )
 
@@ -186,6 +208,53 @@ class RetrievalServiceTests(unittest.TestCase):
                     top_k=3,
                     retrieval_mode="dense",
                 )
+
+    def test_retrieve_distinguishes_transitional_and_unavailable_index_states(self):
+        cases = (
+            ("pending", DocumentOperationInProgressError),
+            ("indexing", DocumentOperationInProgressError),
+            ("deleting", DocumentOperationInProgressError),
+            ("failed", DocumentIndexUnavailableError),
+            ("deleted", DocumentIndexUnavailableError),
+        )
+
+        for status, error_type in cases:
+            registry = FakeRegistry(
+                document=document(active_index_id=None),
+                index=None,
+                indexes=[index(status=status)],
+            )
+            with self.subTest(status=status), self.assertRaises(error_type):
+                self.service(registry=registry).retrieve(
+                    "query",
+                    document_key=DOCUMENT_KEY,
+                    expected_index_id=INDEX_ID,
+                    top_k=3,
+                    retrieval_mode="dense",
+                )
+
+    def test_retrieve_filters_cross_document_and_superseded_index_candidates(self):
+        candidates = [
+            result(),
+            result(document_key="f" * 64, chunk_id="1" * 64),
+            result(index_id="e" * 64, chunk_id="2" * 64),
+        ]
+
+        class FilteringRetriever(CapturingRetriever):
+            def retrieve_semantic(self, query, **kwargs):
+                self.calls.append((query, kwargs))
+                predicate = kwargs["result_predicate"]
+                return [item for item in self.results if predicate(item.metadata)]
+
+        batch = self.service(retriever=FilteringRetriever(candidates)).retrieve(
+            "query",
+            document_key=DOCUMENT_KEY,
+            expected_index_id=INDEX_ID,
+            top_k=3,
+            retrieval_mode="dense",
+        )
+
+        self.assertEqual([chunk.chunk_id for chunk in batch.chunks], ["d" * 64])
 
     def test_retrieve_fails_closed_on_out_of_scope_result(self):
         retriever = CapturingRetriever([result(document_key="other")])

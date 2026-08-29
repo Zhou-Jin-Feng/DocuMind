@@ -20,6 +20,10 @@ class DocumentIndexUnavailableError(RuntimeError):
     """目标文档当前没有可用于检索的活动索引。"""
 
 
+class DocumentOperationInProgressError(RuntimeError):
+    """文档正在执行会暂时阻止纯检索的索引或删除操作。"""
+
+
 class StaleDocumentIndexError(RuntimeError):
     """调用方持有的索引身份不再是文档的活动索引。"""
 
@@ -228,16 +232,46 @@ class RetrievalService:
 
         active_index_id = str(document.get("active_index_id") or "")
         if not active_index_id:
-            raise DocumentIndexUnavailableError(document_key)
+            raise self._unavailable_index_error(document_key)
         if active_index_id != expected_index_id:
             raise StaleDocumentIndexError(expected_index_id)
 
         index = self.registry.get_index(active_index_id)
-        if index is None or (
+        if index is None:
+            raise DocumentIndexUnavailableError(document_key)
+        if (
             str(index.get("document_key", "")) != document_key
             or str(index.get("tenant_id", "")) != self.tenant_id
             or str(index.get("collection_id", "")) != self.collection_id
-            or str(index.get("status", "")) != LifecycleStatus.ACTIVE.value
         ):
+            raise RetrievalScopeViolationError(
+                "active index is outside the requested document scope"
+            )
+
+        status = str(index.get("status", ""))
+        if status in {
+            LifecycleStatus.PENDING.value,
+            LifecycleStatus.INDEXING.value,
+            LifecycleStatus.DELETING.value,
+        }:
+            raise DocumentOperationInProgressError(document_key)
+        if status != LifecycleStatus.ACTIVE.value:
             raise DocumentIndexUnavailableError(document_key)
         return document, index
+
+    def _unavailable_index_error(self, document_key: str) -> RuntimeError:
+        indexes = self.registry.list_indexes(
+            document_key=document_key,
+            tenant_id=self.tenant_id,
+            collection_id=self.collection_id,
+        )
+        transitional_statuses = {
+            LifecycleStatus.PENDING.value,
+            LifecycleStatus.INDEXING.value,
+            LifecycleStatus.DELETING.value,
+        }
+        if any(
+            str(index.get("status", "")) in transitional_statuses for index in indexes
+        ):
+            return DocumentOperationInProgressError(document_key)
+        return DocumentIndexUnavailableError(document_key)

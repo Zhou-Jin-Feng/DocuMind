@@ -13,6 +13,12 @@ from app.services.document_service import (
 )
 from app.services.rag_service import ChatEvent
 from app.services.retrieval_service import EvidenceChunk, RetrievalBatch
+from app.services.retrieval_service import (
+    DocumentIndexUnavailableError,
+    DocumentNotFoundError,
+    DocumentOperationInProgressError,
+    StaleDocumentIndexError,
+)
 
 
 class FakeRAGService:
@@ -119,23 +125,31 @@ class FakeDocumentService:
 class FakeRetrievalService:
     def __init__(self):
         self.calls = []
+        self.error = None
+        self.empty = False
 
     def retrieve(self, query, **kwargs):
         self.calls.append((query, kwargs))
+        if self.error is not None:
+            raise self.error
         return RetrievalBatch(
             document_key="a" * 64,
             index_id="b" * 64,
             source_sha256="c" * 64,
             chunks=(
-                EvidenceChunk(
-                    chunk_id="d" * 64,
-                    content="Full source evidence",
-                    content_sha256="e" * 64,
-                    source="paper.pdf",
-                    page_number=3,
-                    distance=0.42,
-                    rank=1,
-                ),
+                ()
+                if self.empty
+                else (
+                    EvidenceChunk(
+                        chunk_id="d" * 64,
+                        content="Full source evidence",
+                        content_sha256="e" * 64,
+                        source="paper.pdf",
+                        page_number=3,
+                        distance=0.42,
+                        rank=1,
+                    ),
+                )
             ),
         )
 
@@ -299,6 +313,112 @@ class APITests(unittest.TestCase):
             response_schema["$ref"],
             "#/components/schemas/RetrieveResponse",
         )
+
+    def test_retrieve_returns_successful_empty_chunk_list(self):
+        self.application.retrieval_service.empty = True
+        try:
+            response = self.client.post(
+                "/api/v1/retrieve",
+                json=self._retrieve_request(),
+            )
+        finally:
+            self.application.retrieval_service.empty = False
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["chunks"], [])
+
+    def test_retrieve_maps_lifecycle_errors_to_stable_public_codes(self):
+        cases = (
+            (DocumentNotFoundError("document"), 404, "document_not_found"),
+            (StaleDocumentIndexError("index"), 409, "stale_document_index"),
+            (
+                DocumentOperationInProgressError("document"),
+                409,
+                "document_operation_in_progress",
+            ),
+            (
+                DocumentIndexUnavailableError("document"),
+                409,
+                "document_index_unavailable",
+            ),
+        )
+
+        for error, status_code, code in cases:
+            self.application.retrieval_service.error = error
+            try:
+                response = self.client.post(
+                    "/api/v1/retrieve",
+                    json=self._retrieve_request(),
+                    headers={"X-Request-ID": "retrieve-request-1234"},
+                )
+            finally:
+                self.application.retrieval_service.error = None
+
+            with self.subTest(code=code):
+                self.assertEqual(response.status_code, status_code)
+                self.assertEqual(response.json()["error"]["code"], code)
+                self.assertEqual(
+                    response.json()["error"]["request_id"],
+                    "retrieve-request-1234",
+                )
+
+    def test_retrieve_maps_dependency_failure_without_leaking_details(self):
+        self.application.retrieval_service.error = ConnectionError(
+            r"provider failed at C:\private\token.txt"
+        )
+        try:
+            response = self.client.post(
+                "/api/v1/retrieve",
+                json=self._retrieve_request(),
+            )
+        finally:
+            self.application.retrieval_service.error = None
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["error"]["code"],
+            "retrieval_service_unavailable",
+        )
+        self.assertNotIn("private", response.text)
+        self.assertNotIn("token.txt", response.text)
+
+    def test_retrieve_uses_stable_503_when_service_is_not_ready(self):
+        self.application.initialized = False
+        try:
+            response = self.client.post(
+                "/api/v1/retrieve",
+                json=self._retrieve_request(),
+            )
+        finally:
+            self.application.initialized = True
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["error"]["code"],
+            "retrieval_service_unavailable",
+        )
+
+    def test_retrieve_rejects_invalid_contract_with_public_422(self):
+        response = self.client.post(
+            "/api/v1/retrieve",
+            json={**self._retrieve_request(), "top_k": 21},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self.assertNotIn("input", json.dumps(response.json(), ensure_ascii=False))
+
+    @staticmethod
+    def _retrieve_request():
+        return {
+            "schema_version": "1.0",
+            "query": "supporting evidence",
+            "document_key": "a" * 64,
+            "expected_index_id": "b" * 64,
+            "top_k": 3,
+            "retrieval_mode": "dense",
+            "distance_threshold": None,
+        }
 
     def test_invalid_question_has_public_error_shape(self):
         response = self.client.post("/api/v1/chat/stream", json={"question": "  "})

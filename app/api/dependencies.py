@@ -32,5 +32,5 @@ def get_document_service(request: Request) -> DocumentService:
 def get_retrieval_service(request: Request) -> RetrievalService:
     application = get_application(request)
     if not application.initialized or application.retrieval_service is None:
-        raise APIError(503, "application_unavailable", "检索服务尚未就绪。")
+        raise APIError(503, "retrieval_service_unavailable", "检索服务尚未就绪。")
     return application.retrieval_service
