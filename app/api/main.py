@@ -19,7 +19,7 @@ from app.api.errors import (
     unexpected_error_handler,
     validation_error_handler,
 )
-from app.api.routers import chat, documents, health, system
+from app.api.routers import chat, documents, health, retrieval, system
 from app.application import RAGApplication
 from app.config import settings
 from app.observability.context import request_context
@@ -123,6 +123,7 @@ def create_app(
     api.include_router(health.router, prefix=prefix)
     api.include_router(system.router, prefix=prefix)
     api.include_router(documents.router, prefix=prefix)
+    api.include_router(retrieval.router, prefix=prefix)
     api.include_router(chat.router, prefix=prefix)
     return api
 

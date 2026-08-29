@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
+from hashlib import sha256
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
 from app.lifecycle.models import LifecycleStatus
@@ -25,6 +28,84 @@ class RetrievalScopeViolationError(RuntimeError):
     """底层检索器返回了请求作用域之外的结果。"""
 
 
+class InvalidRetrievalEvidenceError(RuntimeError):
+    """底层结果缺少公共证据契约要求的稳定字段。"""
+
+
+_CONTENT_HASH_PATTERN = re.compile(r"^[a-f0-9]{64}$")
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceChunk:
+    """从内部结果白名单映射出的可追溯证据 Chunk。"""
+
+    chunk_id: str
+    content: str
+    content_sha256: str
+    source: str
+    page_number: int | None
+    distance: float
+    rank: int
+
+    @classmethod
+    def from_result(cls, result: Any, *, rank: int) -> "EvidenceChunk":
+        metadata = getattr(result, "metadata", {}) or {}
+        chunk_id = str(metadata.get("chunk_id") or "")
+        if not _CONTENT_HASH_PATTERN.fullmatch(chunk_id):
+            raise InvalidRetrievalEvidenceError(
+                "retrieval result has no stable SHA-256 chunk_id"
+            )
+
+        raw_content = getattr(result, "content", "")
+        if not isinstance(raw_content, str) or not raw_content:
+            raise InvalidRetrievalEvidenceError("retrieval result content is empty")
+        content = raw_content
+
+        raw_source = str(
+            getattr(result, "source", "")
+            or metadata.get("source_file")
+            or metadata.get("source")
+            or ""
+        ).strip()
+        source = PurePosixPath(PureWindowsPath(raw_source).name).name.strip()
+        if not source:
+            raise InvalidRetrievalEvidenceError("retrieval result source is empty")
+
+        raw_page_number = getattr(result, "page_number", None)
+        page_number = (
+            raw_page_number
+            if isinstance(raw_page_number, int) and raw_page_number > 0
+            else None
+        )
+        raw_distance = getattr(result, "distance", None)
+        if raw_distance is None:
+            raise InvalidRetrievalEvidenceError("dense result has no L2 distance")
+        distance = float(raw_distance)
+        if not math.isfinite(distance) or distance < 0:
+            raise InvalidRetrievalEvidenceError("dense result has invalid L2 distance")
+
+        return cls(
+            chunk_id=chunk_id,
+            content=content,
+            content_sha256=sha256(content.encode("utf-8")).hexdigest(),
+            source=source,
+            page_number=page_number,
+            distance=distance,
+            rank=rank,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "chunk_id": self.chunk_id,
+            "content": self.content,
+            "content_sha256": self.content_sha256,
+            "source": self.source,
+            "page_number": self.page_number,
+            "distance": self.distance,
+            "rank": self.rank,
+        }
+
+
 @dataclass(frozen=True, slots=True)
 class RetrievalBatch:
     """一次纯检索的不可变文档范围和底层结果。"""
@@ -32,7 +113,15 @@ class RetrievalBatch:
     document_key: str
     index_id: str
     source_sha256: str
-    results: tuple[Any, ...]
+    chunks: tuple[EvidenceChunk, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "document_key": self.document_key,
+            "index_id": self.index_id,
+            "source_sha256": self.source_sha256,
+            "chunks": [chunk.to_dict() for chunk in self.chunks],
+        }
 
 
 class RetrievalService:
@@ -118,7 +207,10 @@ class RetrievalService:
             document_key=str(document["document_key"]),
             index_id=str(index["index_id"]),
             source_sha256=str(index["source_sha256"]),
-            results=results,
+            chunks=tuple(
+                EvidenceChunk.from_result(result, rank=rank)
+                for rank, result in enumerate(results, start=1)
+            ),
         )
 
     def _resolve_active_index(

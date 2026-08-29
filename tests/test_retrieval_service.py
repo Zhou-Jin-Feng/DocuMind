@@ -1,9 +1,11 @@
 import unittest
+from hashlib import sha256
 
 from app.core.retriever import RetrievalResult
 from app.services.retrieval_service import (
     DocumentIndexUnavailableError,
     DocumentNotFoundError,
+    InvalidRetrievalEvidenceError,
     RetrievalScopeViolationError,
     RetrievalService,
     StaleDocumentIndexError,
@@ -71,17 +73,19 @@ def index(**overrides):
     return value
 
 
-def result(**metadata_overrides):
+def result(content="Evidence", **metadata_overrides):
     metadata = {
         "tenant_id": "default",
         "collection_id": "rag_documents",
         "document_key": DOCUMENT_KEY,
         "index_id": INDEX_ID,
         "chunk_id": "d" * 64,
+        "source_file": r"C:\private\paper.pdf",
+        "page_number": 4,
     }
     metadata.update(metadata_overrides)
     return RetrievalResult(
-        content="Evidence",
+        content=content,
         metadata=metadata,
         distance=0.2,
         rank=1,
@@ -112,7 +116,13 @@ class RetrievalServiceTests(unittest.TestCase):
         self.assertEqual(batch.document_key, DOCUMENT_KEY)
         self.assertEqual(batch.index_id, INDEX_ID)
         self.assertEqual(batch.source_sha256, SOURCE_SHA256)
-        self.assertEqual(batch.results[0].content, "Evidence")
+        self.assertEqual(batch.chunks[0].content, "Evidence")
+        self.assertEqual(
+            batch.chunks[0].content_sha256,
+            sha256(b"Evidence").hexdigest(),
+        )
+        self.assertEqual(batch.chunks[0].source, "paper.pdf")
+        self.assertEqual(batch.chunks[0].page_number, 4)
         query, kwargs = retriever.calls[0]
         self.assertEqual(query, "evidence query")
         self.assertEqual(kwargs["top_k"], 3)
@@ -140,7 +150,7 @@ class RetrievalServiceTests(unittest.TestCase):
             retrieval_mode="dense",
         )
 
-        self.assertEqual(batch.results, ())
+        self.assertEqual(batch.chunks, ())
         self.assertFalse(hasattr(self.service(), "rag_generator"))
 
     def test_retrieve_rejects_unknown_scope_and_unavailable_index(self):
@@ -201,6 +211,63 @@ class RetrievalServiceTests(unittest.TestCase):
                 top_k=3,
                 retrieval_mode="dense",
             )
+
+    def test_retrieve_rejects_missing_stable_evidence_fields(self):
+        invalid_results = (
+            result(chunk_id=None),
+            result(source_file=""),
+            RetrievalResult(
+                content="Evidence",
+                metadata={
+                    **result().metadata,
+                    "chunk_id": "d" * 64,
+                },
+                distance=None,
+                rank=1,
+            ),
+        )
+
+        for invalid_result in invalid_results:
+            with (
+                self.subTest(result=invalid_result),
+                self.assertRaises(InvalidRetrievalEvidenceError),
+            ):
+                self.service(retriever=CapturingRetriever([invalid_result])).retrieve(
+                    "query",
+                    document_key=DOCUMENT_KEY,
+                    expected_index_id=INDEX_ID,
+                    top_k=3,
+                    retrieval_mode="dense",
+                )
+
+    def test_retrieve_preserves_full_content_and_exposes_only_whitelisted_fields(self):
+        content = "Full evidence paragraph. " * 30
+
+        batch = self.service(retriever=CapturingRetriever([result(content)])).retrieve(
+            "query",
+            document_key=DOCUMENT_KEY,
+            expected_index_id=INDEX_ID,
+            top_k=3,
+            retrieval_mode="dense",
+        )
+
+        self.assertGreater(len(content), 240)
+        self.assertEqual(batch.chunks[0].content, content)
+        self.assertEqual(
+            batch.chunks[0].content_sha256, sha256(content.encode()).hexdigest()
+        )
+        self.assertEqual(
+            set(batch.to_dict()["chunks"][0]),
+            {
+                "chunk_id",
+                "content",
+                "content_sha256",
+                "source",
+                "page_number",
+                "distance",
+                "rank",
+            },
+        )
 
 
 if __name__ == "__main__":

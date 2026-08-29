@@ -12,6 +12,7 @@ from app.services.document_service import (
     DocumentRecord,
 )
 from app.services.rag_service import ChatEvent
+from app.services.retrieval_service import EvidenceChunk, RetrievalBatch
 
 
 class FakeRAGService:
@@ -115,6 +116,30 @@ class FakeDocumentService:
         )
 
 
+class FakeRetrievalService:
+    def __init__(self):
+        self.calls = []
+
+    def retrieve(self, query, **kwargs):
+        self.calls.append((query, kwargs))
+        return RetrievalBatch(
+            document_key="a" * 64,
+            index_id="b" * 64,
+            source_sha256="c" * 64,
+            chunks=(
+                EvidenceChunk(
+                    chunk_id="d" * 64,
+                    content="Full source evidence",
+                    content_sha256="e" * 64,
+                    source="paper.pdf",
+                    page_number=3,
+                    distance=0.42,
+                    rank=1,
+                ),
+            ),
+        )
+
+
 class FakeApplication:
     def __init__(self):
         self.settings = Settings(
@@ -124,6 +149,7 @@ class FakeApplication:
         )
         self.initialized = True
         self.rag_service = FakeRAGService()
+        self.retrieval_service = FakeRetrievalService()
         self.document_service = FakeDocumentService()
 
     def readiness(self):
@@ -222,6 +248,57 @@ class APITests(unittest.TestCase):
         self.assertIn('event: token\ndata: {"text":"回答"}', response.text)
         self.assertIn("event: done", response.text)
         self.assertEqual(self.application.rag_service.questions[0][0], "什么是 RAG？")
+
+    def test_retrieve_returns_full_whitelisted_evidence_without_chat(self):
+        chat_call_count = len(self.application.rag_service.questions)
+
+        response = self.client.post(
+            "/api/v1/retrieve",
+            json={
+                "schema_version": "1.0",
+                "query": "supporting evidence",
+                "document_key": "a" * 64,
+                "expected_index_id": "b" * 64,
+                "top_k": 3,
+                "retrieval_mode": "dense",
+                "distance_threshold": None,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["retrieval_version"], "dense-v1")
+        self.assertEqual(payload["document_key"], "a" * 64)
+        self.assertEqual(payload["chunks"][0]["content"], "Full source evidence")
+        self.assertEqual(payload["chunks"][0]["source"], "paper.pdf")
+        self.assertNotIn("metadata", payload["chunks"][0])
+        self.assertEqual(
+            len(self.application.rag_service.questions),
+            chat_call_count,
+        )
+        self.assertEqual(
+            self.application.retrieval_service.calls[-1][1]["expected_index_id"],
+            "b" * 64,
+        )
+
+    def test_retrieve_contract_is_published_in_openapi(self):
+        openapi = self.client.get("/openapi.json").json()
+        operation = openapi["paths"]["/api/v1/retrieve"]["post"]
+
+        request_schema = operation["requestBody"]["content"]["application/json"][
+            "schema"
+        ]
+        response_schema = operation["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ]
+        self.assertEqual(
+            request_schema["$ref"],
+            "#/components/schemas/RetrieveRequest",
+        )
+        self.assertEqual(
+            response_schema["$ref"],
+            "#/components/schemas/RetrieveResponse",
+        )
 
     def test_invalid_question_has_public_error_shape(self):
         response = self.client.post("/api/v1/chat/stream", json={"question": "  "})
