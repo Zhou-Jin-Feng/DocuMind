@@ -2,6 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from app.api.schemas import (
@@ -14,6 +15,7 @@ from app.api.schemas import (
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "docs" / "contracts" / "retrieve-v1.schema.json"
+FIXTURES_PATH = ROOT / "docs" / "contracts" / "retrieve-v1.fixtures.json"
 
 
 def request_payload(**overrides):
@@ -91,6 +93,21 @@ class RetrieveContractTests(unittest.TestCase):
         self.assertEqual(contract["request"], RetrieveRequest.model_json_schema())
         self.assertEqual(contract["response"], RetrieveResponse.model_json_schema())
         self.assertEqual(contract["error"], ErrorResponse.model_json_schema())
+
+    def test_consumer_fixtures_validate_independently_of_provider_models(self):
+        contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        fixtures = json.loads(FIXTURES_PATH.read_text(encoding="utf-8"))
+
+        self.assertEqual(fixtures["schema_version"], RETRIEVE_SCHEMA_VERSION)
+        for kind in ("request", "response", "error"):
+            validator = Draft202012Validator(contract[kind])
+            validator.validate(fixtures["valid"][kind])
+            for case in fixtures["invalid"][kind]:
+                with self.subTest(kind=kind, case=case["name"]):
+                    self.assertTrue(
+                        list(validator.iter_errors(case["payload"])),
+                        msg=f"consumer fixture unexpectedly valid: {case['name']}",
+                    )
 
 
 if __name__ == "__main__":

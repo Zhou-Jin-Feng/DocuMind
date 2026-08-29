@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0",
+  "valid": {
+    "request": {
+      "schema_version": "1.0",
+      "query": "What evidence supports the claim?",
+      "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_index_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "top_k": 3,
+      "retrieval_mode": "dense",
+      "distance_threshold": null
+    },
+    "response": {
+      "schema_version": "1.0",
+      "service_version": "2.1.0",
+      "retrieval_version": "dense-v1",
+      "retrieval_mode": "dense",
+      "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "chunks": [
+        {
+          "chunk_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "content": "A retrieved evidence chunk.",
+          "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source": "paper.pdf",
+          "page_number": 3,
+          "distance": 0.42,
+          "rank": 1
+        }
+      ]
+    },
+    "error": {
+      "error": {
+        "code": "stale_document_index",
+        "message": "The expected index is no longer active.",
+        "request_id": "consumer-contract-1234"
+      }
+    }
+  },
+  "invalid": {
+    "request": [
+      {
+        "name": "unsupported_schema",
+        "payload": {
+          "schema_version": "2.0",
+          "query": "query",
+          "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_index_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "top_k": 3,
+          "retrieval_mode": "dense"
+        }
+      },
+      {
+        "name": "unknown_field",
+        "payload": {
+          "schema_version": "1.0",
+          "query": "query",
+          "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expected_index_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "top_k": 3,
+          "retrieval_mode": "dense",
+          "documents": []
+        }
+      }
+    ],
+    "response": [
+      {
+        "name": "missing_content_hash",
+        "payload": {
+          "schema_version": "1.0",
+          "service_version": "2.1.0",
+          "retrieval_version": "dense-v1",
+          "retrieval_mode": "dense",
+          "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "index_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "chunks": [
+            {
+              "chunk_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "content": "A retrieved evidence chunk.",
+              "source": "paper.pdf",
+              "distance": 0.42,
+              "rank": 1
+            }
+          ]
+        }
+      }
+    ],
+    "error": [
+      {
+        "name": "missing_machine_code",
+        "payload": {
+          "error": {
+            "message": "The request failed.",
+            "request_id": "consumer-contract-1234"
+          }
+        }
+      }
+    ]
+  }
+}

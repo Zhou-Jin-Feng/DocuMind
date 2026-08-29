@@ -112,5 +112,8 @@ same Registry and Milvus data. Disable `/retrieve` Consumers first because the
 older service does not provide that route. No new persistent Schema must be
 removed during rollback.
 
-The checked-in Provider/Consumer artifact is
-`docs/contracts/retrieve-v1.schema.json`.
+The checked-in Provider/Consumer artifacts are
+`docs/contracts/retrieve-v1.schema.json` and
+`docs/contracts/retrieve-v1.fixtures.json`. Consumers should validate the
+shared valid and invalid fixtures directly against the JSON Schema rather than
+importing DocuMind Python models.
