@@ -416,6 +416,44 @@ JSON 比较存储每个模式的指标和 `模式 - 基线` 增量。质量和�
 
 所有三种增强模式都修复了相同的单个基线排名错误并通过了回归门控。重写是后续有界集成实验的首选候选，因为它以显著更低的 P95 延迟匹配重排序质量。组合模式增加了延迟而没有测量到的质量提升，应保持禁用状态。12 案例保留集太小，不能单独更改 Web 默认值。
 
+### v2.1.0 P1 单文档纯检索契约基线
+
+`evaluation/datasets/retrieve_quality_v1.json` 冻结两篇容易混淆的文档、6 个
+Chunk 和 5 个单文档案例，其中包含 4 个可回答案例及 1 个阈值空结果案例。
+`evaluation.retrieve_quality_runner` 使用仓库内 SHA-256 Token Embedding 和内存
+向量存储，但检索入口是生产 `RetrievalService`；每个案例还会用同一过滤条件
+直接调用底层 `Retriever`，以核验公共服务没有改变有序 Chunk ID。
+
+生成当前报告：
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.retrieve_quality_runner `
+  --json-output evaluation/reports/retrieve_quality_current.json `
+  --markdown-output evaluation/reports/retrieve_quality_current.md
+```
+
+与签入基线执行回归门禁：
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.regression_runner `
+  --baseline evaluation/baselines/retrieve_quality_v1.json `
+  --current evaluation/reports/retrieve_quality_current.json `
+  --allowed-drop ndcg_at_k=0 `
+  --minimum api_bottom_parity_rate=1 `
+  --minimum contamination_free_rate=1 `
+  --minimum no_answer_empty_accuracy=1
+```
+
+冻结报告的 Recall@2、MRR@2、nDCG@2、空结果准确率、API/底层一致率、污染
+清零率和成功率均为 `1.0`；Precision@2 为 `0.5`，因为每个正样本只标记一个
+相关 Chunk，而 API 固定返回两个候选。Runner 会在逐案异常、公共/底层排序不一致、
+跨文档污染或空结果错误时写出诊断报告并返回非零。报告记录数据集、文档、
+Embedding、Schema、Retrieval、服务版本、Python 实现和操作系统指纹。
+
+该报告只证明固定输入下纯检索契约与隔离行为可重复，不测量真实 Embedding、
+Milvus、领域语义质量或线上延迟，也不能用于选择生产距离阈值。真实 Provider
+结论必须使用隔离 Collection 和单独校准的数据集生成。
+
 ## 回归门控
 
 在 Python 中将当前报告与保存的基线进行比较：

@@ -49,3 +49,40 @@ Create a real baseline only after running the same golden dataset through a
 real or test-isolated retrieval adapter. Do not compare reports generated from
 different datasets, Top-K values, document IDs, embedding models, or other
 compatibility metadata.
+
+## Single-document API Contract Baseline
+
+`retrieve_quality_v1.json` and `retrieve_quality_v1.md` are the P1 contract and
+isolation baseline for `POST /api/v1/retrieve`. They use two documents, six
+chunks and five cases through the production `RetrievalService`, backed only by
+repository-local deterministic evaluation dependencies.
+
+Generate and gate a current report with:
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.retrieve_quality_runner `
+  --json-output evaluation/reports/retrieve_quality_current.json `
+  --markdown-output evaluation/reports/retrieve_quality_current.md
+
+.\venv\Scripts\python.exe -m evaluation.regression_runner `
+  --baseline evaluation/baselines/retrieve_quality_v1.json `
+  --current evaluation/reports/retrieve_quality_current.json `
+  --allowed-drop ndcg_at_k=0 `
+  --minimum api_bottom_parity_rate=1 `
+  --minimum contamination_free_rate=1 `
+  --minimum no_answer_empty_accuracy=1
+```
+
+Logical input fingerprints:
+
+- dataset: `0a3b71a25f7aefd73df006d622d5b404ca418e9a1672f4272167c4ee430f26e2`
+- documents: `f83815e7cceb4ed135e19d263916bfc1a8bb18536ecd2e98a8165c8306efca8a`
+
+Reviewed artifact fingerprints:
+
+- JSON report: `c764135cff0ce3f48d89c5b9dce9878f0e42c40b2c52ad229d333a46f8dc082f`
+- Markdown report: `4daacf8d52816b277a811cc39f566d51999e15589a1b40b83df03a270d8a9c0f`
+
+All invariant and positive quality metrics are `1.0`, except Precision@2 is
+`0.5` because each positive case labels one relevant chunk. This is an offline
+contract regression, not evidence about real Embedding or Milvus quality.

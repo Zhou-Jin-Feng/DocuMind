@@ -24,7 +24,14 @@ class DeterministicEmbeddingClient:
         normalized = (text or "").casefold()
         return re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]", normalized)
 
-    def embed_text(self, text: str) -> list[float]:
+    def embed_text(
+        self,
+        text: str,
+        *,
+        timeout_seconds: float | None = None,
+        max_attempts: int = 1,
+    ) -> list[float]:
+        del timeout_seconds, max_attempts
         tokens = self._tokens(text)
         if not tokens:
             raise ValueError("评估 Embedding 输入不能为空")
@@ -77,7 +84,9 @@ class InMemoryVectorStore:
         query_embedding: Sequence[float],
         n_results: int = 5,
         where: Mapping[str, Any] | None = None,
+        timeout_seconds: float | None = None,
     ) -> dict[str, list[Any]]:
+        del timeout_seconds
         if not query_embedding:
             raise ValueError("评估查询向量不能为空")
         if n_results <= 0:

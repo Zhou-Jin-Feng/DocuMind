@@ -1,0 +1,109 @@
+{
+  "dataset_name": "documind-retrieve-quality-v1",
+  "dataset_version": "1.0",
+  "top_k": 2,
+  "retrieval_mode": "dense",
+  "documents": [
+    {
+      "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source": "dense-retrieval.txt",
+      "chunks": [
+        {
+          "chunk_id": "1111111111111111111111111111111111111111111111111111111111111111",
+          "page_number": 1,
+          "content": "alpha dense retrieval returns source evidence chunks for claims"
+        },
+        {
+          "chunk_id": "2222222222222222222222222222222222222222222222222222222222222222",
+          "page_number": 2,
+          "content": "beta expected active index isolation prevents stale document versions"
+        },
+        {
+          "chunk_id": "3333333333333333333333333333333333333333333333333333333333333333",
+          "page_number": 3,
+          "content": "gamma chunk sha256 integrity verifies evidence content"
+        }
+      ]
+    },
+    {
+      "document_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "source_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "source": "graph-retrieval.txt",
+      "chunks": [
+        {
+          "chunk_id": "4444444444444444444444444444444444444444444444444444444444444444",
+          "page_number": 1,
+          "content": "alpha graph retrieval global community reports compare multiple papers"
+        },
+        {
+          "chunk_id": "5555555555555555555555555555555555555555555555555555555555555555",
+          "page_number": 2,
+          "content": "beta graph entities and relationships use a separate corpus index"
+        },
+        {
+          "chunk_id": "6666666666666666666666666666666666666666666666666666666666666666",
+          "page_number": 3,
+          "content": "gamma citation network edges connect academic references"
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "dense-source-evidence",
+      "query": "dense retrieval source evidence chunks claims",
+      "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_index_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "relevant_chunk_ids": [
+        "1111111111111111111111111111111111111111111111111111111111111111"
+      ],
+      "distance_threshold": null,
+      "expect_empty": false
+    },
+    {
+      "id": "active-index-isolation",
+      "query": "expected active index isolation stale document versions",
+      "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_index_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "relevant_chunk_ids": [
+        "2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "distance_threshold": null,
+      "expect_empty": false
+    },
+    {
+      "id": "evidence-integrity",
+      "query": "chunk sha256 integrity evidence content",
+      "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_index_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "relevant_chunk_ids": [
+        "3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      "distance_threshold": null,
+      "expect_empty": false
+    },
+    {
+      "id": "graph-community-scope",
+      "query": "graph retrieval global community reports multiple papers",
+      "document_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected_index_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "relevant_chunk_ids": [
+        "4444444444444444444444444444444444444444444444444444444444444444"
+      ],
+      "distance_threshold": null,
+      "expect_empty": false
+    },
+    {
+      "id": "bounded-empty-result",
+      "query": "quantum recipe weather",
+      "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_index_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "relevant_chunk_ids": [],
+      "distance_threshold": 0.0,
+      "expect_empty": true
+    }
+  ]
+}
