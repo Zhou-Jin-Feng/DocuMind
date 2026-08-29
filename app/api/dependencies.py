@@ -8,6 +8,7 @@ from app.api.errors import APIError
 from app.application import RAGApplication
 from app.services.document_service import DocumentService
 from app.services.rag_service import RAGService
+from app.services.retrieval_service import RetrievalService
 
 
 def get_application(request: Request) -> RAGApplication:
@@ -26,3 +27,10 @@ def get_document_service(request: Request) -> DocumentService:
     if not application.initialized or application.document_service is None:
         raise APIError(503, "application_unavailable", "文档服务尚未就绪。")
     return application.document_service
+
+
+def get_retrieval_service(request: Request) -> RetrievalService:
+    application = get_application(request)
+    if not application.initialized or application.retrieval_service is None:
+        raise APIError(503, "application_unavailable", "检索服务尚未就绪。")
+    return application.retrieval_service

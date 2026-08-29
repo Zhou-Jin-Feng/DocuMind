@@ -17,6 +17,7 @@ from app.lifecycle.service import DocumentLifecycleService
 from app.observability.logging import get_logger
 from app.services.document_service import DocumentService
 from app.services.rag_service import RAGService
+from app.services.retrieval_service import RetrievalService
 
 logger = get_logger(__name__)
 
@@ -44,6 +45,7 @@ class RAGApplication:
         self.registry: Any | None = None
         self.lifecycle_service: Any | None = None
         self.rag_service: RAGService | None = None
+        self.retrieval_service: RetrievalService | None = None
         self.document_service: DocumentService | None = None
 
     def initialize(self) -> None:
@@ -88,6 +90,12 @@ class RAGApplication:
                     vector_store=self.vector_store,
                     registry=self.registry,
                     upload_dir=self.settings.upload_dir,
+                    tenant_id=self.settings.default_tenant_id,
+                    collection_id=self.settings.collection_name,
+                )
+                self.retrieval_service = RetrievalService(
+                    retriever=self.retriever,
+                    registry=self.registry,
                     tenant_id=self.settings.default_tenant_id,
                     collection_id=self.settings.collection_name,
                 )
@@ -148,6 +156,7 @@ class RAGApplication:
             self.doc_loader = None
             self.chunker = None
             self.registry = None
+            self.retrieval_service = None
 
     def close(self) -> None:
         """关闭共享资源，并把应用恢复为可重新初始化的状态。"""
@@ -155,6 +164,7 @@ class RAGApplication:
             self._close_resources()
             self.initialized = False
             self.rag_service = None
+            self.retrieval_service = None
             self.document_service = None
 
     def _readiness_timeout(self) -> float:
