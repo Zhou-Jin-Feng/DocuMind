@@ -65,6 +65,36 @@ class EmbeddingClientTests(unittest.TestCase):
         self.assertEqual(ollama.calls, 3)
         self.assertEqual(sleep.call_count, 2)
 
+    def test_single_embedding_uses_request_timeout_without_hidden_client_retry(self):
+        configured_client = Mock()
+        configured_client.embeddings.create.return_value = Mock(
+            data=[Mock(embedding=[1.0, 2.0])]
+        )
+        self.client.client = Mock()
+        self.client.client.with_options.return_value = configured_client
+        self.client.config = {"model": "embedding-test"}
+
+        embedding = self.client.embed_text(
+            "文本",
+            timeout_seconds=2.5,
+            max_attempts=1,
+        )
+
+        self.assertEqual(embedding, [1.0, 2.0])
+        self.client.client.with_options.assert_called_once_with(
+            timeout=2.5,
+            max_retries=0,
+        )
+
+    def test_http_timeout_separates_connection_and_request_budget(self):
+        self.client.connection_timeout_seconds = 1.5
+        self.client.request_timeout_seconds = 7.0
+
+        timeout = self.client._http_timeout()
+
+        self.assertEqual(timeout.connect, 1.5)
+        self.assertEqual(timeout.read, 7.0)
+
     def test_api_health_check_only_checks_initialized_client(self):
         self.client.client = object()
         self.assertTrue(self.client.health_check(timeout_seconds=1))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -41,6 +42,7 @@ class VectorStore:
         uri: str = "http://127.0.0.1:19530",
         token: Optional[str] = None,
         db_name: str = "default",
+        connection_timeout_seconds: float | None = None,
     ):
         """连接 Milvus；已有 Collection 会立即加载，配置稍后由调用方校验。"""
         collection_name = collection_name.strip()
@@ -52,6 +54,11 @@ class VectorStore:
             raise ValueError("Milvus URI cannot be empty")
         if not db_name:
             raise ValueError("Milvus database name cannot be empty")
+        if connection_timeout_seconds is not None and (
+            not math.isfinite(float(connection_timeout_seconds))
+            or float(connection_timeout_seconds) <= 0
+        ):
+            raise ValueError("Milvus connection timeout must be a positive number")
 
         self.collection_name = collection_name
         self.uri = uri
@@ -60,6 +67,8 @@ class VectorStore:
         client_kwargs: Dict[str, Any] = {"uri": uri, "db_name": db_name}
         if token:
             client_kwargs["token"] = token
+        if connection_timeout_seconds is not None:
+            client_kwargs["timeout"] = float(connection_timeout_seconds)
 
         self.client = MilvusClient(**client_kwargs)
         self._embedding_dimension: Optional[int] = None
@@ -464,6 +473,7 @@ class VectorStore:
         query_embedding: List[float],
         n_results: int = 5,
         where: Optional[Dict] = None,
+        timeout_seconds: float | None = None,
     ) -> Dict:
         """
         执行 L2 向量搜索，距离越小表示越相关。
@@ -475,6 +485,10 @@ class VectorStore:
             raise ValueError("Query embedding cannot be empty")
         if n_results <= 0:
             raise ValueError("n_results must be positive")
+        if timeout_seconds is not None and (
+            not math.isfinite(float(timeout_seconds)) or float(timeout_seconds) <= 0
+        ):
+            raise ValueError("Milvus search timeout must be a positive number")
         if not self._collection_ready:
             return {"ids": [], "documents": [], "metadatas": [], "distances": []}
         self._validate_vector_dimension(query_embedding, operation="Query")
@@ -491,6 +505,9 @@ class VectorStore:
                 limit=min(n_results, chunk_count),
                 output_fields=["document", "metadata"],
                 search_params={"metric_type": "L2", "params": {}},
+                timeout=(
+                    float(timeout_seconds) if timeout_seconds is not None else None
+                ),
             )
             hits = results[0] if results else []
             entities = [dict(hit.get("entity") or {}) for hit in hits]

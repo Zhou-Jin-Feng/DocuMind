@@ -77,6 +77,9 @@ class Retriever:
         score_threshold: Optional[float] = None,
         metadata_filter: Optional[Dict] = None,
         result_predicate: Optional[Callable[[Dict], bool]] = None,
+        embedding_timeout_seconds: float | None = None,
+        vector_search_timeout_seconds: float | None = None,
+        embedding_max_attempts: int = 1,
     ) -> List[RetrievalResult]:
         """
         执行语义检索，``score_threshold`` 表示允许的最大 L2 距离。
@@ -123,7 +126,17 @@ class Retriever:
                     "embedding.query",
                     attributes={"provider": provider},
                 ):
-                    query_embedding = self.embedding_client.embed_text(normalized_query)
+                    embedding_kwargs: dict[str, Any] = {}
+                    if embedding_timeout_seconds is not None:
+                        embedding_kwargs["timeout_seconds"] = embedding_timeout_seconds
+                    if embedding_max_attempts != 1:
+                        embedding_kwargs["max_attempts"] = embedding_max_attempts
+                    elif embedding_timeout_seconds is not None:
+                        embedding_kwargs["max_attempts"] = 1
+                    query_embedding = self.embedding_client.embed_text(
+                        normalized_query,
+                        **embedding_kwargs,
+                    )
             except Exception as exc:
                 embedding_duration = perf_counter() - embedding_started
                 retrieval_duration = perf_counter() - retrieval_started
@@ -198,12 +211,16 @@ class Retriever:
                             len(query_embedding),
                         )
                     # 内存谓词无法下推，过取候选以降低过滤后不足 top_k 的概率。
+                    search_kwargs: dict[str, Any] = {}
+                    if vector_search_timeout_seconds is not None:
+                        search_kwargs["timeout_seconds"] = vector_search_timeout_seconds
                     search_results = self.vector_store.search(
                         query_embedding=query_embedding,
                         n_results=(
                             max(top_k * 5, top_k) if result_predicate else top_k
                         ),
                         where=metadata_filter,
+                        **search_kwargs,
                     )
             except Exception as exc:
                 search_duration = perf_counter() - search_started

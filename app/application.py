@@ -61,13 +61,22 @@ class RAGApplication:
             logger.info("正在初始化 RAG 应用服务")
             try:
                 self.embedding_client = UniversalEmbeddingClient(
-                    self.settings.default_embedding_provider
+                    self.settings.default_embedding_provider,
+                    connection_timeout_seconds=(
+                        self.settings.retrieval_connection_timeout_seconds
+                    ),
+                    request_timeout_seconds=(
+                        self.settings.retrieval_embedding_timeout_seconds
+                    ),
                 )
                 self.vector_store = VectorStore(
                     collection_name=self.settings.collection_name,
                     uri=self.settings.milvus_uri,
                     token=self.settings.milvus_token,
                     db_name=self.settings.milvus_db_name,
+                    connection_timeout_seconds=(
+                        self.settings.retrieval_connection_timeout_seconds
+                    ),
                 )
                 self.retriever = Retriever(
                     self.vector_store,
@@ -98,6 +107,20 @@ class RAGApplication:
                     registry=self.registry,
                     tenant_id=self.settings.default_tenant_id,
                     collection_id=self.settings.collection_name,
+                    max_concurrency=self.settings.retrieval_max_concurrency,
+                    queue_timeout_seconds=(
+                        self.settings.retrieval_queue_timeout_seconds
+                    ),
+                    embedding_timeout_seconds=(
+                        self.settings.retrieval_embedding_timeout_seconds
+                    ),
+                    vector_search_timeout_seconds=(
+                        self.settings.retrieval_milvus_timeout_seconds
+                    ),
+                    max_attempts=self.settings.retrieval_max_attempts,
+                    retry_backoff_seconds=(
+                        self.settings.retrieval_retry_backoff_seconds
+                    ),
                 )
                 self.rag_service = RAGService(
                     retriever=self.retriever,

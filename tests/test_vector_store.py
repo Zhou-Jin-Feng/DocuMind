@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from langchain_core.documents import Document
 
@@ -134,6 +134,35 @@ class VectorStoreTests(unittest.TestCase):
         results = self.store.search([3.0, 4.0])
 
         self.assertEqual(results["distances"], [25.0])
+
+    def test_milvus_connection_and_search_timeouts_are_forwarded(self):
+        separate_store = VectorStore(
+            collection_name="timeout_documents",
+            uri="http://milvus.test:19530",
+            db_name="unit_test",
+            connection_timeout_seconds=2.5,
+        )
+        try:
+            self.assertEqual(separate_store.client.connection["timeout"], 2.5)
+            separate_store.ensure_embedding_space("fake", "model-a", 2)
+            separate_store.add_documents(
+                [self._documents()[0]],
+                [[1.0, 0.0]],
+            )
+            original_search = separate_store.client.search
+            separate_store.client.search = Mock(wraps=original_search)
+
+            separate_store.search(
+                [1.0, 0.0],
+                timeout_seconds=4.5,
+            )
+
+            self.assertEqual(
+                separate_store.client.search.call_args.kwargs["timeout"],
+                4.5,
+            )
+        finally:
+            separate_store.close()
 
     def test_embedding_space_is_persisted_and_incompatible_models_are_rejected(self):
         self.store.ensure_embedding_space("fake", "model-a", 2)

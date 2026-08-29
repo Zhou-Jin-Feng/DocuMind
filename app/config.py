@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=100, ge=0)
     retrieval_top_k: int = Field(default=3, gt=0)
     retrieval_score_threshold: Optional[float] = Field(default=None, ge=0)
+    retrieval_connection_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
+    retrieval_embedding_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
+    retrieval_milvus_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    retrieval_max_concurrency: int = Field(default=4, ge=1, le=64)
+    retrieval_queue_timeout_seconds: float = Field(default=1.0, gt=0, le=30)
+    retrieval_max_attempts: int = Field(default=2, ge=1, le=3)
+    retrieval_retry_backoff_seconds: float = Field(default=0.1, ge=0, le=5)
     llm_temperature: float = Field(default=0.7, ge=0, le=2)
     llm_max_tokens: int = Field(default=1000, gt=0)
 

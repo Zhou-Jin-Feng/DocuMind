@@ -91,6 +91,8 @@ The P0 implementation reserves these status families:
 | 409 | `document_operation_in_progress` | Deletion or index transition prevents retrieval |
 | 413 | `request_too_large` | JSON request body exceeds 16 KiB |
 | 422 | `validation_error` | Request does not satisfy Schema `1.0` |
+| 503 | `retrieval_capacity_exceeded` | Bounded retrieval capacity was not acquired in time |
+| 503 | `retrieval_timeout` | Embedding or Milvus exceeded its bounded timeout attempts |
 | 503 | `retrieval_service_unavailable` | Embedding, Milvus, Registry or service is unavailable |
 
 ## Compatibility
@@ -117,3 +119,18 @@ The checked-in Provider/Consumer artifacts are
 `docs/contracts/retrieve-v1.fixtures.json`. Consumers should validate the
 shared valid and invalid fixtures directly against the JSON Schema rather than
 importing DocuMind Python models.
+
+## Resource Controls
+
+Pure retrieval uses separate connection, Embedding and Milvus query timeouts.
+Concurrent requests are bounded by a process-local semaphore and queue timeout.
+Only connection errors, dependency timeouts and explicit HTTP 5xx failures are
+retried, at most three attempts by configuration; validation, lifecycle and
+scope failures are never retried. Every attempt rechecks the same
+`document_key` and `expected_index_id` before search, and the active index is
+checked again before evidence is released.
+
+The synchronous dependency call keeps its concurrency permit until it actually
+returns, including when the HTTP client disconnects. Provider-native timeouts
+bound the remaining work, preventing a cancelled request from releasing a
+permit while a shared Milvus or Embedding client is still in use.

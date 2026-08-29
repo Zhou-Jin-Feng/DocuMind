@@ -17,7 +17,11 @@ class FakeEmbeddingClient:
     provider = "fake"
     config = {"model": "fake-model"}
 
-    def embed_text(self, text):
+    def __init__(self):
+        self.calls = []
+
+    def embed_text(self, text, **kwargs):
+        self.calls.append((text, kwargs))
         if text == "explode":
             raise RuntimeError("embedding unavailable")
         return [1.0, 0.0]
@@ -27,12 +31,14 @@ class FakeVectorStore:
     def __init__(self):
         self.last_n_results = None
         self.embedding_space = None
+        self.search_options = None
 
     def ensure_embedding_space(self, provider, model, dimension):
         self.embedding_space = (provider, model, dimension)
 
-    def search(self, query_embedding, n_results, where=None):
+    def search(self, query_embedding, n_results, where=None, **kwargs):
         self.last_n_results = n_results
+        self.search_options = kwargs
         return {
             "documents": ["RAG检索增强生成", "天气信息"],
             "metadatas": [
@@ -47,7 +53,8 @@ class FakeVectorStore:
 class RetrieverTests(unittest.TestCase):
     def setUp(self):
         self.store = FakeVectorStore()
-        self.retriever = Retriever(self.store, FakeEmbeddingClient())
+        self.embedding_client = FakeEmbeddingClient()
+        self.retriever = Retriever(self.store, self.embedding_client)
 
     def test_threshold_uses_maximum_distance(self):
         results = self.retriever.retrieve_semantic(
@@ -69,6 +76,20 @@ class RetrieverTests(unittest.TestCase):
     def test_system_failure_is_not_converted_to_empty_results(self):
         with self.assertRaises(RuntimeError):
             self.retriever.retrieve_semantic("explode")
+
+    def test_dependency_timeouts_are_forwarded(self):
+        self.retriever.retrieve_semantic(
+            "query",
+            embedding_timeout_seconds=9.0,
+            vector_search_timeout_seconds=4.0,
+            embedding_max_attempts=1,
+        )
+
+        self.assertEqual(
+            self.embedding_client.calls[-1][1],
+            {"timeout_seconds": 9.0, "max_attempts": 1},
+        )
+        self.assertEqual(self.store.search_options, {"timeout_seconds": 4.0})
 
     def test_chinese_rerank_preserves_distance(self):
         results = [

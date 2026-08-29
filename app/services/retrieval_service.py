@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import math
 import re
+import time
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import PurePosixPath, PureWindowsPath
-from typing import Any
+from threading import BoundedSemaphore
+from typing import Any, Callable
 
 from app.lifecycle.models import LifecycleStatus
 
@@ -34,6 +36,14 @@ class RetrievalScopeViolationError(RuntimeError):
 
 class InvalidRetrievalEvidenceError(RuntimeError):
     """底层结果缺少公共证据契约要求的稳定字段。"""
+
+
+class RetrievalBusyError(RuntimeError):
+    """纯检索并发已满，等待队列未能在固定时间内取得许可。"""
+
+
+class RetrievalDependencyTimeoutError(TimeoutError):
+    """Embedding 或 Milvus 在固定尝试次数内持续超时。"""
 
 
 _CONTENT_HASH_PATTERN = re.compile(r"^[a-f0-9]{64}$")
@@ -138,11 +148,41 @@ class RetrievalService:
         registry: Any,
         tenant_id: str,
         collection_id: str,
+        max_concurrency: int = 4,
+        queue_timeout_seconds: float = 1.0,
+        embedding_timeout_seconds: float = 15.0,
+        vector_search_timeout_seconds: float = 5.0,
+        max_attempts: int = 2,
+        retry_backoff_seconds: float = 0.1,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        if max_concurrency <= 0:
+            raise ValueError("max_concurrency must be positive")
+        for name, value in (
+            ("queue_timeout_seconds", queue_timeout_seconds),
+            ("embedding_timeout_seconds", embedding_timeout_seconds),
+            ("vector_search_timeout_seconds", vector_search_timeout_seconds),
+        ):
+            if not math.isfinite(float(value)) or float(value) <= 0:
+                raise ValueError(f"{name} must be a positive finite number")
+        if not 1 <= max_attempts <= 3:
+            raise ValueError("max_attempts must be between 1 and 3")
+        if (
+            not math.isfinite(float(retry_backoff_seconds))
+            or float(retry_backoff_seconds) < 0
+        ):
+            raise ValueError("retry_backoff_seconds must be non-negative")
         self.retriever = retriever
         self.registry = registry
         self.tenant_id = tenant_id
         self.collection_id = collection_id
+        self.queue_timeout_seconds = float(queue_timeout_seconds)
+        self.embedding_timeout_seconds = float(embedding_timeout_seconds)
+        self.vector_search_timeout_seconds = float(vector_search_timeout_seconds)
+        self.max_attempts = max_attempts
+        self.retry_backoff_seconds = float(retry_backoff_seconds)
+        self._sleep = sleep
+        self._slots = BoundedSemaphore(max_concurrency)
 
     def retrieve(
         self,
@@ -167,6 +207,58 @@ class RetrievalService:
         ):
             raise ValueError("distance_threshold must be a non-negative finite number")
 
+        acquired = self._slots.acquire(timeout=self.queue_timeout_seconds)
+        if not acquired:
+            raise RetrievalBusyError("retrieval concurrency limit reached")
+        try:
+            return self._retrieve_with_retries(
+                normalized_query,
+                document_key=document_key,
+                expected_index_id=expected_index_id,
+                top_k=top_k,
+                distance_threshold=distance_threshold,
+            )
+        finally:
+            self._slots.release()
+
+    def _retrieve_with_retries(
+        self,
+        query: str,
+        *,
+        document_key: str,
+        expected_index_id: str,
+        top_k: int,
+        distance_threshold: float | None,
+    ) -> RetrievalBatch:
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                return self._retrieve_once(
+                    query,
+                    document_key=document_key,
+                    expected_index_id=expected_index_id,
+                    top_k=top_k,
+                    distance_threshold=distance_threshold,
+                )
+            except Exception as exc:
+                retryable = self._is_retryable_dependency_error(exc)
+                if not retryable or attempt >= self.max_attempts:
+                    if self._is_timeout_error(exc):
+                        raise RetrievalDependencyTimeoutError(
+                            "retrieval dependency timed out"
+                        ) from exc
+                    raise
+                self._sleep(self.retry_backoff_seconds * (2 ** (attempt - 1)))
+        raise RuntimeError("retrieval retry loop exited unexpectedly")
+
+    def _retrieve_once(
+        self,
+        query: str,
+        *,
+        document_key: str,
+        expected_index_id: str,
+        top_k: int,
+        distance_threshold: float | None,
+    ) -> RetrievalBatch:
         document, index = self._resolve_active_index(
             document_key=document_key,
             expected_index_id=expected_index_id,
@@ -186,11 +278,14 @@ class RetrievalService:
 
         results = tuple(
             self.retriever.retrieve_semantic(
-                normalized_query,
+                query,
                 top_k=top_k,
                 score_threshold=distance_threshold,
                 metadata_filter=metadata_filter,
                 result_predicate=belongs_to_scope,
+                embedding_timeout_seconds=self.embedding_timeout_seconds,
+                vector_search_timeout_seconds=self.vector_search_timeout_seconds,
+                embedding_max_attempts=1,
             )
         )
         if any(
@@ -215,6 +310,26 @@ class RetrievalService:
                 EvidenceChunk.from_result(result, rank=rank)
                 for rank, result in enumerate(results, start=1)
             ),
+        )
+
+    @staticmethod
+    def _is_timeout_error(exc: Exception) -> bool:
+        return isinstance(exc, TimeoutError) or type(exc).__name__ in {
+            "APITimeoutError",
+            "ConnectTimeout",
+            "ReadTimeout",
+            "TimeoutException",
+        }
+
+    @classmethod
+    def _is_retryable_dependency_error(cls, exc: Exception) -> bool:
+        if isinstance(exc, ConnectionError) or cls._is_timeout_error(exc):
+            return True
+        status_code = getattr(exc, "status_code", None)
+        return (
+            isinstance(status_code, int)
+            and not isinstance(status_code, bool)
+            and 500 <= status_code <= 599
         )
 
     def _resolve_active_index(

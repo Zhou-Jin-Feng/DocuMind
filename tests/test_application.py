@@ -112,6 +112,56 @@ class ApplicationTests(unittest.TestCase):
         )
         vector_store.close.assert_called_once_with()
 
+    def test_initialization_wires_retrieval_execution_policy(self):
+        config = Settings(
+            _env_file=None,
+            metrics_enabled=False,
+            retrieval_connection_timeout_seconds=1.5,
+            retrieval_embedding_timeout_seconds=8.0,
+            retrieval_milvus_timeout_seconds=3.0,
+            retrieval_max_concurrency=2,
+            retrieval_queue_timeout_seconds=0.5,
+            retrieval_max_attempts=3,
+            retrieval_retry_backoff_seconds=0.2,
+        )
+        application = RAGApplication(config)
+        embedding_client = Mock(provider="ollama", config={"model": "test"})
+        vector_store = Mock()
+
+        with (
+            patch(
+                "app.application.UniversalEmbeddingClient",
+                return_value=embedding_client,
+            ) as embedding_class,
+            patch(
+                "app.application.VectorStore",
+                return_value=vector_store,
+            ) as vector_store_class,
+            patch("app.application.UniversalLLMClient", return_value=Mock()),
+            patch("app.application.DocumentRegistry", return_value=Mock()),
+        ):
+            application.initialize()
+
+        self.assertTrue(application.initialized)
+        embedding_class.assert_called_once_with(
+            config.default_embedding_provider,
+            connection_timeout_seconds=1.5,
+            request_timeout_seconds=8.0,
+        )
+        vector_store_class.assert_called_once_with(
+            collection_name=config.collection_name,
+            uri=config.milvus_uri,
+            token=config.milvus_token,
+            db_name=config.milvus_db_name,
+            connection_timeout_seconds=1.5,
+        )
+        service = application.retrieval_service
+        self.assertEqual(service.queue_timeout_seconds, 0.5)
+        self.assertEqual(service.embedding_timeout_seconds, 8.0)
+        self.assertEqual(service.vector_search_timeout_seconds, 3.0)
+        self.assertEqual(service.max_attempts, 3)
+        self.assertEqual(service.retry_backoff_seconds, 0.2)
+
 
 if __name__ == "__main__":
     unittest.main()

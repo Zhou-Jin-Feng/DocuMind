@@ -5,7 +5,9 @@ from app.services.rag_service import ChatEvent, RAGService, SourceReference
 from app.services.retrieval_service import (
     DocumentOperationInProgressError,
     EvidenceChunk,
+    RetrievalBusyError,
     RetrievalBatch,
+    RetrievalDependencyTimeoutError,
     RetrievalService,
 )
 
@@ -16,7 +18,9 @@ __all__ = [
     "DocumentOperationInProgressError",
     "EvidenceChunk",
     "RAGService",
+    "RetrievalBusyError",
     "RetrievalBatch",
+    "RetrievalDependencyTimeoutError",
     "RetrievalService",
     "SourceReference",
 ]

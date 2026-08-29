@@ -41,6 +41,27 @@ class SettingsTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Settings(_env_file=None, readiness_probe_timeout_seconds=31)
 
+    def test_retrieval_resource_controls_are_bounded(self):
+        config = Settings(_env_file=None)
+        self.assertEqual(config.retrieval_connection_timeout_seconds, 3.0)
+        self.assertEqual(config.retrieval_embedding_timeout_seconds, 15.0)
+        self.assertEqual(config.retrieval_milvus_timeout_seconds, 5.0)
+        self.assertEqual(config.retrieval_max_concurrency, 4)
+        self.assertEqual(config.retrieval_max_attempts, 2)
+
+        invalid_options = (
+            {"retrieval_connection_timeout_seconds": 0},
+            {"retrieval_embedding_timeout_seconds": 121},
+            {"retrieval_milvus_timeout_seconds": 61},
+            {"retrieval_max_concurrency": 0},
+            {"retrieval_queue_timeout_seconds": 0},
+            {"retrieval_max_attempts": 4},
+            {"retrieval_retry_backoff_seconds": -0.1},
+        )
+        for options in invalid_options:
+            with self.subTest(options=options), self.assertRaises(ValidationError):
+                Settings(_env_file=None, **options)
+
     def test_log_formats_are_normalized_and_validated(self):
         config = Settings(
             _env_file=None,

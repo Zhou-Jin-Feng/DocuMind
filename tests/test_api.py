@@ -17,6 +17,8 @@ from app.services.retrieval_service import (
     DocumentIndexUnavailableError,
     DocumentNotFoundError,
     DocumentOperationInProgressError,
+    RetrievalBusyError,
+    RetrievalDependencyTimeoutError,
     StaleDocumentIndexError,
 )
 
@@ -381,6 +383,24 @@ class APITests(unittest.TestCase):
         )
         self.assertNotIn("private", response.text)
         self.assertNotIn("token.txt", response.text)
+
+    def test_retrieve_maps_timeout_and_capacity_to_stable_codes(self):
+        cases = (
+            (RetrievalBusyError("busy"), "retrieval_capacity_exceeded"),
+            (RetrievalDependencyTimeoutError("timeout"), "retrieval_timeout"),
+        )
+        for error, code in cases:
+            self.application.retrieval_service.error = error
+            try:
+                response = self.client.post(
+                    "/api/v1/retrieve",
+                    json=self._retrieve_request(),
+                )
+            finally:
+                self.application.retrieval_service.error = None
+            with self.subTest(code=code):
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json()["error"]["code"], code)
 
     def test_retrieve_uses_stable_503_when_service_is_not_ready(self):
         self.application.initialized = False

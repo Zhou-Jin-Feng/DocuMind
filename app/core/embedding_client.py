@@ -10,6 +10,7 @@ from math import isfinite
 from typing import List, Optional
 from urllib.parse import urlparse
 from urllib.request import ProxyHandler, Request, build_opener
+from httpx import Timeout
 from openai import OpenAI
 from app.config import settings
 from app.utils.logger import get_logger
@@ -98,7 +99,13 @@ class UniversalEmbeddingClient:
                 config["dimensions"] = settings.ollama_embedding_dimensions
         return config
 
-    def __init__(self, provider: str = "ollama"):
+    def __init__(
+        self,
+        provider: str = "ollama",
+        *,
+        connection_timeout_seconds: float | None = None,
+        request_timeout_seconds: float | None = None,
+    ):
         """
         初始化嵌入客户端
 
@@ -107,6 +114,14 @@ class UniversalEmbeddingClient:
         """
         self.provider = provider
         self._ollama_health_expires_at = 0.0
+        self.connection_timeout_seconds = self._optional_timeout(
+            connection_timeout_seconds,
+            name="connection_timeout_seconds",
+        )
+        self.request_timeout_seconds = self._optional_timeout(
+            request_timeout_seconds,
+            name="request_timeout_seconds",
+        )
 
         self.config = self.configuration_for(provider)
         self.type = self.config.get("type", "api")
@@ -121,6 +136,23 @@ class UniversalEmbeddingClient:
         logger.info(f"  类型: {'本地Ollama' if self.type == 'local' else '云端API'}")
         logger.info(f"  模型: {self.config['model']}")
         logger.info(f"  向量维度: {self.config['dimensions']}")
+
+    @staticmethod
+    def _optional_timeout(value: float | None, *, name: str) -> float | None:
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isfinite(float(value)) or float(value) <= 0:
+            raise ValueError(f"{name} 必须是正有限数字")
+        return float(value)
+
+    def _http_timeout(self) -> Timeout | None:
+        request_timeout = getattr(self, "request_timeout_seconds", None)
+        if request_timeout is None:
+            return None
+        connection_timeout = (
+            getattr(self, "connection_timeout_seconds", None) or request_timeout
+        )
+        return Timeout(request_timeout, connect=connection_timeout)
 
     def _embed_ollama_query(
         self,
@@ -169,6 +201,9 @@ class UniversalEmbeddingClient:
                 if parsed_host in {"localhost", "127.0.0.1", "::1"}
                 else {}
             )
+            http_timeout = self._http_timeout()
+            if http_timeout is not None:
+                client_kwargs["timeout"] = http_timeout
             self.ollama_client = OllamaEmbeddings(
                 model=model_name,
                 base_url=base_url,
@@ -323,6 +358,10 @@ class UniversalEmbeddingClient:
 
     def _initialize_api_client(self) -> OpenAI:
         """初始化云端API客户端"""
+        client_options = {"max_retries": 0}
+        http_timeout = self._http_timeout()
+        if http_timeout is not None:
+            client_options["timeout"] = http_timeout
         if self.provider.startswith("openai"):
             api_key = settings.openai_api_key
             base_url = settings.openai_base_url
@@ -330,7 +369,11 @@ class UniversalEmbeddingClient:
             if not api_key:
                 raise ValueError("未配置OPENAI_API_KEY，请检查.env文件")
 
-            self.client = OpenAI(api_key=api_key, base_url=base_url)
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                **client_options,
+            )
 
         elif self.provider == "deepseek":
             api_key = settings.deepseek_api_key
@@ -339,7 +382,11 @@ class UniversalEmbeddingClient:
             if not api_key:
                 raise ValueError("未配置DEEPSEEK_API_KEY，请检查.env文件")
 
-            self.client = OpenAI(api_key=api_key, base_url=base_url)
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                **client_options,
+            )
 
         elif self.provider == "glm":
             api_key = settings.glm_api_key
@@ -348,9 +395,19 @@ class UniversalEmbeddingClient:
             if not api_key:
                 raise ValueError("未配置GLM_API_KEY，请检查.env文件")
 
-            self.client = OpenAI(api_key=api_key, base_url=base_url)
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                **client_options,
+            )
 
-    def embed_text(self, text: str) -> List[float]:
+    def embed_text(
+        self,
+        text: str,
+        *,
+        timeout_seconds: float | None = None,
+        max_attempts: int = 3,
+    ) -> List[float]:
         """
         对单个文本进行向量化
 
@@ -362,20 +419,29 @@ class UniversalEmbeddingClient:
         """
         if not text.strip():
             raise ValueError("输入文本不能为空")
+        timeout_seconds = self._optional_timeout(
+            timeout_seconds,
+            name="timeout_seconds",
+        )
+        if max_attempts <= 0:
+            raise ValueError("max_attempts 必须大于 0")
 
         # 本地 Ollama
         if self.type == "local":
             try:
-                return self._embed_ollama_query(text)
+                return self._embed_ollama_query(text, max_retries=max_attempts)
             except Exception:
                 logger.exception("Ollama 单文本向量化失败")
                 raise
 
         # 云端 API
         try:
-            response = self.client.embeddings.create(
-                model=self.config["model"], input=text
+            client = (
+                self.client.with_options(timeout=timeout_seconds, max_retries=0)
+                if timeout_seconds is not None
+                else self.client
             )
+            response = client.embeddings.create(model=self.config["model"], input=text)
             return response.data[0].embedding
         except Exception:
             logger.exception("API 单文本向量化失败")

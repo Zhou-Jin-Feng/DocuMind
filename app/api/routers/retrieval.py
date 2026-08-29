@@ -16,6 +16,8 @@ from app.services.retrieval_service import (
     DocumentIndexUnavailableError,
     DocumentNotFoundError,
     DocumentOperationInProgressError,
+    RetrievalBusyError,
+    RetrievalDependencyTimeoutError,
     RetrievalService,
     StaleDocumentIndexError,
 )
@@ -66,6 +68,18 @@ def retrieve_document(
             409,
             "document_index_unavailable",
             "该文档当前没有可用于检索的活动索引。",
+        ) from exc
+    except RetrievalBusyError as exc:
+        raise APIError(
+            503,
+            "retrieval_capacity_exceeded",
+            "检索服务当前繁忙，请稍后重试。",
+        ) from exc
+    except RetrievalDependencyTimeoutError as exc:
+        raise APIError(
+            503,
+            "retrieval_timeout",
+            "检索依赖响应超时，请稍后重试。",
         ) from exc
     except ValueError as exc:
         raise APIError(422, "validation_error", "检索请求不符合接口约束。") from exc
