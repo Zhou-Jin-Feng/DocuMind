@@ -121,6 +121,49 @@ class RAGMetrics:
             buckets=_DEFAULT_BUCKETS,
             registry=self.registry,
         )
+        self.pure_retrieval_requests_total = Counter(
+            "rag_pure_retrieval_requests_total",
+            "Versioned pure retrieval HTTP requests.",
+            ("retrieval_mode", "http_status", "error_code"),
+            registry=self.registry,
+        )
+        self.pure_retrieval_duration = Histogram(
+            "rag_pure_retrieval_duration_seconds",
+            "End-to-end pure retrieval HTTP duration in seconds.",
+            ("retrieval_mode", "http_status"),
+            buckets=_DEFAULT_BUCKETS,
+            registry=self.registry,
+        )
+        self.pure_retrieval_result_count = Histogram(
+            "rag_pure_retrieval_result_count",
+            "Evidence chunks returned by pure retrieval requests.",
+            ("retrieval_mode",),
+            buckets=(0, 1, 2, 3, 5, 8, 10, 20),
+            registry=self.registry,
+        )
+        self.pure_retrieval_empty_total = Counter(
+            "rag_pure_retrieval_empty_total",
+            "Successful pure retrieval requests with no evidence chunks.",
+            ("retrieval_mode",),
+            registry=self.registry,
+        )
+        self.pure_retrieval_5xx_total = Counter(
+            "rag_pure_retrieval_5xx_total",
+            "Pure retrieval server failures by stable machine code.",
+            ("error_code",),
+            registry=self.registry,
+        )
+        self.pure_retrieval_stale_total = Counter(
+            "rag_pure_retrieval_stale_total",
+            "Pure retrieval requests rejected for a stale active index.",
+            registry=self.registry,
+        )
+        self.pure_retrieval_dependency_failures_total = Counter(
+            "rag_pure_retrieval_dependency_failures_total",
+            "Pure retrieval dependency failures by stable machine code.",
+            ("error_code",),
+            registry=self.registry,
+        )
         self.answer_citation_count = Histogram(
             "rag_answer_citation_count",
             "Number of unique exact document citations in completed answers.",
@@ -210,6 +253,36 @@ class RAGMetrics:
             self.retrieval_result_count.labels(normalized_provider).observe(
                 max(result_count, 0)
             )
+
+    def record_pure_retrieval(
+        self,
+        retrieval_mode: str,
+        http_status: int,
+        error_code: str,
+        duration_seconds: float,
+        *,
+        result_count: int | None = None,
+    ) -> None:
+        if not self.enabled:
+            return
+        mode = _label(retrieval_mode)
+        status = _label(http_status)
+        code = _label(error_code, fallback="none")
+        self.pure_retrieval_requests_total.labels(mode, status, code).inc()
+        self.pure_retrieval_duration.labels(mode, status).observe(
+            max(duration_seconds, 0.0)
+        )
+        if result_count is not None:
+            normalized_count = max(result_count, 0)
+            self.pure_retrieval_result_count.labels(mode).observe(normalized_count)
+            if http_status == 200 and normalized_count == 0:
+                self.pure_retrieval_empty_total.labels(mode).inc()
+        if 500 <= http_status <= 599:
+            self.pure_retrieval_5xx_total.labels(code).inc()
+        if code == "stale_document_index":
+            self.pure_retrieval_stale_total.inc()
+        if code in {"retrieval_timeout", "retrieval_service_unavailable"}:
+            self.pure_retrieval_dependency_failures_total.labels(code).inc()
 
     def observe_first_token(
         self,

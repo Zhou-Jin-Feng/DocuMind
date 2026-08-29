@@ -100,6 +100,20 @@ Web 主入口会显式启动 Metrics HTTP 服务。默认地址为 `http://127.0
 
 允许的标签只有：`provider`、`operation`、`status`、`error_type`。引用指标只使用 `provider`。禁止使用 `request_id`、`trace_id`、问题、文件名、文档 ID、引用集合或 API Key 作为指标标签。
 
+纯检索另外使用固定 `retrieval_mode`、HTTP 状态和公开 `error_code` 标签；这些值
+均来自封闭枚举，不使用请求 ID、文档/索引 ID、查询或正文。主要序列为
+`rag_pure_retrieval_requests_total`、`rag_pure_retrieval_duration_seconds`、
+`rag_pure_retrieval_result_count`、`rag_pure_retrieval_empty_total`、
+`rag_pure_retrieval_5xx_total`、`rag_pure_retrieval_stale_total` 和
+`rag_pure_retrieval_dependency_failures_total`。P50/P95 使用 Prometheus
+`histogram_quantile` 从 duration bucket 计算，不在进程内维护滑动分位数。
+
+`/api/v1/retrieve` 接受 W3C `traceparent` / `tracestate`。只提取这两个头，不
+接收 Baggage；`retrieval.request` Server Span 继承上游 Trace，内部
+`rag.retrieve`、`embedding.query` 和 `vector.search` 保持子级关系。日志仅记录
+固定路由、状态、错误码、耗时、命中数、检索模式以及文档/索引哈希的前 12 位，
+不记录查询、Chunk 正文或完整身份。
+
 ### 3.3 本地检查
 
 启动应用后执行：

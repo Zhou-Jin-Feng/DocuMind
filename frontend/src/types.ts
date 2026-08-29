@@ -10,6 +10,7 @@ export interface HealthResponse {
     embedding: ComponentState;
     llm: ComponentState;
     registry: ComponentState;
+    retrieval: ComponentState;
   };
   error_type?: string | null;
 }

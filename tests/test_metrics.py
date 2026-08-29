@@ -46,6 +46,25 @@ class MetricsTests(unittest.TestCase):
         metrics.record_component_error("vector.search", "RuntimeError")
         metrics.observe_embedding("OpenAI", "embedding.query", "success", 0.1)
         metrics.observe_retrieval("OpenAI", "success", 0.2, result_count=3)
+        metrics.record_pure_retrieval(
+            "dense",
+            200,
+            "none",
+            0.3,
+            result_count=0,
+        )
+        metrics.record_pure_retrieval(
+            "dense",
+            409,
+            "stale_document_index",
+            0.1,
+        )
+        metrics.record_pure_retrieval(
+            "dense",
+            503,
+            "retrieval_timeout",
+            5.0,
+        )
         metrics.observe_first_token("OpenAI", "success", 0.15)
         metrics.observe_llm_total("OpenAI", "success", 0.4)
         metrics.observe_citations(
@@ -79,6 +98,27 @@ class MetricsTests(unittest.TestCase):
         )
         self.assertIn(
             'rag_answer_citation_count_count{provider="openai"} 1.0',
+            output,
+        )
+        self.assertIn(
+            'rag_pure_retrieval_requests_total{error_code="none",http_status="200",retrieval_mode="dense"} 1.0',
+            output,
+        )
+        self.assertIn(
+            'rag_pure_retrieval_empty_total{retrieval_mode="dense"} 1.0',
+            output,
+        )
+        self.assertIn("rag_pure_retrieval_stale_total 1.0", output)
+        self.assertIn(
+            'rag_pure_retrieval_5xx_total{error_code="retrieval_timeout"} 1.0',
+            output,
+        )
+        self.assertIn(
+            'rag_pure_retrieval_dependency_failures_total{error_code="retrieval_timeout"} 1.0',
+            output,
+        )
+        self.assertIn(
+            'rag_pure_retrieval_duration_seconds_bucket{http_status="200",le="0.5",retrieval_mode="dense"} 1.0',
             output,
         )
 

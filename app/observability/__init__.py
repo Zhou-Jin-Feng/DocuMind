@@ -14,6 +14,7 @@ from app.observability.logging import get_logger, setup_logger
 from app.observability.tracing import (
     configure_tracing,
     get_tracing,
+    inbound_trace_context,
     mark_span_error,
     shutdown_tracing,
     trace_span,
@@ -26,6 +27,7 @@ __all__ = [
     "get_request_id",
     "get_trace_id",
     "get_tracing",
+    "inbound_trace_context",
     "mark_span_error",
     "request_context",
     "shutdown_tracing",

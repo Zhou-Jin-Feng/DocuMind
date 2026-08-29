@@ -34,6 +34,7 @@ class RAGApplication:
         self.settings = application_settings
         self.initialized = False
         self.startup_error_type: str | None = None
+        self.llm_startup_error_type: str | None = None
         self._lock = RLock()
         self.embedding_client: Any | None = None
         self.vector_store: Any | None = None
@@ -82,10 +83,6 @@ class RAGApplication:
                     self.vector_store,
                     self.embedding_client,
                 )
-                self.llm_client = UniversalLLMClient(
-                    provider=self.settings.default_llm_provider
-                )
-                self.rag_generator = RAGGenerator(self.llm_client)
                 self.doc_loader = UniversalDocumentLoader()
                 self.chunker = DocumentChunker(
                     chunk_size=self.settings.chunk_size,
@@ -122,18 +119,36 @@ class RAGApplication:
                         self.settings.retrieval_retry_backoff_seconds
                     ),
                 )
-                self.rag_service = RAGService(
-                    retriever=self.retriever,
-                    rag_generator=self.rag_generator,
-                    settings=self.settings,
-                    lifecycle_service=self.lifecycle_service,
-                )
                 self.document_service = DocumentService(
                     lifecycle_service=self.lifecycle_service,
                     registry=self.registry,
                     tenant_id=self.settings.default_tenant_id,
                     collection_id=self.settings.collection_name,
                 )
+                try:
+                    self.llm_client = UniversalLLMClient(
+                        provider=self.settings.default_llm_provider
+                    )
+                    self.rag_generator = RAGGenerator(self.llm_client)
+                    self.rag_service = RAGService(
+                        retriever=self.retriever,
+                        rag_generator=self.rag_generator,
+                        settings=self.settings,
+                        lifecycle_service=self.lifecycle_service,
+                    )
+                    self.llm_startup_error_type = None
+                except Exception as exc:
+                    self.llm_client = None
+                    self.rag_generator = None
+                    self.rag_service = None
+                    self.llm_startup_error_type = type(exc).__name__
+                    logger.warning(
+                        "LLM 服务初始化失败，纯检索与文档能力保持可用",
+                        event="llm_startup_degraded",
+                        operation="application.initialize",
+                        status="degraded",
+                        error_type=type(exc).__name__,
+                    )
                 self.startup_error_type = None
                 self.initialized = True
                 logger.info("RAG 应用服务初始化完成")
@@ -180,6 +195,7 @@ class RAGApplication:
             self.chunker = None
             self.registry = None
             self.retrieval_service = None
+            self.llm_startup_error_type = None
 
     def close(self) -> None:
         """关闭共享资源，并把应用恢复为可重新初始化的状态。"""
@@ -232,6 +248,7 @@ class RAGApplication:
             "embedding": "unavailable",
             "llm": "ready" if self._check_llm_configuration() else "unavailable",
             "registry": "ready" if self.registry else "unavailable",
+            "retrieval": "unavailable",
         }
         failures: list[str] = []
         if self.initialized and self.vector_store is not None:
@@ -264,6 +281,14 @@ class RAGApplication:
                     component="embedding",
                     error_type=type(exc).__name__,
                 )
+        if (
+            self.initialized
+            and self.retrieval_service is not None
+            and components["milvus"] == "ready"
+            and components["embedding"] == "ready"
+            and components["registry"] == "ready"
+        ):
+            components["retrieval"] = "ready"
         for name, value in components.items():
             if (
                 value == "unavailable"

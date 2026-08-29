@@ -21,8 +21,19 @@ from web_app import RAGWebApp
 from app.observability.logging import get_logger, reset_logger, setup_logger
 from app.observability.tracing import (
     configure_tracing,
+    inbound_trace_context,
     shutdown_tracing,
     trace_span,
+)
+from app.services.retrieval_service import RetrievalService
+from tests.test_retrieval_service import (
+    CapturingRetriever,
+    FakeRegistry,
+    DOCUMENT_KEY,
+    INDEX_ID,
+    document,
+    index,
+    result,
 )
 
 
@@ -148,6 +159,41 @@ class TracingTests(unittest.TestCase):
             spans["rag.query"].context.trace_id,
             spans["embedding.query"].context.trace_id,
         )
+
+    def test_inbound_traceparent_is_parent_of_pure_retrieval_span(self):
+        exporter = InMemorySpanExporter()
+        configure_tracing(True, span_exporter=exporter)
+        trace_id = "11111111111111111111111111111111"
+        parent_span_id = "2222222222222222"
+        service = RetrievalService(
+            retriever=CapturingRetriever([result()]),
+            registry=FakeRegistry(document=document(), index=index()),
+            tenant_id="default",
+            collection_id="rag_documents",
+            max_attempts=1,
+        )
+
+        with inbound_trace_context(
+            {"traceparent": f"00-{trace_id}-{parent_span_id}-01"}
+        ):
+            service.retrieve(
+                "PRIVATE_QUERY_MUST_NOT_ENTER_TRACE",
+                document_key=DOCUMENT_KEY,
+                expected_index_id=INDEX_ID,
+                top_k=3,
+                retrieval_mode="dense",
+            )
+
+        span = exporter.get_finished_spans()[0]
+        self.assertEqual(span.name, "retrieval.request")
+        self.assertEqual(span.context.trace_id, int(trace_id, 16))
+        self.assertEqual(span.parent.span_id, int(parent_span_id, 16))
+        self.assertEqual(span.attributes["http.route"], "/api/v1/retrieve")
+        self.assertEqual(span.attributes["retrieval.result_count"], 1)
+        serialized = repr(dict(span.attributes))
+        self.assertNotIn("PRIVATE_QUERY", serialized)
+        self.assertNotIn(DOCUMENT_KEY, serialized)
+        self.assertNotIn(INDEX_ID, serialized)
 
     def test_log_trace_id_matches_exported_span(self):
         exporter = InMemorySpanExporter()

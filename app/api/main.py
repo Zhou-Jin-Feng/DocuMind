@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from contextlib import asynccontextmanager
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
@@ -25,18 +26,54 @@ from app.api.schemas import RETRIEVE_MAX_REQUEST_SIZE_BYTES
 from app.application import RAGApplication
 from app.config import settings
 from app.observability.context import request_context
-from app.observability.logging import setup_logger
+from app.observability.logging import get_logger, setup_logger
 from app.observability.metrics import (
     configure_metrics,
+    get_metrics,
     start_metrics_server,
     stop_metrics_server,
 )
 from app.observability.tracing import (
     configure_tracing,
+    inbound_trace_context,
     shutdown_tracing,
 )
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]{8,64}$")
+logger = get_logger(__name__)
+
+
+def _record_retrieval_observation(
+    request: Request,
+    *,
+    http_status: int,
+    started: float,
+) -> None:
+    duration = perf_counter() - started
+    mode = str(getattr(request.state, "retrieval_mode", "unknown"))
+    error_code = str(getattr(request.state, "retrieval_error_code", "none"))
+    result_count = getattr(request.state, "retrieval_result_count", None)
+    get_metrics().record_pure_retrieval(
+        mode,
+        http_status,
+        error_code,
+        duration,
+        result_count=result_count,
+    )
+    logger.info(
+        "纯检索 HTTP 请求完成",
+        event="pure_retrieval_request_completed",
+        operation="retrieval.request",
+        route="/api/v1/retrieve",
+        http_status=http_status,
+        duration_ms=duration * 1000,
+        status="success" if http_status < 400 else "error",
+        error_code=error_code,
+        retrieval_mode=mode,
+        result_count=result_count,
+        document_ref=getattr(request.state, "retrieval_document_ref", None),
+        index_ref=getattr(request.state, "retrieval_index_ref", None),
+    )
 
 
 def create_app(
@@ -96,7 +133,12 @@ def create_app(
         allow_origins=rag_application.settings.api_cors_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Request-ID"],
+        allow_headers=[
+            "Content-Type",
+            "X-Request-ID",
+            "traceparent",
+            "tracestate",
+        ],
         expose_headers=["X-Request-ID"],
     )
 
@@ -107,34 +149,53 @@ def create_app(
             supplied if _REQUEST_ID_PATTERN.fullmatch(supplied) else uuid4().hex
         )
         request.state.request_id = request_id
-        if request.method == "POST" and request.url.path == "/api/v1/retrieve":
-            raw_content_length = request.headers.get("Content-Length", "").strip()
-            try:
-                content_length = int(raw_content_length)
-            except ValueError:
-                content_length = 0
-            request_too_large = content_length > RETRIEVE_MAX_REQUEST_SIZE_BYTES
-            if not request_too_large:
-                request_too_large = (
-                    len(await request.body()) > RETRIEVE_MAX_REQUEST_SIZE_BYTES
-                )
-            if request_too_large:
-                response = JSONResponse(
-                    status_code=413,
-                    content={
-                        "error": {
-                            "code": "request_too_large",
-                            "message": "检索请求体超过允许大小。",
-                            "request_id": request_id,
-                        }
-                    },
-                )
-                response.headers["X-Request-ID"] = request_id
-                return response
-        with request_context(request_id=request_id):
+        is_retrieval = (
+            request.method == "POST" and request.url.path == "/api/v1/retrieve"
+        )
+        retrieval_started = perf_counter()
+        with (
+            inbound_trace_context(request.headers),
+            request_context(request_id=request_id),
+        ):
+            if is_retrieval:
+                raw_content_length = request.headers.get("Content-Length", "").strip()
+                try:
+                    content_length = int(raw_content_length)
+                except ValueError:
+                    content_length = 0
+                request_too_large = content_length > RETRIEVE_MAX_REQUEST_SIZE_BYTES
+                if not request_too_large:
+                    request_too_large = (
+                        len(await request.body()) > RETRIEVE_MAX_REQUEST_SIZE_BYTES
+                    )
+                if request_too_large:
+                    request.state.retrieval_error_code = "request_too_large"
+                    response = JSONResponse(
+                        status_code=413,
+                        content={
+                            "error": {
+                                "code": "request_too_large",
+                                "message": "检索请求体超过允许大小。",
+                                "request_id": request_id,
+                            }
+                        },
+                    )
+                    _record_retrieval_observation(
+                        request,
+                        http_status=413,
+                        started=retrieval_started,
+                    )
+                    response.headers["X-Request-ID"] = request_id
+                    return response
             response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
+            if is_retrieval:
+                _record_retrieval_observation(
+                    request,
+                    http_status=response.status_code,
+                    started=retrieval_started,
+                )
+            response.headers["X-Request-ID"] = request_id
+            return response
 
     api.add_exception_handler(APIError, api_error_handler)
     api.add_exception_handler(RequestValidationError, validation_error_handler)

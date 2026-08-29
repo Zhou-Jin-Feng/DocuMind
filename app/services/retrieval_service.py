@@ -11,7 +11,10 @@ from pathlib import PurePosixPath, PureWindowsPath
 from threading import BoundedSemaphore
 from typing import Any, Callable
 
+from opentelemetry.trace import SpanKind
+
 from app.lifecycle.models import LifecycleStatus
+from app.observability.tracing import trace_span
 
 
 class DocumentNotFoundError(LookupError):
@@ -211,13 +214,28 @@ class RetrievalService:
         if not acquired:
             raise RetrievalBusyError("retrieval concurrency limit reached")
         try:
-            return self._retrieve_with_retries(
-                normalized_query,
-                document_key=document_key,
-                expected_index_id=expected_index_id,
-                top_k=top_k,
-                distance_threshold=distance_threshold,
-            )
+            with trace_span(
+                "retrieval.request",
+                kind=SpanKind.SERVER,
+                attributes={
+                    "http.route": "/api/v1/retrieve",
+                    "retrieval.mode": retrieval_mode,
+                    "retrieval.top_k": top_k,
+                    "retrieval.document_ref": document_key[:12],
+                    "retrieval.index_ref": expected_index_id[:12],
+                },
+            ) as span:
+                batch = self._retrieve_with_retries(
+                    normalized_query,
+                    document_key=document_key,
+                    expected_index_id=expected_index_id,
+                    top_k=top_k,
+                    distance_threshold=distance_threshold,
+                )
+                if span.is_recording():
+                    span.set_attribute("http.response.status_code", 200)
+                    span.set_attribute("retrieval.result_count", len(batch.chunks))
+                return batch
         finally:
             self._slots.release()
 

@@ -13,6 +13,11 @@ from app.observability.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _remember_retrieval_error(request: Request, code: str) -> None:
+    if request.url.path == "/api/v1/retrieve":
+        request.state.retrieval_error_code = code
+
+
 class APIError(Exception):
     def __init__(self, status_code: int, code: str, message: str) -> None:
         super().__init__(code)
@@ -39,6 +44,7 @@ def _payload(
 
 
 async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
+    _remember_retrieval_error(request, exc.code)
     return JSONResponse(
         status_code=exc.status_code,
         content=_payload(request, code=exc.code, message=exc.message),
@@ -49,6 +55,7 @@ async def validation_error_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    _remember_retrieval_error(request, "validation_error")
     fields = [
         {
             "field": ".".join(str(item) for item in error.get("loc", ())[1:]),
@@ -71,6 +78,7 @@ async def validation_error_handler(
 async def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
     code = "not_found" if exc.status_code == 404 else "http_error"
     message = str(exc.detail) if isinstance(exc.detail, str) else "请求无法处理。"
+    _remember_retrieval_error(request, code)
     return JSONResponse(
         status_code=exc.status_code,
         content=_payload(request, code=code, message=message),
@@ -79,6 +87,7 @@ async def http_error_handler(request: Request, exc: HTTPException) -> JSONRespon
 
 
 async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    _remember_retrieval_error(request, "internal_error")
     logger.exception(
         "未处理的 API 异常",
         event="api_request_failed",

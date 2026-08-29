@@ -200,6 +200,7 @@ class ComponentHealth(BaseModel):
     embedding: str
     llm: str
     registry: str
+    retrieval: str
 
 
 class HealthResponse(BaseModel):

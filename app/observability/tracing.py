@@ -10,6 +10,8 @@ from contextlib import contextmanager
 from threading import RLock
 from typing import Iterator, Mapping
 
+from opentelemetry import context as otel_context
+from opentelemetry import propagate
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -201,6 +203,22 @@ def trace_span(
 
     with get_tracing().span(name, attributes=attributes, kind=kind) as span:
         yield span
+
+
+@contextmanager
+def inbound_trace_context(headers: Mapping[str, str]) -> Iterator[None]:
+    """Attach only W3C Trace Context headers for the current request."""
+
+    carrier = {
+        str(name).lower(): str(value)
+        for name, value in headers.items()
+        if str(name).lower() in {"traceparent", "tracestate"}
+    }
+    token = otel_context.attach(propagate.extract(carrier))
+    try:
+        yield
+    finally:
+        otel_context.detach(token)
 
 
 def mark_span_error(span: Span | None, exc: BaseException) -> None:

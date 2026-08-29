@@ -25,6 +25,7 @@ class ApplicationTests(unittest.TestCase):
             client=Mock(),
         )
         application.registry = object()
+        application.retrieval_service = object()
         return application
 
     def test_readiness_probes_milvus_and_embedding(self):
@@ -108,6 +109,7 @@ class ApplicationTests(unittest.TestCase):
                 "embedding": "unavailable",
                 "llm": "unavailable",
                 "registry": "unavailable",
+                "retrieval": "unavailable",
             },
         )
         vector_store.close.assert_called_once_with()
@@ -161,6 +163,38 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(service.vector_search_timeout_seconds, 3.0)
         self.assertEqual(service.max_attempts, 3)
         self.assertEqual(service.retry_backoff_seconds, 0.2)
+
+    def test_llm_failure_keeps_pure_retrieval_ready(self):
+        application = RAGApplication(Settings(_env_file=None, metrics_enabled=False))
+        embedding_client = Mock(provider="ollama", config={"model": "test"})
+        embedding_client.health_check.return_value = True
+        vector_store = Mock()
+        vector_store.client.list_collections.return_value = []
+
+        with (
+            patch(
+                "app.application.UniversalEmbeddingClient",
+                return_value=embedding_client,
+            ),
+            patch("app.application.VectorStore", return_value=vector_store),
+            patch(
+                "app.application.UniversalLLMClient",
+                side_effect=RuntimeError("LLM unavailable"),
+            ),
+            patch("app.application.DocumentRegistry", return_value=Mock()),
+        ):
+            application.initialize()
+
+        self.assertTrue(application.initialized)
+        self.assertIsNone(application.startup_error_type)
+        self.assertEqual(application.llm_startup_error_type, "RuntimeError")
+        self.assertIsNotNone(application.retrieval_service)
+        self.assertIsNotNone(application.document_service)
+        self.assertIsNone(application.rag_service)
+        readiness = application.readiness()
+        self.assertFalse(readiness["ready"])
+        self.assertEqual(readiness["components"]["retrieval"], "ready")
+        self.assertEqual(readiness["components"]["llm"], "unavailable")
 
 
 if __name__ == "__main__":

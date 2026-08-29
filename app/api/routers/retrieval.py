@@ -1,6 +1,6 @@
 """Versioned single-document pure retrieval endpoint."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app import __version__
 from app.api.dependencies import get_retrieval_service
@@ -38,8 +38,12 @@ router = APIRouter(tags=["retrieval"])
 )
 def retrieve_document(
     payload: RetrieveRequest,
+    request: Request,
     service: RetrievalService = Depends(get_retrieval_service),
 ) -> RetrieveResponse:
+    request.state.retrieval_mode = payload.retrieval_mode
+    request.state.retrieval_document_ref = payload.document_key[:12]
+    request.state.retrieval_index_ref = payload.expected_index_id[:12]
     try:
         batch = service.retrieve(
             payload.query,
@@ -89,6 +93,7 @@ def retrieve_document(
             "retrieval_service_unavailable",
             "检索服务暂时不可用，请稍后重试。",
         ) from exc
+    request.state.retrieval_result_count = len(batch.chunks)
     return RetrieveResponse(
         schema_version=RETRIEVE_SCHEMA_VERSION,
         service_version=__version__,

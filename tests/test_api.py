@@ -2,6 +2,7 @@ import io
 import json
 import unittest
 from fastapi.testclient import TestClient
+from unittest.mock import Mock, patch
 
 from app.api.main import create_app
 from app.config import Settings
@@ -178,6 +179,7 @@ class FakeApplication:
                 "embedding": "ready",
                 "llm": "ready",
                 "registry": "ready",
+                "retrieval": "ready",
             },
             "error_type": None,
         }
@@ -217,6 +219,7 @@ class APITests(unittest.TestCase):
                 "embedding": "ready",
                 "llm": "ready",
                 "registry": "ready",
+                "retrieval": "unavailable",
             },
             "error_type": "dependency_unavailable",
         }
@@ -296,6 +299,52 @@ class APITests(unittest.TestCase):
             self.application.retrieval_service.calls[-1][1]["expected_index_id"],
             "b" * 64,
         )
+
+    def test_retrieve_records_safe_http_observation(self):
+        metrics = Mock()
+        with (
+            patch("app.api.main.get_metrics", return_value=metrics),
+            patch("app.api.main.logger") as logger,
+        ):
+            response = self.client.post(
+                "/api/v1/retrieve",
+                json=self._retrieve_request(),
+                headers={
+                    "X-Request-ID": "observation-request-1234",
+                    "traceparent": (
+                        "00-11111111111111111111111111111111-" "2222222222222222-01"
+                    ),
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        metrics.record_pure_retrieval.assert_called_once()
+        args = metrics.record_pure_retrieval.call_args.args
+        self.assertEqual(args[:3], ("dense", 200, "none"))
+        self.assertEqual(
+            metrics.record_pure_retrieval.call_args.kwargs["result_count"],
+            1,
+        )
+        fields = logger.info.call_args.kwargs
+        self.assertEqual(fields["route"], "/api/v1/retrieve")
+        self.assertEqual(fields["document_ref"], "a" * 12)
+        self.assertEqual(fields["index_ref"], "b" * 12)
+        serialized = repr(logger.info.call_args)
+        self.assertNotIn("supporting evidence", serialized)
+        self.assertNotIn("a" * 64, serialized)
+        self.assertNotIn("Full source evidence", serialized)
+
+    def test_retrieve_observes_validation_error_machine_code(self):
+        metrics = Mock()
+        with patch("app.api.main.get_metrics", return_value=metrics):
+            response = self.client.post(
+                "/api/v1/retrieve",
+                json={**self._retrieve_request(), "top_k": 21},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        args = metrics.record_pure_retrieval.call_args.args
+        self.assertEqual(args[:3], ("unknown", 422, "validation_error"))
 
     def test_retrieve_contract_is_published_in_openapi(self):
         openapi = self.client.get("/openapi.json").json()
