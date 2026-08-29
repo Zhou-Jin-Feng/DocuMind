@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DocuMind Retrieve API Contract",
+  "schema_version": "1.0",
+  "request": {
+    "additionalProperties": false,
+    "description": "Versioned single-document dense retrieval request.",
+    "examples": [
+      {
+        "distance_threshold": null,
+        "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_index_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query": "What evidence supports the claim?",
+        "retrieval_mode": "dense",
+        "schema_version": "1.0",
+        "top_k": 3
+      }
+    ],
+    "properties": {
+      "schema_version": {
+        "const": "1.0",
+        "title": "Schema Version",
+        "type": "string"
+      },
+      "query": {
+        "maxLength": 4000,
+        "minLength": 1,
+        "title": "Query",
+        "type": "string"
+      },
+      "document_key": {
+        "pattern": "^[a-f0-9]{64}$",
+        "title": "Document Key",
+        "type": "string"
+      },
+      "expected_index_id": {
+        "pattern": "^[a-f0-9]{64}$",
+        "title": "Expected Index Id",
+        "type": "string"
+      },
+      "top_k": {
+        "maximum": 20,
+        "minimum": 1,
+        "title": "Top K",
+        "type": "integer"
+      },
+      "retrieval_mode": {
+        "const": "dense",
+        "title": "Retrieval Mode",
+        "type": "string"
+      },
+      "distance_threshold": {
+        "anyOf": [
+          {
+            "minimum": 0,
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Distance Threshold"
+      }
+    },
+    "required": [
+      "schema_version",
+      "query",
+      "document_key",
+      "expected_index_id",
+      "top_k",
+      "retrieval_mode"
+    ],
+    "title": "RetrieveRequest",
+    "type": "object"
+  },
+  "response": {
+    "$defs": {
+      "RetrievalChunkResponse": {
+        "additionalProperties": false,
+        "description": "Whitelisted evidence fields for one retrieved source chunk.",
+        "properties": {
+          "chunk_id": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "content": {
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "content_sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "source": {
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page Number"
+          },
+          "distance": {
+            "minimum": 0,
+            "title": "Distance",
+            "type": "number"
+          },
+          "rank": {
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "content",
+          "content_sha256",
+          "source",
+          "distance",
+          "rank"
+        ],
+        "title": "RetrievalChunkResponse",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "Versioned retrieval result with immutable document and index identity.",
+    "examples": [
+      {
+        "chunks": [
+          {
+            "chunk_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "content": "A retrieved evidence chunk.",
+            "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "distance": 0.42,
+            "page_number": 3,
+            "rank": 1,
+            "source": "paper.pdf"
+          }
+        ],
+        "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "index_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "retrieval_mode": "dense",
+        "retrieval_version": "dense-v1",
+        "schema_version": "1.0",
+        "service_version": "2.1.0",
+        "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ],
+    "properties": {
+      "schema_version": {
+        "const": "1.0",
+        "title": "Schema Version",
+        "type": "string"
+      },
+      "service_version": {
+        "minLength": 1,
+        "title": "Service Version",
+        "type": "string"
+      },
+      "retrieval_version": {
+        "const": "dense-v1",
+        "title": "Retrieval Version",
+        "type": "string"
+      },
+      "retrieval_mode": {
+        "const": "dense",
+        "title": "Retrieval Mode",
+        "type": "string"
+      },
+      "document_key": {
+        "pattern": "^[a-f0-9]{64}$",
+        "title": "Document Key",
+        "type": "string"
+      },
+      "index_id": {
+        "pattern": "^[a-f0-9]{64}$",
+        "title": "Index Id",
+        "type": "string"
+      },
+      "source_sha256": {
+        "pattern": "^[a-f0-9]{64}$",
+        "title": "Source Sha256",
+        "type": "string"
+      },
+      "chunks": {
+        "items": {
+          "$ref": "#/$defs/RetrievalChunkResponse"
+        },
+        "maxItems": 20,
+        "title": "Chunks",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "service_version",
+      "retrieval_version",
+      "retrieval_mode",
+      "document_key",
+      "index_id",
+      "source_sha256",
+      "chunks"
+    ],
+    "title": "RetrieveResponse",
+    "type": "object"
+  },
+  "error": {
+    "$defs": {
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Request Id"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fields"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "error": {
+        "$ref": "#/$defs/ErrorBody"
+      }
+    },
+    "required": [
+      "error"
+    ],
+    "title": "ErrorResponse",
+    "type": "object"
+  }
+}
