@@ -1,4 +1,4 @@
-# DocuMind - RAG 系统架构（v2.0.8）
+# DocuMind - RAG 系统架构（v2.1.0）
 
 ## 1. 分层结构
 
@@ -42,7 +42,7 @@ flowchart TD
 
 `app/core` 保持业务能力，`app/observability` 提供横切能力。业务层只调用稳定封装，不直接依赖 Prometheus 注册表、OpenTelemetry 全局 Provider 或日志文件实现。
 
-v2.0 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。
+v2.1 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。`RetrievalService` 独立于 Generator，供受信任的上游按单文档和 active index 获取原始证据。
 
 ## 2. 文档索引流程
 
@@ -120,6 +120,7 @@ React 工作台
 → GET /api/v1/documents/{document_key}
 → POST /api/v1/documents/{document_key}/reindex
 → DELETE /api/v1/documents/{document_key}
+→ POST /api/v1/retrieve（单文档原始 Chunk JSON）
 → POST /api/v1/chat/stream
 → status → sources → token* → done/error
 ```
@@ -127,6 +128,23 @@ React 工作台
 每个响应带 `X-Request-ID`；SSE 事件的数据是公开 API schema，不包含 Prompt、凭据或内部堆栈。API 默认仅允许 `.env` 中列出的本地 CORS 来源。
 
 `/health/live` 只确认 API 进程存活；`/health/ready` 执行有超时上限的 Milvus RPC 和 Ollama Embedding 探测，检查 SQLite 注册表已初始化，并验证 LLM 客户端配置。LLM readiness 不发送真实生成请求，避免健康检查消耗外部 API 配额。依赖未就绪时返回 HTTP 503 和分组件状态，React 以轮询方式自动恢复。
+
+纯检索流程：
+
+```text
+POST /api/v1/retrieve
+→ 校验 Schema 1.0、16 KiB 请求体和 Dense 参数
+→ Registry 解析当前作用域的 document 与 active index
+→ 核对 expected_index_id
+→ tenant/collection/document/index 四字段下推 Milvus
+→ 严格后置谓词与 active index 二次核对
+→ 白名单映射完整 Chunk、来源、页码、L2 distance 与 SHA-256
+→ 同步 JSON 响应，不调用 LLM、Generator 或引用生成器
+```
+
+当前接口一次只允许一个文档。无命中返回 `200` 空列表；stale index、生命周期
+过渡和依赖故障使用不同机器码。任意 Milvus metadata、绝对路径和内部异常均不
+进入公共响应。
 
 文件上传通过 XHR 暴露真实传输百分比；请求体传输完成后，前端进入“解析、切分与向量化”的不确定时长阶段。对话历史只保存在浏览器 `localStorage`，最多保留有限数量的本地会话，不进入后端 RAG 上下文。移动端引用来源使用底部抽屉，关闭后不改变当前回答和来源数据。
 
@@ -237,10 +255,11 @@ Web 和 Metrics 默认监听 `127.0.0.1`。当前系统没有认证，不应直�
 - Web 层记录脱敏后的完整本地异常，只向用户返回通用错误；
 - 流式生成异常不会重复追加用户消息；
 - 子 Span 自动标记错误；被 Web 层捕获的异常会显式标记根 Span。
+- 纯检索把空结果视为正常 200，把 stale/状态冲突映射为 409，把依赖或证据完整性故障映射为脱敏 503。
 
 ## 9. 当前边界
 
-v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加答案质量严格契约；v2.0.4 增加真实 Generator/Judge 装配、逐案例 Runner 和原子 JSON/Markdown 报告；v2.0.5 冻结 28 条答案质量 holdout、35 条阈值正负样本与 11 份专用语料；v2.0.6 使用固定 Ollama/DeepSeek 配置生成并人工复核旧 Prompt 对照；v2.0.7 只使用 validation 扫描 Dense L2 阈值，因正负 distance 明显重叠而冻结“不启用”决策；v2.0.8 加固不可信上下文 Prompt、统一 `[文档N]` 引用并增加流结束后的低基数观测，固定真实 Provider 对照显示 0.7 温度优于预选 0.1 候选。评估层仍只依赖生产 Provider、`RAGGenerator` 和检索组件，生产 `app` 不反向依赖 `evaluation`。正式报告和复核记录证明加固后 3 条 Injection 均未执行恶意指令，且固定数据集的引用正确性/完整性为 `1.0000`；这些结果不能外推为所有模型或用户语料的质量承诺。
+v1.7 在 v1.6.1 检索校准层上增加严格 Rewrite artifact、多查询 RRF、Cross-Encoder Reranker 和独立分数报告。v1.7.1 的四模式同配置对照显示三种增强模式质量相同，Rewrite 的尾延迟最低，组合模式没有额外质量收益。v1.8 将向量后端统一为 Milvus。v1.9/v1.9.1 增加 FastAPI/React 适配层、真实依赖探活、完整文档管理和浏览器回归。v2.0 在此基础上补齐统一 Compose、前后端镜像入口、基础 CI、演示脚本和发布文档。v2.0.1 规范化评测文本指纹并冻结当前确定性 Dense 基线；v2.0.2 在 Python CI Job 中实时生成报告、执行指标回归并上传 Artifact；v2.0.3 增加答案质量严格契约；v2.0.4 增加真实 Generator/Judge 装配、逐案例 Runner 和原子 JSON/Markdown 报告；v2.0.5 冻结 28 条答案质量 holdout、35 条阈值正负样本与 11 份专用语料；v2.0.6 使用固定 Ollama/DeepSeek 配置生成并人工复核旧 Prompt 对照；v2.0.7 只使用 validation 扫描 Dense L2 阈值，因正负 distance 明显重叠而冻结“不启用”决策；v2.0.8 加固不可信上下文 Prompt、统一 `[文档N]` 引用并增加流结束后的低基数观测；v2.1.0 新增单文档纯检索 API、证据哈希、active index 隔离和稳定错误语义。评估层仍只依赖生产 Provider、`RAGGenerator` 和检索组件，生产 `app` 不反向依赖 `evaluation`。固定真实 Provider 评测结果不能外推为所有模型或用户语料的质量承诺。
 
 ```text
 evaluation.runner / production_runner

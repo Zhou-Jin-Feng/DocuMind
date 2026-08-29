@@ -1,4 +1,4 @@
-# 项目结构（v2.0.8）
+# 项目结构（v2.1.0）
 
 ```text
 DocuMind/
@@ -32,6 +32,7 @@ DocuMind/
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── rag_service.py
+│   │   ├── retrieval_service.py
 │   │   └── document_service.py
 │   ├── api/
 │   │   ├── __init__.py
@@ -45,6 +46,7 @@ DocuMind/
 │   │       ├── health.py
 │   │       ├── system.py
 │   │       ├── documents.py
+│   │       ├── retrieval.py
 │   │       └── chat.py
 │   └── utils/
 │       ├── __init__.py
@@ -75,6 +77,8 @@ DocuMind/
 │   ├── test_application.py
 │   ├── test_milvus_integration.py
 │   ├── test_services.py
+│   ├── test_retrieval_service.py
+│   ├── test_retrieve_contract.py
 │   ├── test_api.py
 │   └── *.txt
 ├── evaluation/
@@ -190,10 +194,11 @@ DocuMind/
 | `generator.py` | OpenAI 兼容/Anthropic 消息适配和流式生成 |
 | `web_app.py` | 上传校验、生命周期服务调用、问答编排、根 Span、Metrics 服务和 UI |
 | `app/services/rag_service.py` | 将检索和生成编排为 `status/sources/token/done/error` 结构化事件 |
+| `app/services/retrieval_service.py` | 单文档 active index 校验、Dense 作用域过滤和证据白名单映射 |
 | `app/services/document_service.py` | 文档摄取、列表、详情、重建和可恢复删除编排 |
 | `app/api/main.py` | FastAPI 应用工厂、生命周期初始化、CORS、Request ID 和异常处理 |
-| `app/api/schemas.py` | 健康、配置、文档详情/删除、上传和聊天请求/响应模型 |
-| `app/api/routers/*.py` | health、system、documents、chat HTTP 路由 |
+| `app/api/schemas.py` | 健康、配置、文档、纯检索和聊天请求/响应模型 |
+| `app/api/routers/*.py` | health、system、documents、retrieval、chat HTTP 路由 |
 | `app/api/sse.py` | 将结构化 ChatEvent 编码为 SSE 帧 |
 | `app/core/citations.py` | 生产与离线共用的精确 `[文档N]` 引用解析和非法标记分析 |
 | `frontend/src/App.tsx` | React 工作台状态、问答流、文档管理、上传阶段、来源抽屉和本地历史 |

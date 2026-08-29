@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 RETRIEVE_SCHEMA_VERSION = "1.0"
 RETRIEVAL_VERSION = "dense-v1"
+RETRIEVE_MAX_REQUEST_SIZE_BYTES = 16 * 1024
 _CONTENT_HASH_PATTERN = r"^[a-f0-9]{64}$"
 
 

@@ -408,6 +408,23 @@ class APITests(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "validation_error")
         self.assertNotIn("input", json.dumps(response.json(), ensure_ascii=False))
 
+    def test_retrieve_rejects_oversized_request_before_validation(self):
+        response = self.client.post(
+            "/api/v1/retrieve",
+            json={
+                **self._retrieve_request(),
+                "unexpected_padding": "x" * (17 * 1024),
+            },
+            headers={"X-Request-ID": "oversized-request-1234"},
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.json()["error"]["code"], "request_too_large")
+        self.assertEqual(
+            response.json()["error"]["request_id"],
+            "oversized-request-1234",
+        )
+
     @staticmethod
     def _retrieve_request():
         return {

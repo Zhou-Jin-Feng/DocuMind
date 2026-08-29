@@ -9,6 +9,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app import __version__
@@ -20,6 +21,7 @@ from app.api.errors import (
     validation_error_handler,
 )
 from app.api.routers import chat, documents, health, retrieval, system
+from app.api.schemas import RETRIEVE_MAX_REQUEST_SIZE_BYTES
 from app.application import RAGApplication
 from app.config import settings
 from app.observability.context import request_context
@@ -105,6 +107,30 @@ def create_app(
             supplied if _REQUEST_ID_PATTERN.fullmatch(supplied) else uuid4().hex
         )
         request.state.request_id = request_id
+        if request.method == "POST" and request.url.path == "/api/v1/retrieve":
+            raw_content_length = request.headers.get("Content-Length", "").strip()
+            try:
+                content_length = int(raw_content_length)
+            except ValueError:
+                content_length = 0
+            request_too_large = content_length > RETRIEVE_MAX_REQUEST_SIZE_BYTES
+            if not request_too_large:
+                request_too_large = (
+                    len(await request.body()) > RETRIEVE_MAX_REQUEST_SIZE_BYTES
+                )
+            if request_too_large:
+                response = JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": {
+                            "code": "request_too_large",
+                            "message": "检索请求体超过允许大小。",
+                            "request_id": request_id,
+                        }
+                    },
+                )
+                response.headers["X-Request-ID"] = request_id
+                return response
         with request_context(request_id=request_id):
             response = await call_next(request)
         response.headers["X-Request-ID"] = request_id

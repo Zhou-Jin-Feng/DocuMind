@@ -29,6 +29,7 @@ router = APIRouter(tags=["retrieval"])
     responses={
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
+        413: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         503: {"model": ErrorResponse},
     },

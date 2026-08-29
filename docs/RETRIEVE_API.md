@@ -2,9 +2,8 @@
 
 ## Status
 
-This document freezes Schema `1.0` for the DocuMind single-document Dense
-retrieval Provider. The endpoint is introduced incrementally by the M2 P0
-iteration and is not available until the implementation stage is complete.
+This document defines the released Schema `1.0` contract for the DocuMind
+v2.1.0 single-document Dense retrieval Provider.
 
 ## Endpoint
 
@@ -33,7 +32,8 @@ model and never treats `/chat/stream` output as source evidence.
 All fields except `distance_threshold` are required. Unknown fields are
 rejected. `query` is trimmed and limited to 4,000 characters. Document and index
 identities are lowercase 64-character SHA-256 values. `top_k` is between 1 and
-20. Schema `1.0` accepts only `dense` retrieval.
+20. The JSON request body is limited to 16 KiB. Schema `1.0` accepts only
+`dense` retrieval.
 
 `distance_threshold`, when present, is the maximum accepted Milvus L2 distance.
 L2 distance is lower-is-more-relevant and must not be interpreted as a
@@ -89,6 +89,7 @@ The P0 implementation reserves these status families:
 | 409 | `stale_document_index` | Expected index differs from the active index |
 | 409 | `document_index_unavailable` | Document has no retrievable active index |
 | 409 | `document_operation_in_progress` | Deletion or index transition prevents retrieval |
+| 413 | `request_too_large` | JSON request body exceeds 16 KiB |
 | 422 | `validation_error` | Request does not satisfy Schema `1.0` |
 | 503 | `retrieval_service_unavailable` | Embedding, Milvus, Registry or service is unavailable |
 
@@ -99,6 +100,17 @@ Removing fields, changing field meaning, widening retrieval scope, changing L2
 semantics, or accepting multiple documents requires a new major Schema version.
 A Consumer must reject unsupported Schema versions and must not fall back to
 `/chat/stream`.
+
+## Upgrade And Rollback
+
+Upgrading from v2.0.8 requires no data migration and does not alter existing
+document, lifecycle, health or chat contracts. Deploy the v2.1.0 application and
+confirm `/api/v1/health/ready` before enabling a Consumer.
+
+To roll back, stop v2.1.0 and start the previous v2.0.8 application against the
+same Registry and Milvus data. Disable `/retrieve` Consumers first because the
+older service does not provide that route. No new persistent Schema must be
+removed during rollback.
 
 The checked-in Provider/Consumer artifact is
 `docs/contracts/retrieve-v1.schema.json`.
