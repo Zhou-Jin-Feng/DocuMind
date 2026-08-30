@@ -23,6 +23,7 @@
 - 加固后的不可信上下文 Prompt、XML 边界、统一 `[文档N]` 引用解析，以及低基数线上引用观测。
 - DS-04 已确认的代表性检索数据：75 份多 Chunk 合成文档、400 题探索池、100 题正式 gold（94 approve / 6 modify）。
 - DS-05 已完成 validation/holdout 隔离和指纹冻结；DS-06 在 50/50 代表集上完成四模式对照，增强候选结论为 `NO_GO`，生产默认仍为 Dense。
+- ScholarTrace M2 已在 DocuMind `2.2.0 纯检索交付基线` 上完成 3 篇公开论文的真实 `upload/status/retrieve` 联调；Evidence provenance 校验通过，结论为 `PASS`。
 
 ## 文档导航
 
@@ -248,14 +249,14 @@ P2-01 已用 35 个冻结案例对 Dense、BM25、Hybrid 和 Hybrid + Reranker �
 
 P2 数据证据刷新已完成 DS-00～02：固定来源清单、可续传且逐文件校验的下载器、Parquet/TSV 结构验证器，以及 T2Ranking dev、BEIR NFCorpus、BEIR SciFact 共 12 个文件（169,682,657 bytes）的本地校验。MIRACL 中文全量未下载；按当前单 GPU 试跑外推，其 Embedding-only 约需 462.6 小时，同时不满足许可证、18/24 小时运行和 120 GiB 磁盘门禁，因此保持延期。原始数据位于 Git 忽略目录，公共检索行为没有变化。
 
-P2 DS-03～06 已完成确定性规范化、代表性数据集人工复核、split 隔离冻结和真实四模式评测。DS-06 的 `PASS WITH NOTES / NO_GO` 只表示增强候选没有达到上线门禁；Dense 基线和 ScholarTrace 所需的单文档证据检索不受影响。第二次冻结候选的完整范围和提交排除项见 [`docs/PROJECT_FREEZE_2.md`](docs/PROJECT_FREEZE_2.md)。
+P2 DS-03～06 已完成确定性规范化、代表性数据集人工复核、split 隔离冻结和真实四模式评测。DS-06 的 `PASS WITH NOTES / NO_GO` 只表示增强候选没有达到上线门禁；Dense 基线和 ScholarTrace 所需的单文档证据检索不受影响。第二次项目冻结已完成，完整范围和提交排除项见 [`docs/PROJECT_FREEZE_2.md`](docs/PROJECT_FREEZE_2.md)。
 
 ## 版本摘要
 
 | 版本 | 主要内容 | 状态 |
 |---|---|---|
 | v2.0 | FastAPI/React/Milvus 统一 Compose、基础 CI、演示与发布收口 | 已发布并推送 tag |
-| P2 evidence checkpoint | DS-03～DS-06 数据、隔离、四模式评测和 `NO_GO` 决策 | 待用户授权提交，作为第二次项目冻结候选 |
+| P2 evidence checkpoint | DS-03～DS-06 数据、隔离、四模式评测和 `NO_GO` 决策 | 第二次项目冻结已完成，本地提交，待独立 push/tag |
 
 完整历史和真实提交边界见[版本历史](docs/VERSION_HISTORY.md)。
 

@@ -645,7 +645,7 @@ DS-05 冻结 SHA-256 为
 本身不运行四模式指标，也不改变 `/api/v1/retrieve`、Schema `1.0`、`dense-v1` 或
 单文档范围；冻结结果随后作为 DS-06 的唯一输入。
 
-### P2-01 DS-06 四模式评测与第二次冻结候选
+### P2-01 DS-06 四模式评测与第二次项目冻结
 
 DS-06 在 75 份代表性文档、235 个生产 Chunk 和 50/50 validation/holdout 上完成
 真实 Dense、BM25、Hybrid 与 CPU `BAAI/bge-reranker-base` 对照。Reranker Top-5
@@ -665,11 +665,12 @@ DS-06 在 75 份代表性文档、235 个生产 Chunk 和 50/50 validation/holdo
 均未配置冻结的拒答策略，no-answer 空结果率为 0 不代表具备拒答能力。增强方案保留为
 离线/受控实验，不改变线上公共契约。
 
-第二次项目冻结候选是“个人项目级冻结”，不是公网生产认证：它固定 v2.2.0 Dense
+第二次项目冻结是“个人项目级冻结”，不是公网生产认证：它固定 v2.2.0 Dense
 基线、P2 数据证据、评测报告、测试和边界文档；不包含 raw 数据、模型缓存、Milvus
-数据、`agent/` 工作资料或临时产物。当前报告生成于最终提交前的工作树，提交时必须
-保持输入和报告字节不变，并在提交后复核哈希；按 holdout 一次性规则，不重复运行同一
-holdout。
+数据、`agent/` 工作资料或临时产物。ScholarTrace M2 已在 DocuMind `2.2.0 纯检索交付基线`
+上完成 3 篇公开论文的真实 `upload/status/retrieve` 在线验收，Evidence provenance
+校验通过，正式结论为 `PASS`。冻结提交保持输入和报告字节不变，并已完成提交后哈希
+复核；按 holdout 一次性规则，不重复运行同一 holdout。
 
 ## 回归门控
 
