@@ -95,8 +95,9 @@ baselines, this artifact references four real comparison reports generated from
 the same 35-case validation/holdout dataset, 11-document corpus and production
 chunk settings.
 
-The gate verifies exact evidence compatibility and source-report SHA-256 values
-before comparing Dense with BM25, Hybrid and Hybrid plus Reranker. On this
+The gate verifies exact evidence compatibility and source-report logical-text
+SHA-256 values (normalized for UTF-8 BOM and line endings) before comparing
+Dense with BM25, Hybrid and Hybrid plus Reranker. On this
 11-Chunk fixture, answerable Dense was already Top-1 in every holdout case, so
 BM25 and Hybrid produced no measurable gain that could pass the policy; this is
 evidence of no gain on the frozen fixture, not a general claim that lexical or
@@ -112,7 +113,7 @@ Therefore the public contract remains Schema `1.0` and `dense-v1`.
 
 Reviewed decision artifact fingerprints:
 
-- JSON decision: `75afc60d7389d7fea1952ae58ff145027e3f5021bd7cd381e8cbe8a5de529428`
+- JSON decision: `11707ff4bb6823b9f8284784eec125777f8f565fb7a695e44f467ff3095d467c`
 - Markdown decision: `1546879bea6fb7b4b2d379da217c1621ccba844d306569cb3796a97f2225888c`
 
 The decision runner returns `1` for a valid `NO_GO`; this is a product decision,

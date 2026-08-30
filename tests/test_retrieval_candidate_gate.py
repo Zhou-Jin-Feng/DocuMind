@@ -282,6 +282,24 @@ class RetrievalCandidateGateTests(unittest.TestCase):
         self.assertIn("P2 retrieval candidate gate", output.getvalue())
         self.assertIn("NO_GO", markdown_output.read_text(encoding="utf-8"))
 
+    def test_source_report_hash_is_stable_across_line_endings(self):
+        logical_paths = self._write_reports()
+        platform_paths = {}
+        for kind, source in logical_paths.items():
+            target = self.root / f"{kind}-crlf.json"
+            target.write_bytes(source.read_bytes().replace(b"\n", b"\r\n"))
+            platform_paths[kind] = target
+
+        logical_decision = build_retrieval_candidate_decision(logical_paths)
+        platform_decision = build_retrieval_candidate_decision(platform_paths)
+
+        self.assertEqual(logical_decision.decision, platform_decision.decision)
+        for kind in REPORT_KINDS:
+            self.assertEqual(
+                logical_decision.reports[kind].source_sha256,
+                platform_decision.reports[kind].source_sha256,
+            )
+
     def test_rejects_duplicate_fields(self):
         paths = self._write_reports()
         source = paths["dense"].read_text(encoding="utf-8")

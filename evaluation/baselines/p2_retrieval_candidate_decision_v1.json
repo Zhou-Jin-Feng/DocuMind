@@ -29,19 +29,19 @@
     "source_reports": {
       "dense": {
         "path": "evaluation/reports/p2_1_ollama_threshold_dense.json",
-        "sha256": "2f1343252996ef9ba80eaba82ca08a3c2ede9df31885e7fb107b9503a6d905af"
+        "sha256": "15a4423560ce40c498455b5f870229316c757f03a239c24bcd4553ca1eed07c8"
       },
       "bm25": {
         "path": "evaluation/reports/p2_1_bm25_threshold.json",
-        "sha256": "c2b50c2aa2053e298047dd31e21ec0cdc74a11c217896ad7ce21eedd8f0e7516"
+        "sha256": "e862a6f2da014fad0dd35e6b55c9474edb0fe6cdf623323102c9527d7c29a4c0"
       },
       "hybrid": {
         "path": "evaluation/reports/p2_1_ollama_threshold_hybrid.json",
-        "sha256": "c9eb8540d1913bfa59cd99171882e45dafd59104fdf6242ab1b58b54b9a1459b"
+        "sha256": "03e72d6fe4fa0a79e5a9f08679e35514b4ecb6be5841453188dbf1e62bf021cf"
       },
       "rerank": {
         "path": "evaluation/reports/p2_1_ollama_threshold_hybrid_rerank.json",
-        "sha256": "3f6856d437ad3ce3088c091bed9c7ed2f21ab860199fc139059bbdd33e042eb9"
+        "sha256": "8949feab06cbf221056ee02a3dd426801114e8f2a1c6442cb26e79b9ea7aaa7b"
       }
     }
   },

@@ -9,7 +9,7 @@ from math import floor, isclose, isfinite
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from evaluation.fingerprints import file_sha256
+from evaluation.fingerprints import text_file_sha256
 from evaluation.regression import EvaluationSnapshot
 
 REPORT_KINDS = ("dense", "bm25", "hybrid", "rerank")
@@ -567,7 +567,9 @@ def _load_report(kind: str, path: str | Path) -> LoadedCandidateReport:
         kind=kind,
         path=report_path,
         display_path=_safe_display_path(report_path),
-        source_sha256=file_sha256(report_path),
+        # Candidate reports are UTF-8 JSON artifacts; hash logical text so the
+        # evidence remains stable across Windows CRLF and Linux LF checkouts.
+        source_sha256=text_file_sha256(report_path),
         snapshot=snapshot,
         payload=payload,
         case_fingerprint=case_evidence[0],

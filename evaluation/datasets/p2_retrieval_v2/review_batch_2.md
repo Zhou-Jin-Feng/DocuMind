@@ -16,6 +16,7 @@ For each case, review the question, answerability, ambiguity and every proposed 
   - source `t01-ingestion-active.txt` / document `p2rep:document:c895c4af52ea8786f9f140fe326d25466d2dded5dbc5d1c2d35e1f8f6f245117` / chunk `22efd7ddb70c84148b8dd731981bfe6bd5610e404f934f837b3fb2722cab663a` / grade `3` / control `DM-UPLOAD-LIMIT-ACT` / quote: 单个上传文件的当前硬上限为 50 MiB；超限请求必须在解析前拒绝并返回稳定的客户端错误。
 - Human decision: `[ ] approve  [ ] modify  [ ] delete`
 - Reviewer note:
+
 ## 2. REP-T01-02
 
 - Proposed split: `validation`
@@ -656,3 +657,4 @@ For each case, review the question, answerability, ambiguity and every proposed 
   - source `t06-embedding-active.txt` / document `p2rep:document:3e1dc80bc59ffd25b7d3d7e4e5342225657cd6f5e023caea5238d465eafd4a24` / chunk `ce1baffebca4ffc998e7a6921831d77c424c51e96fc17eabd76d722988d214e8` / grade `3` / control `DM-EMBED-MODEL-ACT-PROC` / quote: 启动时读取模型身份；写索引和检索前分别核对 index metadata，发现不一致则拒绝。
 - Human decision: `[ ] approve  [ ] modify  [ ] delete`
 - Reviewer note:
+

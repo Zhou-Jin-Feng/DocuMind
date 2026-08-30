@@ -16,6 +16,7 @@ For each case, review the question, answerability, ambiguity and every proposed 
   - source `t13-lifecycle-active.txt` / document `p2rep:document:30766e28f0ecee066c3cde8ce587abbbce2f3508f567ecab56d0558fcdff5c37` / chunk `22c634b42c3bf2b44f44db69f12c776b31ade39b44251557400c036e3a2c2b0a` / grade `3` / control `DM-STALE-STATE-ACT` / quote: 文档存在但 active 内容版本与请求前提冲突时返回 409，不得退化为跨版本检索。
 - Human decision: `[ ] approve  [ ] modify  [ ] delete`
 - Reviewer note:
+
 ## 2. REP-T13-02
 
 - Proposed split: `holdout`
@@ -656,3 +657,4 @@ For each case, review the question, answerability, ambiguity and every proposed 
   - source `t18-health-active.txt` / document `p2rep:document:928b88290877782a20bc1054f0906102866025cb54087f823ee106993d25f6b9` / chunk `b879ffd0edaf04ca4e40ff47200201bd5f213f02e0ef511833725dd88f396976` / grade `3` / control `DM-READINESS-ACT-PROC` / quote: 依次核对 Registry、Embedding 和 Milvus 的有界探测；任一失败都返回 503 和脱敏组件状态。
 - Human decision: `[ ] approve  [ ] modify  [ ] delete`
 - Reviewer note:
+
