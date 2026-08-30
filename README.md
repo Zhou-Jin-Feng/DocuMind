@@ -2,6 +2,8 @@
 
 一个本地单用户 RAG 知识库问答系统。当前主链路采用 FastAPI、React/TypeScript、Milvus Standalone 和 SSE 流式响应，包含文档生命周期管理、单文档纯检索、真实依赖探活、引用来源、结构化可观测性、离线评测和自动质量回归门禁。
 
+> 适用范围：本地单用户或可信私网，不提供公网多租户或高可用承诺。主线保持 Dense-only，增强检索状态见评测文档。
+
 > GitHub 已发布 tag 仍为 `v2.0`。当前代码版本为 v2.2.0；v2.0.1 至 v2.2.0 的后续版本 tag 均尚未创建。
 
 ## 核心能力
@@ -19,6 +21,8 @@
 - 人工逐案复核的旧 Prompt 真实对照，明确记录当前拒答和统一引用格式的失败边界。
 - 基于独立 validation/holdout 协议的 Dense L2 阈值校准；当前证据明确支持“不启用全局默认阈值”。
 - 加固后的不可信上下文 Prompt、XML 边界、统一 `[文档N]` 引用解析，以及低基数线上引用观测。
+- DS-04 已确认的代表性检索数据：75 份多 Chunk 合成文档、400 题探索池、100 题正式 gold（94 approve / 6 modify）。
+- DS-05 已完成 validation/holdout 隔离和指纹冻结；DS-06 在 50/50 代表集上完成四模式对照，增强候选结论为 `NO_GO`，生产默认仍为 Dense。
 
 ## 文档导航
 
@@ -33,6 +37,7 @@
 | [依赖说明](docs/DEPENDENCIES.md) | 直接依赖、安装边界和可复现性 |
 | [运行示例](docs/DEMO_SCRIPT.md) | 启动、端到端流程和故障处理 |
 | [版本历史](docs/VERSION_HISTORY.md) | 主要版本与架构变化 |
+| [交付验证](docs/PROJECT_FREEZE_2.md) | 交付范围、验证证据和使用限制 |
 
 ## 环境要求
 
@@ -243,11 +248,14 @@ P2-01 已用 35 个冻结案例对 Dense、BM25、Hybrid 和 Hybrid + Reranker �
 
 P2 数据证据刷新已完成 DS-00～02：固定来源清单、可续传且逐文件校验的下载器、Parquet/TSV 结构验证器，以及 T2Ranking dev、BEIR NFCorpus、BEIR SciFact 共 12 个文件（169,682,657 bytes）的本地校验。MIRACL 中文全量未下载；按当前单 GPU 试跑外推，其 Embedding-only 约需 462.6 小时，同时不满足许可证、18/24 小时运行和 120 GiB 磁盘门禁，因此保持延期。原始数据位于 Git 忽略目录，公共检索行为没有变化。
 
+P2 DS-03～06 已完成确定性规范化、代表性数据集人工复核、split 隔离冻结和真实四模式评测。DS-06 的 `PASS WITH NOTES / NO_GO` 只表示增强候选没有达到上线门禁；Dense 基线和 ScholarTrace 所需的单文档证据检索不受影响。第二次冻结候选的完整范围和提交排除项见 [`docs/PROJECT_FREEZE_2.md`](docs/PROJECT_FREEZE_2.md)。
+
 ## 版本摘要
 
 | 版本 | 主要内容 | 状态 |
 |---|---|---|
 | v2.0 | FastAPI/React/Milvus 统一 Compose、基础 CI、演示与发布收口 | 已发布并推送 tag |
+| P2 evidence checkpoint | DS-03～DS-06 数据、隔离、四模式评测和 `NO_GO` 决策 | 待用户授权提交，作为第二次项目冻结候选 |
 
 完整历史和真实提交边界见[版本历史](docs/VERSION_HISTORY.md)。
 
@@ -258,6 +266,7 @@ P2 数据证据刷新已完成 DS-00～02：固定来源清单、可续传且逐
 - 默认 LLM Provider 是 OpenAI；Embedding 默认使用本地 Ollama，普通 Web 闭环并非默认完全离线。
 - Query Rewrite、Hybrid 和 Reranker 尚未进入 Web 默认请求路径。
 - 当前 8 条确定性数据集只用于管线回归，不能代表生产答案质量。
+- ScholarTrace 可按 `2.2.0 纯检索交付基线`、Schema `1.0`、`dense-v1`、单文档和 readiness 契约接入；公网认证、多租户、高可用和大规模吞吐不在本项目冻结承诺内。
 - 检索命中正确文档不等于最终回答忠实；Faithfulness 和引用质量必须由独立答案评测验证。
 - v2.0.6 已固化真实旧 Prompt 对照；它通过了执行成功率、Faithfulness 和 Injection 人工检查，但拒答与统一引用指标未达目标，因此不能声明当前生产答案质量已通过验收。
 - v2.0.7 已完成阈值校准，但结果是不启用全局默认值；项目只能声明“支持显式阈值并有不启用证据”，不能声明参考部署已通过检索阈值实现可靠拒答。

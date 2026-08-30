@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-representative-chunks-v1.schema.json",
+  "title": "DocuMind P2 representative production chunk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "document_id", "chunk_index", "char_count", "content_sha256"],
+  "properties": {
+    "schema_version": {"const": "p2-representative-chunk-v1"},
+    "id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "document_id": {"type": "string", "pattern": "^p2rep:document:[0-9a-f]{64}$"},
+    "chunk_index": {"type": "integer", "minimum": 0},
+    "char_count": {"type": "integer", "minimum": 1, "maximum": 500},
+    "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -107,6 +107,8 @@ DocuMind/
 │   ├── retrieve_quality_runner.py
 │   ├── retrieval_candidate_gate.py
 │   ├── retrieval_candidate_gate_runner.py
+│   ├── representative_dataset.py
+│   ├── representative_split_audit.py
 │   ├── data_source_downloader.py
 │   ├── data_source_validation.py
 │   ├── data_source_normalization.py
@@ -125,11 +127,16 @@ DocuMind/
 │   │   │   ├── holdout_dataset.jsonl
 │   │   │   └── documents/
 │   │   ├── v1_7/                # 经数据集指纹绑定的 Rewrite artifact
-│   │   └── v2_answer_quality/
+│   │   ├── v2_answer_quality/
 │   │       ├── dataset.jsonl
 │   │       ├── threshold_dataset.jsonl
 │   │       ├── documents/
 │   │       └── README.md
+│   │   └── p2_retrieval_v2/
+│   │       ├── gold_dataset.jsonl
+│   │       ├── gold_candidates.jsonl
+│   │       ├── review_decisions.jsonl
+│   │       └── documents/
 │   ├── baselines/
 │   │   ├── deterministic_dense_v2.json
 │   │   ├── deterministic_dense_v2.md
@@ -273,6 +280,15 @@ DocuMind/
 | `evaluation/data_source_normalization.py` | DS-03 三来源适配器、稳定 ID、严格 qrels 完整性、原子规范化构建与快照复验 CLI |
 | `evaluation/data_sources/contracts/*.schema.json` | DS-03 documents、queries、qrels、snapshot 的严格版本化 JSON Schema |
 | `evaluation/reports/p2_ds03_normalization_evidence_v1.*` | 三来源规范化计数、输入 revision 和可复现指纹的脱敏证据 |
+| `evaluation/representative_dataset.py` | DS-04 代表性文档、探索题、候选 qrels、人工审查包和 gold 的确定性生成与严格复验 CLI |
+| `evaluation/representative_split_audit.py` | DS-05 validation/holdout 隔离、近重复/事实族泄漏审计和冻结指纹 CLI |
+| `evaluation/ds06_runner.py` | DS-06 Dense、BM25、Hybrid、Reranker validation/holdout 评测和严格候选决策 CLI |
+| `evaluation/representative_data/` | DS-04 的 25 主题显式设计及 document、Chunk、question、candidate、review、gold、snapshot、DS-05 split Schema |
+| `evaluation/datasets/p2_retrieval_v2/` | 75 份合成文档、400 题探索池、100 题候选、人工决定台账、100 题正式 gold 和 DS-05 `split_freeze.json`；含两批审查包 |
+| `evaluation/reports/p2_ds04_pre_review_v1.*` | DS-04 配额、指纹、隐私扫描和人工审查待办的 pre-review 证据 |
+| `evaluation/reports/p2_ds04_final_review_v1.*` | DS-04 94/6/0 人工决定、grade 修改审计和 gold 固化证据 |
+| `evaluation/reports/p2_ds05_split_audit_v1.*` | DS-05 split 隔离、泄漏检查、指纹冻结和脱敏审计证据 |
+| `evaluation/reports/p2_ds06_{validation,holdout,final_decision}_v1.*` | DS-06 四模式真实对照、一次性 holdout 和 `NO_GO` 决策证据 |
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
 | `evaluation/baselines/deterministic_dense_v2.*` | v2.0.1 冻结、供 v2.0.2 PR CI 实时比较的 Dense 基线与可读报告 |
 | `evaluation/baselines/retrieve_quality_v1.*` | v2.2.0 单文档纯检索 API、底层排序一致和污染清零基线 |

@@ -1,0 +1,40 @@
+Reranker 上线闸门 - 当前生效
+
+文档编号: DM-T17-ACTIVE
+主题域: retrieval
+authority_state: active
+document_version: 2.2.0
+
+## 适用范围
+
+本文描述 DocuMind 在“Reranker 上线闸门”主题下的一个完整版本状态。文档将规则、执行步骤、结构化摘录、失败边界和审计要求放在同一主题内，供上传、分块和检索评测使用。本文件是本主题当前生效的控制依据。草案和历史文件即使关键词更相似，也不能覆盖本文件；执行与回答必须优先引用当前控制项。
+
+## 核心规则
+
+Control ID: DM-RERANK-GATE-ACT | Rule: 当前 Reranker 决策为 NO_GO，公共 retrieve 继续使用 dense-v1。
+
+该版本冻结值为“NO_GO; dense-v1 remains default”。检索结果必须同时保留控制项、文档版本和权威状态，不能只凭关键词相似度把草案或废止版本当作当前答案。
+
+## 执行步骤
+
+Procedure-Control: DM-RERANK-GATE-ACT-PROC | Procedure: 只有新代表性 gold 上无质量回归、成功率为 1.0 且 P95 增量同时不超过 750 ms 和 2 倍 Dense，才可重新申请。
+
+执行人员应先确认版本与状态，再核对输入条件，最后记录可追溯结果。若前置条件不满足，应停止在安全状态并返回明确错误；不得通过扩大重试、删除数据或跳过完整性检查来掩盖失败。
+
+## 结构化或非纯文本摘录
+
+Config-Control: DM-RERANK-GATE-ACT-DATA
+```yaml
+control_id: DM-RERANK-GATE-ACT
+version: 2.2.0
+configured_value: "NO_GO; dense-v1 remains default"
+authority: 当前生效
+```
+
+## 冲突与失败边界
+
+同主题文件可能包含相似术语但不同版本值。发生冲突时，当前生效文件的直接证据等级最高；草案可以作为背景，历史文件只用于解释旧行为。对文档没有写明的人员、未来版本、外部账号或秘密值必须判定为不可回答，不能根据常识补齐。
+
+## 审计与回滚
+
+每次执行至少记录 Control ID、document_version、authority_state 和结果摘要。回滚只能回到已验证的稳定状态，不能把 draft 当作回滚目标。本文为项目生成的合成评测材料，不包含真实客户、员工、邮箱、手机号、访问令牌、生产路径或业务文档。

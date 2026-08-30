@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-representative-snapshot-v1.schema.json",
+  "title": "DocuMind P2 representative dataset snapshot",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "count", "sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^[a-z_]+\\.jsonl$"},
+        "count": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "review_packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "count", "sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^review_batch_[12]\\.md$"},
+        "count": {"const": 50},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dataset_id", "status", "design_sha256", "generation", "counts", "shape", "outputs", "review_packets", "documents_tree_sha256", "fingerprints", "human_review"],
+  "properties": {
+    "schema_version": {"const": "p2-representative-snapshot-v1"},
+    "dataset_id": {"const": "p2-retrieval-v2"},
+    "status": {"enum": ["awaiting_human_review", "gold_confirmed"]},
+    "design_sha256": {"$ref": "#/$defs/sha256"},
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generator", "chunker", "chunk_size", "chunk_overlap", "label_policy"],
+      "properties": {
+        "generator": {"const": "documind-representative-rule-builder-v1"},
+        "chunker": {"const": "RecursiveCharacterTextSplitter:v1"},
+        "chunk_size": {"const": 500},
+        "chunk_overlap": {"const": 100},
+        "label_policy": {"enum": ["assisted_unverified_until_explicit_human_confirmation", "human_confirmed_gold_after_explicit_review"]}
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topics", "documents", "chunks", "exploration_questions", "gold_candidates", "review_pending"],
+      "properties": {
+        "topics": {"const": 25},
+        "documents": {"const": 75},
+        "chunks": {"type": "integer", "minimum": 225},
+        "exploration_questions": {"const": 400},
+        "gold_candidates": {"const": 100},
+        "review_pending": {"type": "integer", "minimum": 0, "maximum": 100},
+        "gold_dataset": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_chunks_per_document", "median_chunks_per_document", "maximum_chunks_per_document", "authority_counts", "format_counts", "exploration_category_counts", "gold_category_counts", "gold_split_counts", "gold_no_answer_by_split"],
+      "properties": {
+        "minimum_chunks_per_document": {"type": "integer", "minimum": 1},
+        "median_chunks_per_document": {"type": "number", "minimum": 3},
+        "maximum_chunks_per_document": {"type": "integer", "minimum": 3},
+        "authority_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["active", "draft", "superseded"],
+          "properties": {"active": {"const": 25}, "draft": {"const": 25}, "superseded": {"const": 25}}
+        },
+        "format_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["table_extract", "yaml_config", "json_log", "ocr_extract", "mixed_zh_en"],
+          "properties": {
+            "table_extract": {"const": 15},
+            "yaml_config": {"const": 15},
+            "json_log": {"const": 15},
+            "ocr_extract": {"const": 15},
+            "mixed_zh_en": {"const": 15}
+          }
+        },
+        "exploration_category_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exact_lexical", "semantic", "difficult_negative", "authority_version", "non_plain_text", "general_operations"],
+          "properties": {
+            "exact_lexical": {"const": 75},
+            "semantic": {"const": 75},
+            "difficult_negative": {"const": 75},
+            "authority_version": {"const": 50},
+            "non_plain_text": {"const": 50},
+            "general_operations": {"const": 75}
+          }
+        },
+        "gold_category_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exact_lexical", "semantic", "difficult_negative", "authority_version", "non_plain_text", "general_operations"],
+          "properties": {
+            "exact_lexical": {"const": 15},
+            "semantic": {"const": 15},
+            "difficult_negative": {"const": 20},
+            "authority_version": {"const": 10},
+            "non_plain_text": {"const": 10},
+            "general_operations": {"const": 30}
+          }
+        },
+        "gold_split_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["validation", "holdout"],
+          "properties": {"validation": {"const": 50}, "holdout": {"const": 50}}
+        },
+        "gold_no_answer_by_split": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["validation", "holdout"],
+          "properties": {"validation": {"const": 13}, "holdout": {"const": 13}}
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documents", "chunks", "exploration", "gold_candidates", "review_decisions"],
+      "properties": {
+        "documents": {"$ref": "#/$defs/output"},
+        "chunks": {"$ref": "#/$defs/output"},
+        "exploration": {"$ref": "#/$defs/output"},
+        "gold_candidates": {"$ref": "#/$defs/output"},
+        "review_decisions": {"$ref": "#/$defs/output"},
+        "gold_dataset": {"$ref": "#/$defs/output"}
+      }
+    },
+    "review_packets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review_batch_1", "review_batch_2"],
+      "properties": {
+        "review_batch_1": {"$ref": "#/$defs/review_packet"},
+        "review_batch_2": {"$ref": "#/$defs/review_packet"}
+      }
+    },
+    "documents_tree_sha256": {"$ref": "#/$defs/sha256"},
+    "fingerprints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documents", "chunks", "exploration", "gold_candidates", "review_decisions", "documents_tree_sha256", "dataset_sha256", "review_packets"],
+      "properties": {
+        "documents": {"$ref": "#/$defs/sha256"},
+        "chunks": {"$ref": "#/$defs/sha256"},
+        "exploration": {"$ref": "#/$defs/sha256"},
+        "gold_candidates": {"$ref": "#/$defs/sha256"},
+        "review_decisions": {"$ref": "#/$defs/sha256"},
+        "gold_dataset": {"$ref": "#/$defs/sha256"},
+        "documents_tree_sha256": {"$ref": "#/$defs/sha256"},
+        "dataset_sha256": {"$ref": "#/$defs/sha256"},
+        "review_packets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["review_batch_1", "review_batch_2"],
+          "properties": {
+            "review_batch_1": {"$ref": "#/$defs/sha256"},
+            "review_batch_2": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    },
+    "human_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "approved", "modified", "deleted", "pending", "privacy_decision", "authority_decision"],
+      "properties": {
+        "required": {"const": 100},
+        "approved": {"type": "integer", "minimum": 0, "maximum": 100},
+        "modified": {"type": "integer", "minimum": 0, "maximum": 100},
+        "deleted": {"type": "integer", "minimum": 0, "maximum": 100},
+        "pending": {"type": "integer", "minimum": 0, "maximum": 100},
+        "privacy_decision": {"enum": ["pending_human", "confirmed"]},
+        "authority_decision": {"enum": ["pending_human", "confirmed"]}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "gold_confirmed"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "generation": {"properties": {"label_policy": {"const": "human_confirmed_gold_after_explicit_review"}}},
+          "counts": {"required": ["gold_dataset"]},
+          "outputs": {"required": ["gold_dataset"]},
+          "fingerprints": {"required": ["gold_dataset"]}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "awaiting_human_review"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "generation": {"properties": {"label_policy": {"const": "assisted_unverified_until_explicit_human_confirmation"}}}
+        }
+      }
+    }
+  ]
+}

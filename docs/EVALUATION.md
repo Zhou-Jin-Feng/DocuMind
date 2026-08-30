@@ -578,6 +578,99 @@ DS-03 将 T2Ranking dev、BEIR NFCorpus 和 BEIR SciFact 的官方 corpus、quer
 本阶段没有下载新数据、运行 Embedding、写入 Milvus、调用生成模型或改变公共
 `/api/v1/retrieve`、Schema `1.0`、`dense-v1` 和单文档范围。
 
+### P2-01 DS-04 代表性数据集
+
+DS-04 在 `evaluation/datasets/p2_retrieval_v2/` 生成完全合成且可提交的 Track B
+材料。25 个 DocuMind 运维主题各包含 active、draft、superseded 三个版本，共 75
+份文档；全部使用生产 `chunk_size=500`、`chunk_overlap=100` 的递归分块器，得到
+235 个 Chunk，每份文档 3 至 4 个 Chunk，中位数为 3。主题覆盖上传、解析、分块、
+Embedding、生命周期、检索、健康、可观测性、存储和安全，不包含客户或生产文档。
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.representative_dataset build `
+  --replace `
+  --report-json evaluation/reports/p2_ds04_pre_review_v1.json `
+  --report-markdown evaluation/reports/p2_ds04_pre_review_v1.md
+
+.\venv\Scripts\python.exe -m evaluation.representative_dataset validate
+
+.\venv\Scripts\python.exe -m evaluation.representative_dataset finalize `
+  --report-json evaluation/reports/p2_ds04_final_review_v1.json `
+  --report-markdown evaluation/reports/p2_ds04_final_review_v1.md
+```
+
+探索池为 400 题，自动预选 100 题候选，proposed validation/holdout 各 50 题、各
+13 题无答案。候选主类别配额为 exact lexical 15、semantic 15、difficult negative
+20、authority/version 10、non-plain-text 10、general operations 30。每个 qrel 都绑定
+同一文档内的生产 Chunk ID、证据控制项、原文引句和 `0-3` grade；验证器会重跑生产
+分块器并拒绝跨文档 qrel、缺失引文、重复问题、指纹漂移和未归属目录替换。
+
+人工审查前数据集指纹为
+`0a4d2b7d036185335f2cf13b9a226ead7ccdbd47b6dff4adb02b4d9a687d330d`，自动隐私/
+凭据扫描 0 命中。`review_batch_1.md` 和 `review_batch_2.md` 各含 50 题，并展示源
+文件、document ID、chunk ID、grade 与引文；审查包哈希也纳入快照。
+
+人工审查结果已经固化：94 题 `approve`，6 题 `modify`，0 题 `delete`，0 题
+`pending`。6 个修改均为用户明确指定的 superseded qrel grade `2 -> 3`，修改目标、
+旧值和新值保存在 `review_decisions.jsonl`。正式 `gold_dataset.jsonl` 保留 100 题，
+每题的 answerability、qrels、grade、歧义、权威和隐私状态均标记为人工确认；最终数据集
+指纹为
+`7f2440695b6f575be045e066544009a765a308544982adb8618bf5004bf418a3`，证据报告见
+`evaluation/reports/p2_ds04_final_review_v1.{json,md}`。本 gold 随后已通过 DS-05
+隔离审计并冻结，具体见下一节；在 DS-06 完成前不用于生产收益声明。
+
+### P2-01 DS-05 Split 隔离与指纹冻结
+
+DS-05 在任何 Embedding、Milvus 或模式评测之前，对 DS-04 的正式
+`gold_dataset.jsonl` 执行 split 隔离和泄漏审计，并将结果冻结到
+`evaluation/datasets/p2_retrieval_v2/split_freeze.json`。机器可读审计与脱敏
+报告分别为 `evaluation/reports/p2_ds05_split_audit_v1.json` 和 `.md`。
+
+validation 与 holdout 各 50 题、各 6 个主题族；两者之间的 case ID、规范化问题、
+事实族、主题、文档、生产 Chunk、qrel pair、证据控制项和证据引句哈希均为零重合。
+问题相似度扫描固定使用 NFKC、casefold、仅保留字母数字的规范化，以及
+`SequenceMatcher >= 0.95` 的高置信阈值，跨 split 近重复为 0。冻结文件同时记录每题
+身份、问题集合、qrel pair 集合和记录集合 SHA-256；之后修改 gold 或移动 split 会在
+评测前被拒绝。
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.representative_split_audit audit
+.\venv\Scripts\python.exe -m evaluation.representative_split_audit freeze
+.\venv\Scripts\python.exe -m evaluation.representative_split_audit validate
+```
+
+DS-05 冻结 SHA-256 为
+`49600e59d3525ac78ffadb61f667004db42752e0b80ad1bccce4e383ae4472a2`；审计 SHA-256
+为 `eb380f920044ecb0878ed56551222a5e5aca7bddce0ebf9cf845e1eee866d93b`。DS-05
+本身不运行四模式指标，也不改变 `/api/v1/retrieve`、Schema `1.0`、`dense-v1` 或
+单文档范围；冻结结果随后作为 DS-06 的唯一输入。
+
+### P2-01 DS-06 四模式评测与第二次冻结候选
+
+DS-06 在 75 份代表性文档、235 个生产 Chunk 和 50/50 validation/holdout 上完成
+真实 Dense、BM25、Hybrid 与 CPU `BAAI/bge-reranker-base` 对照。Reranker Top-5
+只在 validation 选择，holdout 只执行一次。最终报告为
+`evaluation/reports/p2_ds06_final_decision_v1.{json,md}`，结论为
+`PASS WITH NOTES / NO_GO`。
+
+| 模式 | Recall@3 | MRR@3 | nDCG@3 | P95 | 结论 |
+|---|---:|---:|---:|---:|---|
+| Dense | 0.4054 | 0.3018 | 0.3278 | 170.3 ms | baseline |
+| BM25 | 0.3243 | 0.2477 | 0.2564 | 7.9 ms | 质量回退 |
+| Hybrid | 0.3919 | 0.3153 | 0.3234 | 186.8 ms | Recall/nDCG 回退 |
+| Reranker Top-5 | 0.4459 | 0.4459 | 0.4360 | 1102.9 ms | 质量提升但延迟不合格 |
+
+本次评测证明 Reranker 在代表性多 Chunk 语料上有质量信号，但 P95 约为 Dense 的
+`6.48x`，超过 `+750 ms` 和 `2x` 门禁；BM25 和 Hybrid 不能作为默认替代。四种模式
+均未配置冻结的拒答策略，no-answer 空结果率为 0 不代表具备拒答能力。增强方案保留为
+离线/受控实验，不改变线上公共契约。
+
+第二次项目冻结候选是“个人项目级冻结”，不是公网生产认证：它固定 v2.2.0 Dense
+基线、P2 数据证据、评测报告、测试和边界文档；不包含 raw 数据、模型缓存、Milvus
+数据、`agent/` 工作资料或临时产物。当前报告生成于最终提交前的工作树，提交时必须
+保持输入和报告字节不变，并在提交后复核哈希；按 holdout 一次性规则，不重复运行同一
+holdout。
+
 ## 回归门控
 
 在 Python 中将当前报告与保存的基线进行比较：

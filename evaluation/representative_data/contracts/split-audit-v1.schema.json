@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-ds05-split-audit-v1.schema.json",
+  "title": "DocuMind P2 DS-05 split isolation and leakage audit",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "question_normalization", "near_duplicate_threshold"],
+      "properties": {
+        "version": {"const": "question-near-duplicate-v1"},
+        "question_normalization": {"const": "NFKC + casefold + alphanumeric characters"},
+        "near_duplicate_threshold": {"const": 0.95}
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count", "case_ids", "fact_family_ids", "topic_ids", "document_ids",
+        "chunk_ids", "qrel_pair_ids", "evidence_control_ids",
+        "evidence_quote_hashes", "question_hashes", "records_sha256",
+        "questions_sha256", "qrel_pairs_sha256"
+      ],
+      "properties": {
+        "count": {"type": "integer", "minimum": 1},
+        "case_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "fact_family_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "topic_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "document_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "chunk_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "qrel_pair_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "evidence_control_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "evidence_quote_hashes": {"type": "array", "items": {"$ref": "#/$defs/sha256"}, "uniqueItems": true},
+        "question_hashes": {"type": "array", "items": {"$ref": "#/$defs/sha256"}, "uniqueItems": true},
+        "records_sha256": {"$ref": "#/$defs/sha256"},
+        "questions_sha256": {"$ref": "#/$defs/sha256"},
+        "qrel_pairs_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "similarity_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validation_id", "holdout_id", "similarity"],
+      "properties": {
+        "validation_id": {"type": "string"},
+        "holdout_id": {"type": "string"},
+        "similarity": {"type": "number", "minimum": 0.95, "maximum": 1}
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "dataset_id", "source_gold_dataset_sha256",
+    "source_snapshot_dataset_sha256", "algorithm", "splits", "overlap_checks",
+    "exact_question_duplicates_by_split", "near_duplicate_questions",
+    "leakage_findings", "status", "freeze_sha256", "audit_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "p2-ds05-split-audit-v1"},
+    "dataset_id": {"const": "p2-retrieval-v2"},
+    "source_gold_dataset_sha256": {"$ref": "#/$defs/sha256"},
+    "source_snapshot_dataset_sha256": {"$ref": "#/$defs/sha256"},
+    "algorithm": {"$ref": "#/$defs/algorithm"},
+    "splits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validation", "holdout"],
+      "properties": {
+        "validation": {"$ref": "#/$defs/split"},
+        "holdout": {"$ref": "#/$defs/split"}
+      }
+    },
+    "overlap_checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_ids", "fact_family_ids", "topic_ids", "document_ids", "chunk_ids", "qrel_pair_ids", "evidence_control_ids", "evidence_quote_hashes", "normalized_questions"],
+      "properties": {
+        "case_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "fact_family_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "topic_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "document_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "chunk_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "qrel_pair_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "evidence_control_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "evidence_quote_hashes": {"type": "array", "items": {"$ref": "#/$defs/sha256"}, "uniqueItems": true},
+        "normalized_questions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "exact_question_duplicates_by_split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validation", "holdout"],
+      "properties": {
+        "validation": {"type": "integer", "minimum": 0},
+        "holdout": {"type": "integer", "minimum": 0}
+      }
+    },
+    "near_duplicate_questions": {"type": "array", "items": {"$ref": "#/$defs/similarity_pair"}},
+    "leakage_findings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invalid_split", "intra_split_duplicate_questions", "near_duplicate_questions"],
+      "properties": {
+        "invalid_split": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "intra_split_duplicate_questions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "validation": {"type": "integer", "minimum": 1},
+            "holdout": {"type": "integer", "minimum": 1}
+          }
+        },
+        "near_duplicate_questions": {"type": "array", "items": {"$ref": "#/$defs/similarity_pair"}}
+      }
+    },
+    "status": {"enum": ["passed", "failed"]},
+    "freeze_sha256": {"$ref": "#/$defs/sha256"},
+    "audit_sha256": {"$ref": "#/$defs/sha256"}
+  }
+}

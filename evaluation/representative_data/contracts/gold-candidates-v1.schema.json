@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-representative-gold-candidates-v1.schema.json",
+  "title": "DocuMind P2 representative unverified gold candidate",
+  "$defs": {
+    "qrel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "chunk_id", "relevance_grade", "evidence_control_id", "evidence_quote", "rationale"],
+      "properties": {
+        "document_id": {"type": "string", "pattern": "^p2rep:document:[0-9a-f]{64}$"},
+        "chunk_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "relevance_grade": {"type": "integer", "minimum": 0, "maximum": 3},
+        "evidence_control_id": {"type": "string", "pattern": "^DM-[A-Z0-9-]+-(?:ACT|DRF|OLD)(?:-PROC|-DATA)?$"},
+        "evidence_quote": {"type": "string", "minLength": 1},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "question", "answerable", "primary_category", "secondary_categories", "topic_id", "fact_family_id", "candidate_qrels", "label_provenance", "ambiguity_state", "privacy_state", "review_status", "proposed_split", "selection_reason"],
+  "properties": {
+    "schema_version": {"const": "p2-representative-gold-candidate-v1"},
+    "id": {"type": "string", "pattern": "^REP-T(?:0[1-9]|1[0-9]|2[0-5])-(?:0[1-9]|1[0-6])$"},
+    "question": {"type": "string", "minLength": 8},
+    "answerable": {"type": "boolean"},
+    "primary_category": {"enum": ["exact_lexical", "semantic", "difficult_negative", "authority_version", "non_plain_text", "general_operations"]},
+    "secondary_categories": {"type": "array", "uniqueItems": true, "items": {"enum": ["no_answer", "authority_sensitive"]}},
+    "topic_id": {"type": "string", "pattern": "^T(?:0[1-9]|1[0-9]|2[0-5])$"},
+    "fact_family_id": {"type": "string", "pattern": "^t(?:0[1-9]|1[0-9]|2[0-5])-fact-(?:0[1-9]|1[0-6])$"},
+    "candidate_qrels": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/qrel"}},
+    "label_provenance": {"const": "assisted_unverified"},
+    "ambiguity_state": {"enum": ["clear", "multiple_relevant_authority_ordered", "clear_but_non_authoritative", "clear_historical_only", "unanswerable_absent", "unanswerable_future", "unanswerable_external", "unanswerable_private"]},
+    "privacy_state": {"const": "synthetic_safe_pending_human"},
+    "review_status": {"const": "pending_human"},
+    "proposed_split": {"enum": ["validation", "holdout"]},
+    "selection_reason": {"const": "quota-balanced preselection; requires explicit human confirmation"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"answerable": {"const": true}}, "required": ["answerable"]},
+      "then": {"properties": {"candidate_qrels": {"minItems": 1}}},
+      "else": {"properties": {"candidate_qrels": {"maxItems": 0}}}
+    }
+  ]
+}

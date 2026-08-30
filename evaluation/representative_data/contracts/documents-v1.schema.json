@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-representative-documents-v1.schema.json",
+  "title": "DocuMind P2 representative document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "topic_id",
+    "domain",
+    "title",
+    "filename",
+    "language",
+    "source_format",
+    "authority_state",
+    "document_version",
+    "content_sha256",
+    "chunk_count",
+    "control_ids",
+    "privacy_state",
+    "review_status"
+  ],
+  "properties": {
+    "schema_version": {"const": "p2-representative-document-v1"},
+    "id": {"type": "string", "pattern": "^p2rep:document:[0-9a-f]{64}$"},
+    "topic_id": {"type": "string", "pattern": "^T(?:0[1-9]|1[0-9]|2[0-5])$"},
+    "domain": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,31}$"},
+    "title": {"type": "string", "minLength": 1},
+    "filename": {"type": "string", "pattern": "^t(?:0[1-9]|1[0-9]|2[0-5])-[a-z][a-z0-9-]{1,31}-(?:active|draft|superseded)\\.txt$"},
+    "language": {"const": "zh-CN-mixed-en"},
+    "source_format": {"enum": ["table_extract", "yaml_config", "json_log", "ocr_extract", "mixed_zh_en"]},
+    "authority_state": {"enum": ["active", "draft", "superseded"]},
+    "document_version": {"type": "string", "minLength": 1},
+    "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "chunk_count": {"type": "integer", "minimum": 1},
+    "control_ids": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^DM-[A-Z0-9-]+-(?:ACT|DRF|OLD)(?:-PROC|-DATA)?$"}
+    },
+    "privacy_state": {"const": "synthetic_safe_pending_human"},
+    "review_status": {"const": "pending_human"}
+  }
+}

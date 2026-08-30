@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-ds05-split-freeze-v1.schema.json",
+  "title": "DocuMind P2 DS-05 validation and holdout freeze",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count", "case_ids", "fact_family_ids", "topic_ids", "document_ids",
+        "chunk_ids", "qrel_pair_ids", "evidence_control_ids",
+        "evidence_quote_hashes", "question_hashes", "records_sha256",
+        "questions_sha256", "qrel_pairs_sha256"
+      ],
+      "properties": {
+        "count": {"type": "integer", "minimum": 1},
+        "case_ids": {"type": "array", "items": {"type": "string", "pattern": "^REP-T(?:0[1-9]|1[0-9]|2[0-5])-(?:0[1-9]|1[0-6])$"}, "uniqueItems": true},
+        "fact_family_ids": {"type": "array", "items": {"type": "string", "pattern": "^t(?:0[1-9]|1[0-9]|2[0-5])-fact-(?:0[1-9]|1[0-6])$"}, "uniqueItems": true},
+        "topic_ids": {"type": "array", "items": {"type": "string", "pattern": "^T(?:0[1-9]|1[0-9]|2[0-5])$"}, "uniqueItems": true},
+        "document_ids": {"type": "array", "items": {"type": "string", "pattern": "^p2rep:document:[0-9a-f]{64}$"}, "uniqueItems": true},
+        "chunk_ids": {"type": "array", "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "uniqueItems": true},
+        "qrel_pair_ids": {"type": "array", "items": {"type": "string", "pattern": "^p2rep:document:[0-9a-f]{64}::[0-9a-f]{64}$"}, "uniqueItems": true},
+        "evidence_control_ids": {"type": "array", "items": {"type": "string", "pattern": "^DM-[A-Z0-9-]+-(?:ACT|DRF|OLD)(?:-PROC|-DATA)?$"}, "uniqueItems": true},
+        "evidence_quote_hashes": {"type": "array", "items": {"$ref": "#/$defs/sha256"}, "uniqueItems": true},
+        "question_hashes": {"type": "array", "items": {"$ref": "#/$defs/sha256"}, "uniqueItems": true},
+        "records_sha256": {"$ref": "#/$defs/sha256"},
+        "questions_sha256": {"$ref": "#/$defs/sha256"},
+        "qrel_pairs_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "question_normalization", "near_duplicate_threshold"],
+      "properties": {
+        "version": {"const": "question-near-duplicate-v1"},
+        "question_normalization": {"const": "NFKC + casefold + alphanumeric characters"},
+        "near_duplicate_threshold": {"const": 0.95}
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "dataset_id", "source_gold_dataset_sha256",
+    "source_snapshot_dataset_sha256", "algorithm", "splits", "status",
+    "freeze_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "p2-ds05-split-freeze-v1"},
+    "dataset_id": {"const": "p2-retrieval-v2"},
+    "source_gold_dataset_sha256": {"$ref": "#/$defs/sha256"},
+    "source_snapshot_dataset_sha256": {"$ref": "#/$defs/sha256"},
+    "algorithm": {"$ref": "#/$defs/algorithm"},
+    "splits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validation", "holdout"],
+      "properties": {
+        "validation": {"$ref": "#/$defs/split"},
+        "holdout": {"$ref": "#/$defs/split"}
+      }
+    },
+    "status": {"const": "frozen"},
+    "freeze_sha256": {"$ref": "#/$defs/sha256"}
+  }
+}

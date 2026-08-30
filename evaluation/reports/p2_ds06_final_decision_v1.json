@@ -1,0 +1,232 @@
+{
+  "schema_version": "p2-ds06-evaluation-v1",
+  "generated_at": "2026-08-30T12:35:44.854817+00:00",
+  "dataset": {
+    "freeze_sha256": "49600e59d3525ac78ffadb61f667004db42752e0b80ad1bccce4e383ae4472a2",
+    "gold_sha256": "7f2440695b6f575be045e066544009a765a308544982adb8618bf5004bf418a3",
+    "document_count": 75,
+    "chunk_count": 235,
+    "documents_jsonl_sha256": "88473888e081105853d339c99b7c7b866be6dfbd9022c47d72845d439851986e",
+    "chunks_jsonl_sha256": "4fb1820de17bb8ac6560ee4effd6da3b06f77e3c9f74378199f705e1b6e135af"
+  },
+  "validation_report": {
+    "path": "evaluation/reports/p2_ds06_validation_v1.json",
+    "selected_rerank_depth": 5,
+    "metrics": {
+      "dense": {
+        "recall_at_k": 0.3918918918918919,
+        "mrr_at_k": 0.2927927927927928,
+        "ndcg_at_k": 0.33509841457399825,
+        "contextual_recall_at_k": 0.463963963963964,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 199.48618,
+        "p50_duration_ms": 151.05700000000002,
+        "p95_duration_ms": 205.05834999999993,
+        "maximum_duration_ms": 2440.396
+      },
+      "bm25": {
+        "recall_at_k": 0.35135135135135137,
+        "mrr_at_k": 0.33333333333333337,
+        "ndcg_at_k": 0.3287615368688679,
+        "contextual_recall_at_k": 0.3918918918918919,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 5.480639999999999,
+        "p50_duration_ms": 4.702500000000001,
+        "p95_duration_ms": 9.660749999999998,
+        "maximum_duration_ms": 11.223
+      },
+      "hybrid": {
+        "recall_at_k": 0.44594594594594594,
+        "mrr_at_k": 0.35135135135135137,
+        "ndcg_at_k": 0.3787069666768784,
+        "contextual_recall_at_k": 0.47297297297297297,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 160.00933999999998,
+        "p50_duration_ms": 154.50549999999998,
+        "p95_duration_ms": 194.46559999999997,
+        "maximum_duration_ms": 248.832
+      }
+    },
+    "reranker_depths": {
+      "5": {
+        "recall_at_k": 0.5540540540540541,
+        "mrr_at_k": 0.46846846846846846,
+        "ndcg_at_k": 0.4791101869798206,
+        "contextual_recall_at_k": 0.5630630630630631,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 1070.8140799999999,
+        "p50_duration_ms": 995.867,
+        "p95_duration_ms": 1146.427,
+        "maximum_duration_ms": 4515.829
+      },
+      "8": {
+        "recall_at_k": 0.4864864864864865,
+        "mrr_at_k": 0.4549549549549549,
+        "ndcg_at_k": 0.44854234456825964,
+        "contextual_recall_at_k": 0.4954954954954955,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 1452.6047800000001,
+        "p50_duration_ms": 1425.577,
+        "p95_duration_ms": 1665.5131999999999,
+        "maximum_duration_ms": 1741.536
+      }
+    }
+  },
+  "holdout_report": {
+    "path": "evaluation/reports/p2_ds06_holdout_v1.json",
+    "metrics": {
+      "dense": {
+        "recall_at_k": 0.40540540540540543,
+        "mrr_at_k": 0.3018018018018018,
+        "ndcg_at_k": 0.327795668303482,
+        "contextual_recall_at_k": 0.40540540540540543,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 142.50706,
+        "p50_duration_ms": 140.26850000000002,
+        "p95_duration_ms": 170.2527,
+        "maximum_duration_ms": 172.384
+      },
+      "bm25": {
+        "recall_at_k": 0.32432432432432434,
+        "mrr_at_k": 0.24774774774774774,
+        "ndcg_at_k": 0.2564086260216342,
+        "contextual_recall_at_k": 0.3783783783783784,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 5.310779999999999,
+        "p50_duration_ms": 5.1555,
+        "p95_duration_ms": 7.9376999999999995,
+        "maximum_duration_ms": 9.731
+      },
+      "hybrid": {
+        "recall_at_k": 0.3918918918918919,
+        "mrr_at_k": 0.3153153153153153,
+        "ndcg_at_k": 0.3234086682537532,
+        "contextual_recall_at_k": 0.40540540540540543,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 155.20218,
+        "p50_duration_ms": 152.221,
+        "p95_duration_ms": 186.79215,
+        "maximum_duration_ms": 210.189
+      },
+      "rerank": {
+        "recall_at_k": 0.44594594594594594,
+        "mrr_at_k": 0.44594594594594594,
+        "ndcg_at_k": 0.4360421846562138,
+        "contextual_recall_at_k": 0.463963963963964,
+        "no_answer_empty_accuracy": 0.0,
+        "case_count": 50,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 1032.2744,
+        "p50_duration_ms": 991.398,
+        "p95_duration_ms": 1102.9349,
+        "maximum_duration_ms": 3148.606
+      }
+    }
+  },
+  "decision": {
+    "schema_version": "p2-ds06-evaluation-v1",
+    "decision": "NO_GO",
+    "selected_candidate": null,
+    "selected_rerank_depth": 5,
+    "public_contract_action": "keep Schema 1.0 and dense-v1",
+    "dense_metrics": {
+      "recall_at_k": 0.40540540540540543,
+      "mrr_at_k": 0.3018018018018018,
+      "ndcg_at_k": 0.327795668303482,
+      "contextual_recall_at_k": 0.40540540540540543,
+      "no_answer_empty_accuracy": 0.0,
+      "case_count": 50,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 142.50706,
+      "p50_duration_ms": 140.26850000000002,
+      "p95_duration_ms": 170.2527,
+      "maximum_duration_ms": 172.384
+    },
+    "candidates": {
+      "bm25": {
+        "eligible": false,
+        "selected_depth": null,
+        "quality_gain_over_dense": -0.05405405405405403,
+        "failures": [
+          "recall_at_k regression",
+          "mrr_at_k regression",
+          "ndcg_at_k regression",
+          "no strict quality gain over dense"
+        ],
+        "metrics": {
+          "recall_at_k": 0.32432432432432434,
+          "mrr_at_k": 0.24774774774774774,
+          "ndcg_at_k": 0.2564086260216342,
+          "contextual_recall_at_k": 0.3783783783783784,
+          "no_answer_empty_accuracy": 0.0,
+          "case_count": 50,
+          "successful_case_rate": 1.0,
+          "average_duration_ms": 5.310779999999999,
+          "p50_duration_ms": 5.1555,
+          "p95_duration_ms": 7.9376999999999995,
+          "maximum_duration_ms": 9.731
+        }
+      },
+      "hybrid": {
+        "eligible": false,
+        "selected_depth": null,
+        "quality_gain_over_dense": 0.013513513513513542,
+        "failures": [
+          "recall_at_k regression",
+          "ndcg_at_k regression"
+        ],
+        "metrics": {
+          "recall_at_k": 0.3918918918918919,
+          "mrr_at_k": 0.3153153153153153,
+          "ndcg_at_k": 0.3234086682537532,
+          "contextual_recall_at_k": 0.40540540540540543,
+          "no_answer_empty_accuracy": 0.0,
+          "case_count": 50,
+          "successful_case_rate": 1.0,
+          "average_duration_ms": 155.20218,
+          "p50_duration_ms": 152.221,
+          "p95_duration_ms": 186.79215,
+          "maximum_duration_ms": 210.189
+        }
+      },
+      "rerank": {
+        "eligible": false,
+        "selected_depth": 5,
+        "quality_gain_over_dense": 0.14414414414414417,
+        "failures": [
+          "p95 increase > 750 ms",
+          "p95 exceeds 2x dense"
+        ],
+        "metrics": {
+          "recall_at_k": 0.44594594594594594,
+          "mrr_at_k": 0.44594594594594594,
+          "ndcg_at_k": 0.4360421846562138,
+          "contextual_recall_at_k": 0.463963963963964,
+          "no_answer_empty_accuracy": 0.0,
+          "case_count": 50,
+          "successful_case_rate": 1.0,
+          "average_duration_ms": 1032.2744,
+          "p50_duration_ms": 991.398,
+          "p95_duration_ms": 1102.9349,
+          "maximum_duration_ms": 3148.606
+        }
+      }
+    }
+  }
+}
