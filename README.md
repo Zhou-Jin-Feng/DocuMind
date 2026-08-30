@@ -239,6 +239,10 @@ v2.1.0 P0 本地复审为 Python `241 passed, 1 skipped, 149 subtests passed`、
 
 v2.2.0 P1 本地复审为 Python `266 passed, 1 skipped, 168 subtests passed`、Vitest `5 passed`、Playwright `6 passed`；Black 检查 102 个 Python 文件，compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、34 份 JSON、42 份 Markdown、本地链接、版本对齐、`deterministic_dense_v2` 和 `retrieve_quality_v1` 回归门禁均通过。当前源码还通过真实 Ollama/Milvus 的 `2.2.0` 独立 API 冒烟：retrieval readiness、TXT 上传、active 状态、W3C Trace Context、3 个 Chunk 纯检索、证据哈希/排序及文档删除闭环均正常。跳过项仍是需显式环境开关的独立 Milvus 集成测试；本次真实冒烟验证装配与协议，不产生通用语义质量或阈值结论。
 
+P2-01 已用 35 个冻结案例对 Dense、BM25、Hybrid 和 Hybrid + Reranker 完成真实 Provider 上线门禁，结论为 [`NO_GO`](evaluation/baselines/p2_retrieval_candidate_decision_v1.md)：在这组 11 Chunk、正样本 Dense 已达 Top-1 天花板的数据上，BM25/Hybrid 未观测到可计入门禁的质量增益，不能外推为普遍“无收益”；CPU Reranker 的 holdout MRR 下降且热路径 P95 显著增加。因此公共 `/retrieve` 仍保持 Schema `1.0`、`dense-v1` 和单文档范围。
+
+P2 数据证据刷新已完成 DS-00～02：固定来源清单、可续传且逐文件校验的下载器、Parquet/TSV 结构验证器，以及 T2Ranking dev、BEIR NFCorpus、BEIR SciFact 共 12 个文件（169,682,657 bytes）的本地校验。MIRACL 中文全量未下载；按当前单 GPU 试跑外推，其 Embedding-only 约需 462.6 小时，同时不满足许可证、18/24 小时运行和 120 GiB 磁盘门禁，因此保持延期。原始数据位于 Git 忽略目录，公共检索行为没有变化。
+
 ## 版本摘要
 
 | 版本 | 主要内容 | 状态 |

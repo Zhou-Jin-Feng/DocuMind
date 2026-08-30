@@ -1,0 +1,196 @@
+{
+  "schema_version": "1.0",
+  "decision": "NO_GO",
+  "selected_candidate": null,
+  "public_contract_action": "keep_schema_1_0_dense_v1",
+  "policy": {
+    "minimum_total_cases": 30,
+    "minimum_validation_cases": 15,
+    "minimum_holdout_cases": 15,
+    "minimum_holdout_answerable_cases": 5,
+    "minimum_holdout_no_answer_cases": 5,
+    "minimum_recall_gain": 0.02,
+    "minimum_mrr_gain": 0.02,
+    "minimum_no_answer_gain": 0.05,
+    "allowed_quality_drop": 0.0,
+    "minimum_successful_case_rate": 1.0,
+    "maximum_p95_increase_ms": 750.0,
+    "maximum_p95_multiplier": 2.0
+  },
+  "evidence": {
+    "dataset_sha256": "8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210",
+    "documents_sha256": "7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878103",
+    "case_fingerprint": "9ed195ee4adac81f3e73cfc293d6222a858d4087b90b014720a06a2f2fa6bd44",
+    "total_case_count": 35,
+    "validation_case_count": 20,
+    "holdout_case_count": 15,
+    "holdout_answerable_case_count": 5,
+    "holdout_no_answer_case_count": 10,
+    "source_reports": {
+      "dense": {
+        "path": "evaluation/reports/p2_1_ollama_threshold_dense.json",
+        "sha256": "2f1343252996ef9ba80eaba82ca08a3c2ede9df31885e7fb107b9503a6d905af"
+      },
+      "bm25": {
+        "path": "evaluation/reports/p2_1_bm25_threshold.json",
+        "sha256": "c2b50c2aa2053e298047dd31e21ec0cdc74a11c217896ad7ce21eedd8f0e7516"
+      },
+      "hybrid": {
+        "path": "evaluation/reports/p2_1_ollama_threshold_hybrid.json",
+        "sha256": "c9eb8540d1913bfa59cd99171882e45dafd59104fdf6242ab1b58b54b9a1459b"
+      },
+      "rerank": {
+        "path": "evaluation/reports/p2_1_ollama_threshold_hybrid_rerank.json",
+        "sha256": "3f6856d437ad3ce3088c091bed9c7ed2f21ab860199fc139059bbdd33e042eb9"
+      }
+    }
+  },
+  "global_failures": [],
+  "dense_holdout_metrics": {
+    "recall_at_k": 1.0,
+    "precision_at_k": 0.3333333333333333,
+    "mrr_at_k": 1.0,
+    "top_k_hit_rate": 1.0,
+    "correct_document_avg_rank": 1.0,
+    "no_answer_retrieval_accuracy": 0.0,
+    "refusal_accuracy": null,
+    "keyword_coverage": null,
+    "case_count": 15.0,
+    "successful_case_rate": 1.0,
+    "average_duration_ms": 134.739266668718,
+    "p50_duration_ms": 131.36880000820383,
+    "p95_duration_ms": 163.63959999580402,
+    "maximum_duration_ms": 169.37819999293424
+  },
+  "candidates": {
+    "bm25": {
+      "eligible": false,
+      "failures": [
+        "bm25: no material holdout quality gain"
+      ],
+      "holdout_metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null,
+        "case_count": 15.0,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 0.4633133319051315,
+        "p50_duration_ms": 0.45510000200010836,
+        "p95_duration_ms": 0.5842099984874949,
+        "maximum_duration_ms": 0.6049999938113615
+      },
+      "deltas_from_dense": {
+        "recall_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "no_answer_retrieval_accuracy": 0.0
+      },
+      "p95_increase_ms": -163.05538999731652,
+      "p95_multiplier": 0.0035701016043945045,
+      "diagnostics": {
+        "holdout_answerable_case_count": 5,
+        "holdout_no_answer_case_count": 10,
+        "baseline_answerable_top1_rate": 1.0,
+        "candidate_answerable_top1_rate": 1.0,
+        "baseline_mrr_headroom_to_one": 0.0,
+        "changed_rank_case_count": 5,
+        "answerable_rank_improvements": 0,
+        "answerable_rank_regressions": 0,
+        "candidate_no_answer_non_empty_rate": 1.0,
+        "candidate_holdout_duration_min_ms": 0.328,
+        "candidate_holdout_duration_max_ms": 0.605
+      }
+    },
+    "hybrid": {
+      "eligible": false,
+      "failures": [
+        "hybrid: no material holdout quality gain"
+      ],
+      "holdout_metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null,
+        "case_count": 15.0,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 135.21176666545216,
+        "p50_duration_ms": 130.00209999154322,
+        "p95_duration_ms": 166.94361999543617,
+        "maximum_duration_ms": 172.76649999257643
+      },
+      "deltas_from_dense": {
+        "recall_at_k": 0.0,
+        "mrr_at_k": 0.0,
+        "no_answer_retrieval_accuracy": 0.0
+      },
+      "p95_increase_ms": 3.304019999632146,
+      "p95_multiplier": 1.0201908340017751,
+      "diagnostics": {
+        "holdout_answerable_case_count": 5,
+        "holdout_no_answer_case_count": 10,
+        "baseline_answerable_top1_rate": 1.0,
+        "candidate_answerable_top1_rate": 1.0,
+        "baseline_mrr_headroom_to_one": 0.0,
+        "changed_rank_case_count": 4,
+        "answerable_rank_improvements": 0,
+        "answerable_rank_regressions": 0,
+        "candidate_no_answer_non_empty_rate": 1.0,
+        "candidate_holdout_duration_min_ms": 110.318,
+        "candidate_holdout_duration_max_ms": 172.766
+      }
+    },
+    "rerank": {
+      "eligible": false,
+      "failures": [
+        "rerank: mrr_at_k regressed by 0.1000",
+        "rerank: no material holdout quality gain",
+        "rerank: P95 increase 2074.0 ms exceeds 750.0 ms",
+        "rerank: P95 multiplier 13.674 exceeds 2.000"
+      ],
+      "holdout_metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.9,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.2,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null,
+        "case_count": 15.0,
+        "successful_case_rate": 1.0,
+        "average_duration_ms": 1753.6088066650943,
+        "p50_duration_ms": 1640.1119000074686,
+        "p95_duration_ms": 2237.6185599976448,
+        "maximum_duration_ms": 2533.741799998097
+      },
+      "deltas_from_dense": {
+        "recall_at_k": 0.0,
+        "mrr_at_k": -0.09999999999999998,
+        "no_answer_retrieval_accuracy": 0.0
+      },
+      "p95_increase_ms": 2073.9789600018407,
+      "p95_multiplier": 13.674065202157795,
+      "diagnostics": {
+        "holdout_answerable_case_count": 5,
+        "holdout_no_answer_case_count": 10,
+        "baseline_answerable_top1_rate": 1.0,
+        "candidate_answerable_top1_rate": 0.8,
+        "baseline_mrr_headroom_to_one": 0.0,
+        "changed_rank_case_count": 5,
+        "answerable_rank_improvements": 0,
+        "answerable_rank_regressions": 1,
+        "candidate_no_answer_non_empty_rate": 1.0,
+        "candidate_holdout_duration_min_ms": 1556.137,
+        "candidate_holdout_duration_max_ms": 2533.742
+      }
+    }
+  }
+}

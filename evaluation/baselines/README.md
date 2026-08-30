@@ -86,3 +86,35 @@ Reviewed artifact fingerprints:
 All invariant and positive quality metrics are `1.0`, except Precision@2 is
 `0.5` because each positive case labels one relevant chunk. This is an offline
 contract regression, not evidence about real Embedding or Milvus quality.
+
+## P2 Retrieval Candidate Decision
+
+`p2_retrieval_candidate_decision_v1.json` and its readable Markdown companion
+freeze the P2-01 `NO_GO` decision. Unlike the deterministic regression
+baselines, this artifact references four real comparison reports generated from
+the same 35-case validation/holdout dataset, 11-document corpus and production
+chunk settings.
+
+The gate verifies exact evidence compatibility and source-report SHA-256 values
+before comparing Dense with BM25, Hybrid and Hybrid plus Reranker. On this
+11-Chunk fixture, answerable Dense was already Top-1 in every holdout case, so
+BM25 and Hybrid produced no measurable gain that could pass the policy; this is
+evidence of no gain on the frozen fixture, not a general claim that lexical or
+hybrid retrieval never helps. Reranking reduced holdout MRR from `1.0` to `0.9`
+and increased P95 from `163.6 ms` to `2237.6 ms`.
+
+The decision artifact also records diagnostic signals: answerable Top-1 rates,
+per-case rank changes, no-answer non-empty rates, and holdout duration ranges.
+All modes returned non-empty results for the ten no-answer cases because this
+comparison intentionally used no rejection threshold; that value must not be
+read as a refusal-quality result.
+Therefore the public contract remains Schema `1.0` and `dense-v1`.
+
+Reviewed decision artifact fingerprints:
+
+- JSON decision: `75afc60d7389d7fea1952ae58ff145027e3f5021bd7cd381e8cbe8a5de529428`
+- Markdown decision: `1546879bea6fb7b4b2d379da217c1621ccba844d306569cb3796a97f2225888c`
+
+The decision runner returns `1` for a valid `NO_GO`; this is a product decision,
+not malformed evidence. A later experiment must write a new versioned artifact
+instead of replacing this reviewed result.

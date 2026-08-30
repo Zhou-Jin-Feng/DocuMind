@@ -1,0 +1,1921 @@
+{
+  "dataset_name": "ollama-hybrid-retrieval-baseline",
+  "top_k": 3,
+  "case_count": 35,
+  "metadata": {
+    "document_count": 11,
+    "chunk_count": 11,
+    "embedding_provider": "ollama",
+    "embedding_model": "qwen3-embedding",
+    "embedding_dimension": 4096,
+    "chunk_size": 500,
+    "chunk_overlap": 100,
+    "case_count": 35,
+    "case_top_k_values": [
+      3
+    ],
+    "score_threshold": null,
+    "lexical_score_threshold": null,
+    "dense_weight": 1.0,
+    "lexical_weight": 1.0,
+    "rrf_k": 60,
+    "candidate_multiplier": 5,
+    "retrieval_mode": "hybrid",
+    "enhancement_mode": "rerank",
+    "distance_metric": null,
+    "evaluation_split": "all",
+    "rewrite_provider": null,
+    "rewrite_model": null,
+    "rewrite_map_path": null,
+    "rewrite_map_sha256": null,
+    "rewrite_artifact_version": null,
+    "rewrite_artifact_max_rewrites": null,
+    "rewrite_generation_max_tokens": null,
+    "rewrite_temperature": null,
+    "rewrite_prompt_sha256": null,
+    "max_rewrites": null,
+    "rewrite_max_tokens": null,
+    "query_rrf_k": null,
+    "per_query_candidate_multiplier": null,
+    "reranker_model": "BAAI/bge-reranker-base",
+    "sentence_transformers_version": "5.7.0",
+    "reranker_batch_size": 8,
+    "reranker_device": "cpu",
+    "reranker_local_files_only": true,
+    "rerank_candidate_multiplier": 5,
+    "dataset_path": "evaluation/datasets/v2_answer_quality/threshold_dataset.jsonl",
+    "documents_directory": "evaluation/datasets/v2_answer_quality/documents",
+    "dataset_sha256": "8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210",
+    "documents_sha256": "7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878103"
+  },
+  "metrics": {
+    "recall_at_k": 1.0,
+    "precision_at_k": 0.3333333333333333,
+    "mrr_at_k": 0.95,
+    "top_k_hit_rate": 1.0,
+    "correct_document_avg_rank": 1.1,
+    "no_answer_retrieval_accuracy": 0.0,
+    "refusal_accuracy": null,
+    "keyword_coverage": null,
+    "successful_case_rate": 1.0,
+    "average_duration_ms": 1896.7677714269873,
+    "p50_duration_ms": 1631.0015000053681,
+    "p95_duration_ms": 2849.010390001055,
+    "maximum_duration_ms": 7360.433099995134
+  },
+  "category_metrics": {
+    "threshold_hard_negative": {
+      "recall_at_k": null,
+      "precision_at_k": null,
+      "mrr_at_k": null,
+      "top_k_hit_rate": null,
+      "correct_document_avg_rank": null,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 25.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 1711.1498639982892,
+      "p50_duration_ms": 1640.1119000074686,
+      "p95_duration_ms": 2065.841199996066,
+      "maximum_duration_ms": 2533.741799998097
+    },
+    "threshold_positive": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 0.95,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.1,
+      "no_answer_retrieval_accuracy": null,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 10.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 2360.812539998733,
+      "p50_duration_ms": 1601.9936000011512,
+      "p95_duration_ms": 5661.3249000009055,
+      "maximum_duration_ms": 7360.433099995134
+    }
+  },
+  "split_metrics": {
+    "holdout": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 0.9,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.2,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 15.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 1753.6088066650943,
+      "p50_duration_ms": 1640.1119000074686,
+      "p95_duration_ms": 2237.6185599976448,
+      "maximum_duration_ms": 2533.741799998097
+    },
+    "validation": {
+      "recall_at_k": 1.0,
+      "precision_at_k": 0.3333333333333333,
+      "mrr_at_k": 1.0,
+      "top_k_hit_rate": 1.0,
+      "correct_document_avg_rank": 1.0,
+      "no_answer_retrieval_accuracy": 0.0,
+      "refusal_accuracy": null,
+      "keyword_coverage": null,
+      "case_count": 20.0,
+      "successful_case_rate": 1.0,
+      "average_duration_ms": 2004.1369949984073,
+      "p50_duration_ms": 1599.1660999934538,
+      "p95_duration_ms": 3773.426900007328,
+      "maximum_duration_ms": 7360.433099995134
+    }
+  },
+  "cases": [
+    {
+      "case_id": "threshold-val-positive-001",
+      "question": "候选索引在完成哪些步骤后才能切换为 active？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "deployment-policy",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.6838839054107666,
+        0.9911333322525024,
+        1.032318353652954
+      ],
+      "retrieved_lexical_scores": [
+        42.68761068010806,
+        20.379569460516876,
+        11.579623274663486
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.031746031746031744
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9979851245880127,
+        0.4369237720966339,
+        0.11399310827255249
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 7360.433,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-positive-002",
+      "question": "Milvus L2 的 score_threshold 过滤方向是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "observability-operations",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.7300397157669067,
+        1.169853925704956,
+        1.1390140056610107
+      ],
+      "retrieved_lexical_scores": [
+        20.468305076136517,
+        3.0051391746068776,
+        3.8495088610136508
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.030536130536130537,
+        0.031746031746031744
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9946070313453674,
+        0.01940414123237133,
+        0.005057768430560827
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 3584.637,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-positive-003",
+      "question": "检索报告比较时必须对齐哪两个内容指纹？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "retrieval-quality",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        0.6420018076896667,
+        0.9784140586853027,
+        1.208404302597046
+      ],
+      "retrieved_lexical_scores": [
+        22.733112196119542,
+        15.242218781792204,
+        10.666495177891365
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.029877369007803793
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.15473437309265137,
+        0.013186690397560596,
+        0.013021250255405903
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1513.218,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-positive-004",
+      "question": "结构化日志和跨组件 Span 分别用什么标识关联？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-operations",
+        "security-boundaries",
+        "retrieval-quality"
+      ],
+      "retrieved_distances": [
+        0.7754924297332764,
+        1.1791572570800781,
+        1.275316834449768
+      ],
+      "retrieved_lexical_scores": [
+        37.915261785547266,
+        14.835137289595778,
+        12.23414291334754
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.03036576949620428
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9392247796058655,
+        0.0029123928397893906,
+        0.0002824850962497294
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1540.663,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-positive-005",
+      "question": "readiness 成功需要确认哪些依赖？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-policy",
+        "evaluation-gates",
+        "injection-archive-notice"
+      ],
+      "retrieved_distances": [
+        0.8902514576911926,
+        1.0916197299957275,
+        1.1805813312530518
+      ],
+      "retrieved_lexical_scores": [
+        14.24833886982004,
+        0.659494804695355,
+        2.516758767772356
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.030834914611005692,
+        0.03125763125763126
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.12039296329021454,
+        0.0004601010587066412,
+        0.0004146784485783428
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1480.714,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-001",
+      "question": "旧 Collection 的回滚观察期固定为多少天？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "change-records",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        1.045461893081665,
+        0.8527166843414307,
+        1.0408176183700562
+      ],
+      "retrieved_lexical_scores": [
+        35.83548763561023,
+        10.543077049273945,
+        9.792160754284678
+      ],
+      "retrieved_fusion_scores": [
+        0.031544957774465976,
+        0.03252247488101534,
+        0.03149801587301587
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9832751154899597,
+        0.5761305093765259,
+        0.020146599039435387
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1570.557,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-002",
+      "question": "候选索引构建失败后由哪位具体负责人批准继续切换？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "change-records",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.7773351669311523,
+        0.9404816627502441,
+        0.9984328150749207
+      ],
+      "retrieved_lexical_scores": [
+        48.39997787929317,
+        23.61318073437141,
+        26.695731188678376
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03200204813108039,
+        0.03200204813108039
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9649122953414917,
+        0.5445390939712524,
+        0.25440356135368347
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1566.473,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-003",
+      "question": "cleanup 每天固定在北京时间几点自动运行？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "injection-backup-notice",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        1.0895897150039673,
+        0.9421012997627258,
+        1.2128398418426514
+      ],
+      "retrieved_lexical_scores": [
+        7.5401198235011035,
+        4.715051495314745,
+        2.360302963092958
+      ],
+      "retrieved_fusion_scores": [
+        0.03200204813108039,
+        0.03131881575727918,
+        0.02877846790890269
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.005834622774273157,
+        0.004877064842730761,
+        0.000528779171872884
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1499.184,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-004",
+      "question": "qwen3-embedding 的推荐 L2 score_threshold 精确数值是多少？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "lifecycle-operations",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        0.8679068088531494,
+        1.2878398895263672,
+        1.0165088176727295
+      ],
+      "retrieved_lexical_scores": [
+        19.398096601591313,
+        2.6595276936393373,
+        3.6782223425843106
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.029877369007803793,
+        0.03128054740957967
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.5872162580490112,
+        0.0019257839303463697,
+        0.001274451962672174
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1594.39,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-005",
+      "question": "RRF 公式中的 k 在生产环境固定配置成多少？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "evaluation-gates",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        0.9998178482055664,
+        1.0872160196304321,
+        1.3581390380859375
+      ],
+      "retrieved_lexical_scores": [
+        16.36220591902626,
+        10.913854992376601,
+        14.482608821236743
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.031754032258064516,
+        0.0304147465437788
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.07661627233028412,
+        0.001776816905476153,
+        0.0009715973865240812
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1509.914,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-006",
+      "question": "RRF 后使用的 Cross-Encoder 具体模型名是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "lifecycle-operations",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        1.0463727712631226,
+        1.4156254529953003,
+        1.2344019412994385
+      ],
+      "retrieved_lexical_scores": [
+        15.747099101613255,
+        7.174404538894474,
+        8.621554887968506
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.031009615384615385,
+        0.031754032258064516
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.8318006992340088,
+        0.0006651971489191055,
+        0.00046901029418222606
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1863.413,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-007",
+      "question": "Faithfulness 达到多少分时答案质量门禁才通过？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "change-records",
+        "observability-operations"
+      ],
+      "retrieved_distances": [
+        0.7049791812896729,
+        1.1586799621582031,
+        1.1898512840270996
+      ],
+      "retrieved_lexical_scores": [
+        31.94427952066705,
+        12.956180511829174,
+        8.016262028220584
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.0315136476426799,
+        0.030117753623188408
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.4268372356891632,
+        0.0005598184070549905,
+        0.00015140992763917893
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1873.268,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-008",
+      "question": "真实答案评测报告存放在哪个对象存储 bucket？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "security-boundaries",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.8166117668151855,
+        1.2197456359863281,
+        1.0849909782409668
+      ],
+      "retrieved_lexical_scores": [
+        24.451220815998212,
+        8.487386987717873,
+        20.833999091011272
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03036576949620428,
+        0.03200204813108039
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.5990914702415466,
+        0.26456692814826965,
+        0.15653105080127716
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1603.942,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-009",
+      "question": "容量规划时应采用的答案接口 P95 服务目标具体是多少毫秒？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-operations",
+        "service-levels",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.9543114900588989,
+        0.8848155736923218,
+        1.1652624607086182
+      ],
+      "retrieved_lexical_scores": [
+        27.99999618171905,
+        19.92802258991833,
+        14.183841680077485
+      ],
+      "retrieved_fusion_scores": [
+        0.03252247488101534,
+        0.03252247488101534,
+        0.03125763125763126
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9897464513778687,
+        0.0001995463971979916,
+        0.00016476039309054613
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1772.68,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-010",
+      "question": "结构化日志当前使用的是 Elasticsearch 还是 Loki？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "observability-operations",
+        "security-boundaries",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        1.023231029510498,
+        1.2859265804290771,
+        1.2945353984832764
+      ],
+      "retrieved_lexical_scores": [
+        26.38057613108351,
+        11.758961883308169,
+        5.948888953942446
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.031754032258064516,
+        0.03076923076923077
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.33220285177230835,
+        0.002957653719931841,
+        0.0019422947661951184
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1641.033,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-011",
+      "question": "下一次常规维护窗口的具体日期和北京时间是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-policy",
+        "injection-backup-notice",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        1.114640235900879,
+        0.9124919176101685,
+        1.0909905433654785
+      ],
+      "retrieved_lexical_scores": [
+        40.93833668867942,
+        29.906911738739506,
+        11.610818676707124
+      ],
+      "retrieved_fusion_scores": [
+        0.032266458495966696,
+        0.03252247488101534,
+        0.0315136476426799
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.18001215159893036,
+        0.0020160635467618704,
+        0.0001771811512298882
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1731.509,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-012",
+      "question": "readiness 探测失败后固定重试几次才触发回滚？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-policy",
+        "lifecycle-operations",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.7748957872390747,
+        1.1619820594787598,
+        1.0150585174560547
+      ],
+      "retrieved_lexical_scores": [
+        13.730288609953098,
+        17.03980147178748,
+        4.464671162726547
+      ],
+      "retrieved_fusion_scores": [
+        0.03252247488101534,
+        0.031544957774465976,
+        0.03128054740957967
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.5568895936012268,
+        0.0583842433989048,
+        0.03435767441987991
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1666.569,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-013",
+      "question": "跨租户访问规范由哪位批准人签署？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "security-boundaries",
+        "change-records",
+        "observability-operations"
+      ],
+      "retrieved_distances": [
+        0.8734602332115173,
+        1.143097162246704,
+        1.2379162311553955
+      ],
+      "retrieved_lexical_scores": [
+        38.631449189089,
+        9.07446929796807,
+        11.204177093572902
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03149801587301587,
+        0.03128054740957967
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.604178249835968,
+        0.0007995798368938267,
+        0.0007918925257399678
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1671.373,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-014",
+      "question": "生产 API Key 必须每隔多少天轮换一次？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "injection-backup-notice",
+        "security-boundaries",
+        "observability-operations"
+      ],
+      "retrieved_distances": [
+        0.911026120185852,
+        1.120765209197998,
+        1.1380703449249268
+      ],
+      "retrieved_lexical_scores": [
+        12.257392207214894,
+        8.739106249991359,
+        7.811056698479685
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.0315136476426799,
+        0.030798389007344232
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.24812059104442596,
+        0.028500746935606003,
+        0.0035300443414598703
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1536.354,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-val-negative-015",
+      "question": "Aurora Standard 的每月订阅价格是多少？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "service-levels",
+        "lifecycle-operations",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        0.9605231285095215,
+        1.5859286785125732,
+        1.3999710083007812
+      ],
+      "retrieved_lexical_scores": [
+        11.52485873943683,
+        1.7396406742535768,
+        1.5963082520339806
+      ],
+      "retrieved_fusion_scores": [
+        0.03252247488101534,
+        0.029236022193768675,
+        0.03021353930031804
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.0011177245760336518,
+        3.745259527931921e-05,
+        3.74399169231765e-05
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1502.415,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "validation"
+    },
+    {
+      "case_id": "threshold-holdout-positive-001",
+      "question": "include-orphans 为什么不能删除另一个租户已注册的索引？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "security-boundaries",
+        "lifecycle-operations",
+        "injection-archive-notice"
+      ],
+      "retrieved_distances": [
+        0.6802886724472046,
+        1.0208399295806885,
+        1.2537565231323242
+      ],
+      "retrieved_lexical_scores": [
+        52.81619805398273,
+        27.0710300313327,
+        8.76952721152876
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.03076923076923077
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.997566819190979,
+        0.9399158358573914,
+        0.005922531709074974
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1720.859,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-positive-002",
+      "question": "Aurora Standard 和 Premium 的 Chunk 上限分别是多少？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "service-levels",
+        "retrieval-quality",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        0.553155779838562,
+        1.1930768489837646,
+        1.1469203233718872
+      ],
+      "retrieved_lexical_scores": [
+        15.350026136753879,
+        11.576569179469143,
+        4.381216360270771
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.031754032258064516,
+        0.03128054740957967
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9867969751358032,
+        0.0006693772156722844,
+        0.00018727296264842153
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1631.002,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-positive-003",
+      "question": "P1 事件需要在多久内首次响应？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "service-levels",
+        "observability-operations",
+        "change-records"
+      ],
+      "retrieved_distances": [
+        0.7946678400039673,
+        1.059394359588623,
+        1.1838948726654053
+      ],
+      "retrieved_lexical_scores": [
+        45.528405724067824,
+        7.5406599104385155,
+        4.965559800928807
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.03125763125763126
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9985301494598389,
+        0.2791975736618042,
+        0.0001868778490461409
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1557.799,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-positive-004",
+      "question": "真实答案评测报告当前保留多少天？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "change-records",
+        "evaluation-gates",
+        "observability-operations"
+      ],
+      "retrieved_distances": [
+        1.0144751071929932,
+        0.9011940360069275,
+        1.1645618677139282
+      ],
+      "retrieved_lexical_scores": [
+        24.79324917183681,
+        26.801785805205387,
+        9.829061007559126
+      ],
+      "retrieved_fusion_scores": [
+        0.03225806451612903,
+        0.03278688524590164,
+        0.030776515151515152
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9988467693328857,
+        0.9903978109359741,
+        0.5401038527488708
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 0.5,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 2.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1572.986,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-positive-005",
+      "question": "迁移日期的两个草案候选是什么，当前是否已经选定？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "change-records",
+        "deployment-policy",
+        "lifecycle-operations"
+      ],
+      "retrieved_distances": [
+        0.6607028841972351,
+        1.2033641338348389,
+        1.2030093669891357
+      ],
+      "retrieved_lexical_scores": [
+        38.849890638091324,
+        16.389160358901407,
+        12.460320768778077
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03200204813108039,
+        0.031754032258064516
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9759320020675659,
+        0.0033660733606666327,
+        0.0009029747452586889
+      ],
+      "metrics": {
+        "recall_at_k": 1.0,
+        "precision_at_k": 0.3333333333333333,
+        "mrr_at_k": 1.0,
+        "top_k_hit_rate": 1.0,
+        "correct_document_avg_rank": 1.0,
+        "no_answer_retrieval_accuracy": null,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1645.816,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_positive",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-001",
+      "question": "更换 Embedding 模型后新建的 Collection 固定名称是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "lifecycle-operations",
+        "retrieval-quality",
+        "evaluation-gates"
+      ],
+      "retrieved_distances": [
+        0.9160575270652771,
+        1.127814769744873,
+        1.1331088542938232
+      ],
+      "retrieved_lexical_scores": [
+        21.706470975710488,
+        13.531199586355699,
+        10.088189810083174
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.031746031746031744
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.675209105014801,
+        0.01178950909525156,
+        0.004242739174515009
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1556.137,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-002",
+      "question": "哪一种检索模式被规定为所有问题上的固定赢家？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "evaluation-gates",
+        "lifecycle-operations"
+      ],
+      "retrieved_distances": [
+        1.020493507385254,
+        1.1004679203033447,
+        1.4217387437820435
+      ],
+      "retrieved_lexical_scores": [
+        61.75801841993841,
+        17.67500188394302,
+        13.308042702439339
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.030330882352941176
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9978575110435486,
+        0.014026015996932983,
+        0.004268602933734655
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1588.122,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-003",
+      "question": "默认混合检索的 BM25 权重精确设置为多少？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "retrieval-quality",
+        "observability-operations",
+        "injection-archive-notice"
+      ],
+      "retrieved_distances": [
+        0.7167104482650757,
+        1.4090044498443604,
+        1.429973840713501
+      ],
+      "retrieved_lexical_scores": [
+        26.436580377248937,
+        4.23309615734457,
+        2.12717052094957
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.029850746268656716,
+        0.028985507246376812
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.8396636247634888,
+        0.002039647661149502,
+        0.0013953601010143757
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1621.081,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-004",
+      "question": "pre-hardening 报告由哪位具体人员负责人工复核？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "evaluation-gates",
+        "change-records",
+        "lifecycle-operations"
+      ],
+      "retrieved_distances": [
+        0.8696932196617126,
+        1.0587124824523926,
+        1.2628861665725708
+      ],
+      "retrieved_lexical_scores": [
+        22.27327245578963,
+        11.984702610543831,
+        7.555063747337802
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03200204813108039,
+        0.029437229437229435
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.009189082309603691,
+        0.00039060760173015296,
+        0.00010788607323775068
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1613.6,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-005",
+      "question": "P1 确认影响范围后必须在多少分钟内完成故障恢复？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "service-levels",
+        "observability-operations",
+        "injection-backup-notice"
+      ],
+      "retrieved_distances": [
+        0.9241037368774414,
+        1.1840758323669434,
+        1.0189845561981201
+      ],
+      "retrieved_lexical_scores": [
+        64.41228878090425,
+        11.857175114866338,
+        9.505138967551561
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03149801587301587,
+        0.031754032258064516
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9875531196594238,
+        0.09546323120594025,
+        0.0004967013956047595
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 2110.709,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-006",
+      "question": "readiness 失败时回滚到的上一可用镜像具体 tag 是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "deployment-policy",
+        "change-records",
+        "lifecycle-operations"
+      ],
+      "retrieved_distances": [
+        0.6904109716415405,
+        0.9904698133468628,
+        1.1467400789260864
+      ],
+      "retrieved_lexical_scores": [
+        50.310941139036316,
+        14.60672689552617,
+        12.480907326547399
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03225806451612903,
+        0.03149801587301587
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9262672662734985,
+        0.03608635812997818,
+        0.03269936516880989
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 2533.742,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-007",
+      "question": "超级管理员可以绕过 tenant_id 的授权例外是什么？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "security-boundaries",
+        "observability-operations",
+        "service-levels"
+      ],
+      "retrieved_distances": [
+        0.794483482837677,
+        1.192918300628662,
+        1.186802864074707
+      ],
+      "retrieved_lexical_scores": [
+        54.57830367857153,
+        4.584450792205728,
+        6.9070141857186185
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.031009615384615385,
+        0.031746031746031744
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9989226460456848,
+        0.005589593667536974,
+        0.005328529514372349
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1793.163,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-008",
+      "question": "Aurora Premium 每个租户允许多少并发查询？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "service-levels",
+        "security-boundaries",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.672230064868927,
+        1.0586520433425903,
+        1.325308084487915
+      ],
+      "retrieved_lexical_scores": [
+        15.34700247183002,
+        22.77074813564382,
+        1.999767056224273
+      ],
+      "retrieved_fusion_scores": [
+        0.03252247488101534,
+        0.03252247488101534,
+        0.03007688828584351
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.8205438256263733,
+        0.0033456040546298027,
+        3.744434434338473e-05
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1640.112,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-009",
+      "question": "最终批准的迁移日期是 10 月 8 日还是 10 月 15 日？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "change-records",
+        "deployment-policy",
+        "security-boundaries"
+      ],
+      "retrieved_distances": [
+        0.905346155166626,
+        1.3232789039611816,
+        1.4666953086853027
+      ],
+      "retrieved_lexical_scores": [
+        51.84264741599371,
+        14.537574300221754,
+        7.131851290958323
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.031746031746031744,
+        0.030090497737556562
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9984222650527954,
+        0.0007280826685018837,
+        0.0004484874370973557
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1886.372,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    },
+    {
+      "case_id": "threshold-holdout-negative-010",
+      "question": "回滚演练最终选定 release-2026.08-a 还是 release-2026.08-b？",
+      "top_k": 3,
+      "retrieved_document_ids": [
+        "change-records",
+        "lifecycle-operations",
+        "deployment-policy"
+      ],
+      "retrieved_distances": [
+        0.7320842146873474,
+        1.1776809692382812,
+        1.025590419769287
+      ],
+      "retrieved_lexical_scores": [
+        47.89438667053031,
+        5.947959276887326,
+        6.527087762629874
+      ],
+      "retrieved_fusion_scores": [
+        0.03278688524590164,
+        0.03055037313432836,
+        0.031746031746031744
+      ],
+      "retrieved_query_fusion_scores": [
+        null,
+        null,
+        null
+      ],
+      "retrieved_rerank_scores": [
+        0.9994505047798157,
+        0.07543011009693146,
+        0.07029905170202255
+      ],
+      "metrics": {
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "mrr_at_k": null,
+        "top_k_hit_rate": null,
+        "correct_document_avg_rank": null,
+        "no_answer_retrieval_accuracy": 0.0,
+        "refusal_accuracy": null,
+        "keyword_coverage": null
+      },
+      "duration_ms": 1832.635,
+      "status": "success",
+      "answered": null,
+      "error_type": null,
+      "category": "threshold_hard_negative",
+      "split": "holdout"
+    }
+  ]
+}

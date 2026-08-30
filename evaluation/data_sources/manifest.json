@@ -1,0 +1,269 @@
+{
+  "schema_version": "p2-data-source-manifest-v1",
+  "audit_date": "2026-08-29",
+  "audit_scope": "DS-01 public retrieval source, revision, license, size and acquisition feasibility audit",
+  "download_authorized": true,
+  "download_authorization": {
+    "authorized_date": "2026-08-29",
+    "stage": "DS-02",
+    "source_ids": ["t2ranking-mteb-dev", "beir-nfcorpus", "beir-scifact"],
+    "excluded_source_ids": ["miracl-zh-dev", "dureader-retrieval-mteb-dev", "mmarco-chinese-mteb-dev", "mr-tydi-v1.1"]
+  },
+  "budget": {
+    "raw_plus_normalized_limit_bytes": 21474836480,
+    "single_source_limit_bytes": 8589934592,
+    "minimum_free_space_bytes": 128849018880,
+    "automatic_download_attempts": 3,
+    "maximum_end_to_end_runtime_hours": 24,
+    "maximum_launch_projection_hours": 18
+  },
+  "decisions": {
+    "approved_for_ds02": "Source and license evidence are sufficient for a bounded local acquisition after the next stage is approved.",
+    "conditional_local_only": "May be acquired for local audit after DS-02 approval, but raw and derived text must not be redistributed until the license/provenance issue is resolved.",
+    "deferred": "Not suitable for the current Chinese retrieval objective or exceeds the declared acquisition boundary.",
+    "catalog_only": "Registry or task metadata only; no dataset download."
+  },
+  "sources": [
+    {
+      "id": "t2ranking-mteb-dev",
+      "track": "A-public-benchmark",
+      "role": "primary Chinese passage retrieval control",
+      "decision": "approved_for_ds02",
+      "selected_artifact": {
+        "dataset_id": "mteb/T2Retrieval",
+        "revision": "cf778c0ea4168ec5174a34d888d6453e4cde9222",
+        "download_bytes": 158850394,
+        "expanded_dataset_bytes": 282511914,
+        "counts": {
+          "corpus": 118605,
+          "queries": 22812,
+          "qrels": 118932,
+          "split": "dev"
+        },
+        "files": [
+          {"path": "corpus/dev-00000-of-00001.parquet", "bytes": 156879982, "sha256": "8f0400530c6ba664e580e2ae7bb5ed41a908b8abc17c3b3934f42cc65992ac1e", "kind": "corpus", "rows": 118605, "columns": ["_id", "text", "title"]},
+          {"path": "data/dev-00000-of-00001.parquet", "bytes": 1149414, "sha256": "c4c6ffd715faf151e0832a26dfcf2d7ec1edc17d9620a9aa99e721cc2436d7d2", "kind": "qrels", "rows": 118932, "columns": ["query-id", "corpus-id", "score"]},
+          {"path": "queries/dev-00000-of-00001.parquet", "bytes": 817540, "sha256": "186b4d0a13cc4d8339eccfc6d465d1b2d4d1f6572defa8d39f3c8da3b66b0210", "kind": "queries", "rows": 22812, "columns": ["_id", "text"]}
+        ]
+      },
+      "official_source": "https://github.com/THUIR/T2Ranking",
+      "official_dataset": "https://huggingface.co/datasets/THUIR/T2Ranking",
+      "registry_task": "https://github.com/embeddings-benchmark/mteb/blob/d384f76b903f5b4f5cf9b9808adb2e2e4d40aa59/mteb/tasks/retrieval/zho/cmteb_retrieval.py",
+      "upstream_license": "Apache-2.0",
+      "license_evidence": "THUIR README states Apache License 2.0; MTEB task metadata records apache-2.0. The selected MTEB mirror card is blank, so attribution and file provenance must be retained.",
+      "feasibility": "Selected dev snapshot is below the 8 GiB per-source limit. The full THUIR repository is approximately 32.8 GB and is not approved for acquisition.",
+      "notes": "MTEB task is human-annotated, Chinese (cmn-Hans), ndcg_at_10, dev split."
+    },
+    {
+      "id": "miracl-zh-dev",
+      "track": "A-public-benchmark",
+      "role": "primary multilingual/Chinese retrieval control",
+      "decision": "conditional_local_only",
+      "selected_artifact": {
+        "dataset_id": "mteb/MIRACLRetrieval",
+        "revision": "9c09abc13478308c27598f350e31d8f06b9b5481",
+        "download_bytes": 1092278097,
+        "expanded_dataset_bytes": 1769027614,
+        "counts": {
+          "corpus": 4934368,
+          "queries": 393,
+          "qrels": 3928,
+          "language": "zh",
+          "split": "dev"
+        },
+        "files": [
+          {"path": "zh-corpus/dev-00000-of-00004.parquet", "bytes": 267726509, "sha256": "fcca65e14f25e24c51b4f7837a0bbd45c3a0a83609c6634baac14402ea0236aa"},
+          {"path": "zh-corpus/dev-00001-of-00004.parquet", "bytes": 239033388, "sha256": "7ec4674600084a4c36acf125d3eaf1c657b38c69e553a3b20c5cfc3e30b084e7"},
+          {"path": "zh-corpus/dev-00002-of-00004.parquet", "bytes": 292325426, "sha256": "4efe375653b9de034408b8564f63717c5e001db51fb134a749a551f431d2cb0b"},
+          {"path": "zh-corpus/dev-00003-of-00004.parquet", "bytes": 293136321, "sha256": "89984fe58af6fa09e0baf3bb0d9e2a814fcd2fa895cdf261a4c5c2dc67ada467"},
+          {"path": "zh-qrels/dev-00000-of-00001.parquet", "bytes": 42650, "sha256": "20a953fbac41f0e352aefd43958b79bf9cd9e1ed0817c14cc71f362d06f668db"},
+          {"path": "zh-queries/dev-00000-of-00001.parquet", "bytes": 13803, "sha256": "39c60e6300e076db1854473f29f104fdd4b44651ddbabee8e0df37b31e8d7cd6"}
+        ]
+      },
+      "official_source": "https://github.com/project-miracl/miracl",
+      "official_dataset": "https://huggingface.co/datasets/miracl/miracl",
+      "official_corpus": "https://huggingface.co/datasets/miracl/miracl-corpus",
+      "registry_task": "https://github.com/embeddings-benchmark/mteb/blob/d384f76b903f5b4f5cf9b9808adb2e2e4d40aa59/mteb/tasks/retrieval/multilingual/miracl_retrieval.py",
+      "upstream_license": "Apache-2.0 on official Hugging Face cards; CC-BY-SA-4.0 in MTEB task metadata and selected MTEB card",
+      "license_evidence": "Conflicting license declarations require legal/provenance review before any redistribution of raw or derived text.",
+      "feasibility": "Chinese dev snapshot is approximately 1.02 GiB compressed and 1.77 GB expanded, within the per-source limit. Full multilingual corpus is not approved.",
+      "notes": "Corpus consists of Wikipedia passages, not full articles. The selected zh configuration has 4,934,368 passages and 393 dev queries; the high passage count is expected."
+    },
+    {
+      "id": "dureader-retrieval-mteb-dev",
+      "track": "A-public-benchmark",
+      "role": "primary Chinese web-search retrieval control",
+      "decision": "conditional_local_only",
+      "selected_artifact": {
+        "dataset_id": "mteb/DuRetrieval",
+        "revision": "313c81b51311893c8fd09ca432f96b841ed0ebb3",
+        "download_bytes": 64985502,
+        "expanded_dataset_bytes": 113802413,
+        "counts": {
+          "corpus": 100001,
+          "queries": 2000,
+          "qrels": 9839,
+          "split": "dev"
+        },
+        "files": [
+          {"path": "corpus/dev-00000-of-00001.parquet", "bytes": 64442871, "sha256": "dc60d5f9b5a642371c19602c94e79b4a6df2e1a667b0642d0980f4e47f072df2"},
+          {"path": "data/dev-00000-of-00001.parquet", "bytes": 420717, "sha256": "e310a25c8cfe7164fc4bed6e115dc9b43b02a8399c44e61ca28cadda93ae2ad4"},
+          {"path": "queries/dev-00000-of-00001.parquet", "bytes": 118467, "sha256": "bfb7b9433ab3ccbb1f18d1ded6f6ce8f3988f2bf65f374735714a26ba09089ea"}
+        ]
+      },
+      "official_source": "https://github.com/baidu/DuReader/tree/master/DuReader-Retrieval",
+      "official_dataset": "https://huggingface.co/datasets/zyznull/dureader-retrieval-ranking",
+      "registry_task": "https://github.com/embeddings-benchmark/mteb/blob/d384f76b903f5b4f5cf9b9808adb2e2e4d40aa59/mteb/tasks/retrieval/zho/cmteb_retrieval.py",
+      "upstream_license": "Not stated in the official repository root; MTEB task metadata states Apache-2.0",
+      "license_evidence": "Official repository license is not explicit while the selected MTEB mirror card is blank. Keep local-only until provenance and redistribution terms are confirmed.",
+      "feasibility": "Selected dev snapshot is approximately 62 MiB compressed and 114 MB expanded, within budget.",
+      "notes": "MTEB task is human-annotated, Chinese (cmn-Hans), ndcg_at_10, dev split."
+    },
+    {
+      "id": "mmarco-chinese-mteb-dev",
+      "track": "A-public-benchmark",
+      "role": "supplementary Chinese translated passage ranking control",
+      "decision": "conditional_local_only",
+      "selected_artifact": {
+        "dataset_id": "mteb/MMarcoRetrieval",
+        "revision": "4940a7b26bf53463cfe3435bb8e201963e9c31ae",
+        "download_bytes": 20557139,
+        "expanded_dataset_bytes": 32045929,
+        "counts": {
+          "corpus": 106813,
+          "queries": 6980,
+          "qrels": 7437,
+          "split": "dev"
+        },
+        "files": [
+          {"path": "corpus/dev-00000-of-00001.parquet", "bytes": 20219994, "sha256": "c6d27f1c88b424b711b21d41bb0f3e5b1b43d7e7d9303fbb795404f48cf7f14c"},
+          {"path": "data/dev-00000-of-00001.parquet", "bytes": 114126, "sha256": "2de65e0744870ed8bd0790eca6790597c6513770b027ffc9d8dd34206de7e296"},
+          {"path": "queries/dev-00000-of-00001.parquet", "bytes": 219572, "sha256": "f4176ed7005710ca86a8f6cf4d1ebffafe7f6dccc536a452f8a92b106410b03c"}
+        ]
+      },
+      "official_source": "https://github.com/unicamp-dl/mMARCO",
+      "official_dataset": "https://huggingface.co/datasets/unicamp-dl/mmarco",
+      "registry_task": "https://github.com/embeddings-benchmark/mteb/blob/d384f76b903f5b4f5cf9b9808adb2e2e4d40aa59/mteb/tasks/retrieval/zho/cmteb_retrieval.py",
+      "upstream_license": "Apache-2.0 in the official mMARCO repository; selected MTEB Chinese derived task says license not specified",
+      "license_evidence": "The official full dataset is Apache-2.0, but the selected Chinese MTEB snapshot is a derived artifact with no card license. Local-only pending provenance review.",
+      "feasibility": "Selected dev snapshot is approximately 20 MiB compressed and 32 MB expanded. The official full mMARCO repository is approximately 192 GB and is not approved.",
+      "notes": "Use only as supplementary evidence; do not combine its score with Track B production claims."
+    },
+    {
+      "id": "mr-tydi-v1.1",
+      "track": "A-public-benchmark",
+      "role": "optional multilingual retrieval control",
+      "decision": "deferred",
+      "selected_artifact": null,
+      "official_source": "https://github.com/castorini/mr.tydi",
+      "official_dataset": "https://huggingface.co/datasets/castorini/mr-tydi",
+      "upstream_license": "Apache-2.0",
+      "license_evidence": "Official repository and dataset card state Apache-2.0.",
+      "feasibility": "Full repository is approximately 25.0 GB; more importantly, v1.1 has no Chinese configuration. It covers Arabic, Bengali, English, Finnish, Indonesian, Japanese, Korean, Russian, Swahili, Telugu and Thai.",
+      "notes": "Do not label Mr. TyDi as a Chinese dataset. Reopen only for a multilingual control after the Chinese track is complete."
+    },
+    {
+      "id": "beir-nfcorpus",
+      "track": "A-public-benchmark",
+      "role": "small English graded-relevance pipeline control",
+      "decision": "approved_for_ds02",
+      "selected_artifact": {
+        "dataset_ids": ["BeIR/nfcorpus", "BeIR/nfcorpus-qrels"],
+        "revisions": {
+          "BeIR/nfcorpus": "b5026a0e96e8a7ac4f95f482a596389289d46269",
+          "BeIR/nfcorpus-qrels": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65"
+        },
+        "download_bytes": 6308571,
+        "expanded_dataset_bytes": 10528194,
+        "counts": {"corpus": 3633, "queries": 3237, "qrels": 134294},
+        "license": "CC-BY-SA-4.0",
+        "repositories": [
+          {
+            "dataset_id": "BeIR/nfcorpus",
+            "revision": "b5026a0e96e8a7ac4f95f482a596389289d46269",
+            "files": [
+              {"path": "corpus/corpus-00000-of-00001.parquet", "bytes": 3157570, "sha256": "f2a1c0b570a5efdf23cfa36f5e573d062cc113c6e7251e22c69b323a33ea895e", "kind": "corpus", "rows": 3633, "columns": ["_id", "title", "text"]},
+              {"path": "queries/queries-00000-of-00001.parquet", "bytes": 80929, "sha256": "edd2b878b8130fb3b5e3c4b9428ddc1e67fbd6eedf8ae099fca3b87838ba6b29", "kind": "queries", "rows": 3237, "columns": ["_id", "title", "text"]}
+            ]
+          },
+          {
+            "dataset_id": "BeIR/nfcorpus-qrels",
+            "revision": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65",
+            "files": [
+              {"path": "dev.tsv", "bytes": 258218, "sha256": "b1d38b5e8f78c4a5820bce2b7ec2db54911d7690dc601e76811846b211180bd8", "kind": "qrels", "split": "dev", "rows": 11385, "columns": ["query-id", "corpus-id", "score"]},
+              {"path": "test.tsv", "bytes": 279572, "sha256": "f8fba6ef3d4dd9c3a242a8ba4ae38276fc3622fce7dcbae764766d564542fd2a", "kind": "qrels", "split": "test", "rows": 12334, "columns": ["query-id", "corpus-id", "score"]},
+              {"path": "train.tsv", "bytes": 2504643, "sha256": "6336b80f9bffc4f063f3aa450047ad35c0b7c534efe4a6ba35e16dbace047f6a", "kind": "qrels", "split": "train", "rows": 110575, "columns": ["query-id", "corpus-id", "score"]}
+            ]
+          }
+        ]
+      },
+      "official_source": "https://github.com/beir-cellar/beir",
+      "official_dataset": "https://beir.ai/",
+      "license_evidence": "Hugging Face dataset and qrels cards state CC-BY-SA-4.0; derived redistributable outputs must preserve attribution and share-alike terms.",
+      "feasibility": "Approximately 6.3 MB download and 10.5 MB expanded.",
+      "notes": "English biomedical corpus; useful for adapter and graded-qrels validation, not a Chinese production proxy."
+    },
+    {
+      "id": "beir-scifact",
+      "track": "A-public-benchmark",
+      "role": "small English scientific retrieval control",
+      "decision": "approved_for_ds02",
+      "selected_artifact": {
+        "dataset_ids": ["BeIR/scifact", "BeIR/scifact-qrels"],
+        "revisions": {
+          "BeIR/scifact": "b3b5335604bf5ee3c4447671af975ea25143d4f5",
+          "BeIR/scifact-qrels": "2938d17dc3b09882fdb8c12bbbe2e2dc0e75a029"
+        },
+        "download_bytes": 4582323,
+        "expanded_dataset_bytes": 8164958,
+        "counts": {"corpus": 5183, "queries": 1109, "qrels": 1258, "evaluation_queries": 300, "evaluation_qrels": 339, "evaluation_split": "test"},
+        "license": "CC-BY-SA-4.0",
+        "repositories": [
+          {
+            "dataset_id": "BeIR/scifact",
+            "revision": "b3b5335604bf5ee3c4447671af975ea25143d4f5",
+            "files": [
+              {"path": "corpus/corpus-00000-of-00001.parquet", "bytes": 4469916, "sha256": "243324b35f03d82bd6d98a5f575966876e86cad7ce16e5333a35b1b793dc4f45", "kind": "corpus", "rows": 5183, "columns": ["_id", "title", "text"]},
+              {"path": "queries/queries-00000-of-00001.parquet", "bytes": 64982, "sha256": "1c37956c5dc8b810b60302323c24d1a9e79e26411ba8f5ad9d0888642e2a9034", "kind": "queries", "rows": 1109, "columns": ["_id", "title", "text"]}
+            ]
+          },
+          {
+            "dataset_id": "BeIR/scifact-qrels",
+            "revision": "2938d17dc3b09882fdb8c12bbbe2e2dc0e75a029",
+            "files": [
+              {"path": "test.tsv", "bytes": 5389, "sha256": "0864bb985e0ca2367ba217977e72004d549054b2b06666ed9d4825ac7c21284c", "kind": "qrels", "split": "test", "rows": 339, "columns": ["query-id", "corpus-id", "score"]},
+              {"path": "train.tsv", "bytes": 14502, "sha256": "a53f2114831916c096b6c37d9e54da68cef4efdcdbd5ed46533601af972acf1d", "kind": "qrels", "split": "train", "rows": 919, "columns": ["query-id", "corpus-id", "score"]}
+            ]
+          }
+        ]
+      },
+      "official_source": "https://github.com/beir-cellar/beir",
+      "official_dataset": "https://beir.ai/",
+      "license_evidence": "Hugging Face dataset and qrels cards state CC-BY-SA-4.0; derived redistributable outputs must preserve attribution and share-alike terms.",
+      "feasibility": "Approximately 4.6 MB download and 8.2 MB expanded.",
+      "notes": "English scientific corpus; useful for adapter and citation-style retrieval checks, not a Chinese production proxy."
+    },
+    {
+      "id": "c-mteb-registry",
+      "track": "A-public-benchmark",
+      "role": "task registry and metadata source",
+      "decision": "catalog_only",
+      "selected_artifact": null,
+      "official_source": "https://github.com/embeddings-benchmark/mteb",
+      "registry_revision": "d384f76b903f5b4f5cf9b9808adb2e2e4d40aa59",
+      "license": "Apache-2.0 for the MTEB code repository; individual dataset licenses remain authoritative",
+      "feasibility": "No dataset download. Pin task metadata and dataset revisions in this manifest.",
+      "notes": "Registry metadata is not itself a license grant for the underlying datasets."
+    }
+  ],
+  "source_hashes": {
+    "mteb_task_zho_cmteb_retrieval_py_sha256": "2b6f209bb3cec4da4af3c1541b93c984f8b94440fd29b84d9fe4a2fc964b57d2",
+    "mteb_task_miracl_retrieval_py_sha256": "453fb329687a8ddaebd93867223945c00bc0d1e35a57cebb47040865042bd046"
+  },
+  "overall_recommendation": {
+    "ds02_candidates": ["t2ranking-mteb-dev", "beir-nfcorpus", "beir-scifact"],
+    "ds02_candidates_after_license_review": ["miracl-zh-dev", "dureader-retrieval-mteb-dev", "mmarco-chinese-mteb-dev"],
+    "deferred": ["mr-tydi-v1.1"],
+    "initial_runtime_strategy": "Acquire approved small snapshots first, run a bounded pilot, then separately approve the MIRACL zh snapshot. Do not acquire full T2Ranking, full Mr. TyDi or full mMARCO repositories."
+  }
+}

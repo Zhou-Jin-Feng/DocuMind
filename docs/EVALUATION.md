@@ -454,6 +454,130 @@ Embedding、Schema、Retrieval、服务版本、Python 实现和操作系统指�
 Milvus、领域语义质量或线上延迟，也不能用于选择生产距离阈值。真实 Provider
 结论必须使用隔离 Collection 和单独校准的数据集生成。
 
+### P2-01 增强检索上线决策
+
+P2-01 使用 `evaluation/datasets/v2_answer_quality/threshold_dataset.jsonl` 的
+35 个冻结案例和 11 份合成语料，对 Dense、BM25、Hybrid 及
+Hybrid + `BAAI/bge-reranker-base` 进行同输入真实对照。数据包含 20 个
+validation 案例和 15 个 holdout 案例；最终决策只读取 holdout，其中 5 个可回答、
+10 个困难无答案案例。Dense、Hybrid 和 Reranker 使用本地 Ollama
+`qwen3-embedding`、4096 维向量和隔离 Milvus Collection；Reranker 使用 CPU
+及本地模型缓存。所有临时 Collection 在报告生成后已删除。
+
+候选门禁要求：至少 30 个总案例、15 个 validation、15 个 holdout，Recall、MRR
+和无答案准确率不得低于 Dense，至少一项达到预先固定的最小收益，成功率为
+`1.0`，且 P95 增量不超过 `750 ms`、倍数不超过 `2.0`。门禁还会校验四份报告
+的案例指纹、数据集/语料指纹、分块、Embedding、阈值和 Hybrid 配置，并记录
+每份源报告的 SHA-256。门禁还会从逐案结果重新计算 validation/holdout 的关键
+质量、成功率和 P95 指标；报告内聚合值与逐案结果不一致时按无效证据拒绝。
+
+| 模式 | Holdout Recall@3 | Holdout MRR@3 | Holdout 无答案 | Holdout P95 |
+|---|---:|---:|---:|---:|
+| Dense | 1.0000 | 1.0000 | 0.0000 | 163.6 ms |
+| BM25 | 1.0000 | 1.0000 | 0.0000 | 0.6 ms |
+| Hybrid | 1.0000 | 1.0000 | 0.0000 | 166.9 ms |
+| Hybrid + Reranker | 1.0000 | 0.9000 | 0.0000 | 2237.6 ms |
+
+运行决策器：
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.retrieval_candidate_gate_runner `
+  --dense evaluation/reports/p2_1_ollama_threshold_dense.json `
+  --bm25 evaluation/reports/p2_1_bm25_threshold.json `
+  --hybrid evaluation/reports/p2_1_ollama_threshold_hybrid.json `
+  --rerank evaluation/reports/p2_1_ollama_threshold_hybrid_rerank.json `
+  --output-json evaluation/baselines/p2_retrieval_candidate_decision_v1.json `
+  --output-markdown evaluation/baselines/p2_retrieval_candidate_decision_v1.md
+```
+
+退出码 `0` 表示至少一个候选满足 `GO`，`1` 表示证据有效但结论为 `NO_GO`，
+`2` 表示报告无效或不可比较。本次正式结论为 `NO_GO`：在当前 11 Chunk、每份
+语料基本只有一个 Chunk 且 5 条可回答 holdout 的 Dense Top-1 已为 `1.0` 的
+天花板数据上，BM25 和 Hybrid 未观测到可计入门禁的质量收益；这不是对它们在
+更大或更困难语料上“普遍无收益”的证明。Reranker 的 MRR 下降 `0.10`，P95
+增加约 `2074 ms`、达到 Dense 的 `13.67` 倍。P2-01 因此按条件阶段关闭为 `DEFERRED`，公共 Schema `1.0`、
+`dense-v1`、单文档范围和现有阈值行为均不改变。该结论只适用于冻结数据、
+语料和本机运行环境；以后若更换代表性数据或候选配置，必须生成新的版本化决策，
+不能覆盖本工件。
+
+复审补充：四份报告的逐案诊断已写入决策工件的 `Diagnostic Signals`。Dense、
+BM25 和 Hybrid 的可回答 Top-1 比例均为 `1.0`，因此 Recall/MRR 没有上升空间；
+Reranker 有 1 条可回答案例从第 1 位降到第 2 位。四种模式对 10 条无答案案例均
+返回非空候选（`candidate_no_answer_non_empty_rate=1.0`），这是因为本次对照明确
+不带拒答阈值，不能解释为候选拒答能力相同。Reranker 的 holdout 单案例耗时范围
+为 `1556.1–2533.7 ms`；首轮模型加载另在 validation 中形成冷启动长尾，热路径仍
+远超 Dense，故延迟门禁失败并非统计误差。
+
+### P2-01 DS-02 公开数据获取与试跑
+
+DS-02 只获取 `evaluation/data_sources/manifest.json` 的
+`download_authorization.source_ids` 白名单。下载器使用固定 revision、单线程、
+`.part` Range 续传、三次退避、原子发布、逐文件大小/SHA-256 校验、20 GiB 总预算、
+8 GiB 单来源上限和 120 GiB 最低空闲门禁。raw 与 normalized 数据均位于 Git 忽略的
+`data/evaluation_sources/`。
+
+安装开发/评测依赖后执行或复验下载：
+
+```powershell
+.\venv\Scripts\python.exe evaluation/data_source_downloader.py download
+.\venv\Scripts\python.exe evaluation/data_source_downloader.py verify
+```
+
+真读取 Parquet/TSV 并运行有界本地 Embedding pilot：
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.data_source_validation `
+  --read-rows-per-source 1000 `
+  --embedding-sample-size 32 `
+  --embedding-batch-size 8 `
+  --output-json evaluation/reports/p2_ds02_acquisition_evidence_v1.json `
+  --output-markdown evaluation/reports/p2_ds02_acquisition_evidence_v1.md
+```
+
+本次 12 个文件共 169,682,657 bytes，T2Ranking dev、BEIR NFCorpus 与 BEIR
+SciFact 的大小、哈希、字段和行数全部通过。3,000 行有界读取完成；32 条 T2 中文
+passage 使用 `qwen3-embedding`、batch 8、4096 维，最近一次政策刷新复跑测得约
+2.96 passage/s。
+
+MIRACL 全量下载/建库结论为 `DEFER_FULL_DOWNLOAD`。其 Embedding-only 方向性
+外推约 462.6 小时，超过 18 小时启动线约 25.7 倍、超过 24 小时硬上限约 19.3
+倍；raw float32 向量约 80.8 GB，
+还会在计算 Milvus index/WAL 前突破 120 GiB 空闲下限，且许可证来源冲突尚未解决。
+只有先冻结不需要全量 Dense 建库的确定性子集或 hard-negative 协议、解决许可证，
+并证明端到端预计不超过 18 小时、实际运行硬停不超过 24 小时且磁盘满足下限，才能
+重新申请 MIRACL。端到端计时覆盖下载、标准化、Embedding、Milvus 写入/建索引、
+检索与 Reranker 评测、报告生成和清理。
+
+### P2-01 DS-03 确定性规范化
+
+DS-03 将 T2Ranking dev、BEIR NFCorpus 和 BEIR SciFact 的官方 corpus、query、qrels
+转换为严格版本化的 `documents.jsonl`、`queries.jsonl`、`qrels.jsonl` 和根
+`snapshot.json`。四份 JSON Schema 位于 `evaluation/data_sources/contracts/`，
+适配器与 CLI 位于 `evaluation/data_source_normalization.py`，详细字段和边界见
+`evaluation/data_sources/README.md`。
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.data_source_normalization build `
+  --report-json evaluation/reports/p2_ds03_normalization_evidence_v1.json `
+  --report-markdown evaluation/reports/p2_ds03_normalization_evidence_v1.md
+
+.\venv\Scripts\python.exe -m evaluation.data_source_normalization validate
+```
+
+非空目标目录默认拒绝覆盖；只有显式 `--replace` 且旧目录包含有效 DS-03
+`snapshot.json` 归属标记时才允许原子替换。构建器会拒绝重复 ID/qrels、悬空引用、
+跨 split 查询、`0-3` 外相关性等级和路径穿越。规范化只移除 BOM、统一换行，不猜测
+或修复上游文本编码。
+
+本次产出 127,421 份文档、27,158 条查询、254,484 条 qrels；独立临时目录重建的
+`snapshot.json` 与九个 JSONL 文件全部逐字节一致，聚合数据指纹为
+`05096037d6cdd2ae9667e66616ae1f55c8236383f0a72f559f4f1846618fbaaa`。T2 原始语料中
+23/118,605 个 document 行含 Unicode replacement character，查询为 0/22,812；
+该上游局部缺陷被原样保留并须在后续评测中显式审计。
+
+本阶段没有下载新数据、运行 Embedding、写入 Milvus、调用生成模型或改变公共
+`/api/v1/retrieve`、Schema `1.0`、`dense-v1` 和单文档范围。
+
 ## 回归门控
 
 在 Python 中将当前报告与保存的基线进行比较：
@@ -488,4 +612,4 @@ result.assert_passed()
 
 ## 范围
 
-当前 v2.0.8 仍将查询重写和交叉编码器重排序保留在 Web 默认请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。旧 Prompt 对照、阈值校准和 Prompt/引用加固均已完成；阈值结论是不启用，答案质量结果只适用于固定数据集、语料和 Provider 配置。
+当前 v2.2.0 仍将查询重写、BM25/Hybrid 和交叉编码器重排序保留在公共请求路径之外。Docker Compose 已覆盖 FastAPI、React、Milvus、etcd 和 MinIO；Prometheus/Grafana/Jaeger 等完整可观测性后端、Celery/Redis、身份验证、在线历史感知检索和生产发布策略仍是后续路线图项目。旧 Prompt 对照、阈值校准和 Prompt/引用加固均已完成；阈值结论是不启用，P2-01 增强检索结论为 `NO_GO`，答案质量和检索候选结果只适用于各自固定数据集、语料和 Provider 配置。

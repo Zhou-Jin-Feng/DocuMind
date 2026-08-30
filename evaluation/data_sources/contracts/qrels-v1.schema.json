@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-normalized-qrels-v1.schema.json",
+  "title": "DocuMind P2 Normalized Qrel V1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "p2-normalized-qrel-v1"},
+    "id": {"type": "string", "pattern": "^p2n:qrel:[a-f0-9]{64}$"},
+    "source_snapshot_id": {"type": "string", "minLength": 1},
+    "query_id": {"type": "string", "pattern": "^p2n:query:[a-f0-9]{64}$"},
+    "document_id": {"type": "string", "pattern": "^p2n:document:[a-f0-9]{64}$"},
+    "relevance_grade": {"type": "integer", "minimum": 0, "maximum": 3},
+    "label_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": ["official_qrels", "human_review", "assisted_unverified"]
+        },
+        "source_dataset": {"type": "string", "minLength": 1},
+        "source_revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "source_split": {"type": "string", "minLength": 1},
+        "source_query_id": {"type": "string", "minLength": 1},
+        "source_document_id": {"type": "string", "minLength": 1}
+      },
+      "required": [
+        "method",
+        "source_dataset",
+        "source_revision",
+        "source_split",
+        "source_query_id",
+        "source_document_id"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "source_snapshot_id",
+    "query_id",
+    "document_id",
+    "relevance_grade",
+    "label_provenance"
+  ]
+}

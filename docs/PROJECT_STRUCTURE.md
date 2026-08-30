@@ -105,6 +105,15 @@ DocuMind/
 │   ├── regression_runner.py
 │   ├── retrieve_quality.py
 │   ├── retrieve_quality_runner.py
+│   ├── retrieval_candidate_gate.py
+│   ├── retrieval_candidate_gate_runner.py
+│   ├── data_source_downloader.py
+│   ├── data_source_validation.py
+│   ├── data_source_normalization.py
+│   ├── data_sources/
+│   │   ├── manifest.json
+│   │   ├── README.md
+│   │   └── contracts/
 │   ├── reports.py
 │   ├── runner.py
 │   ├── datasets/
@@ -125,6 +134,7 @@ DocuMind/
 │   │   ├── deterministic_dense_v2.json
 │   │   ├── deterministic_dense_v2.md
 │   │   ├── retrieve_quality_v1.json / .md
+│   │   ├── p2_retrieval_candidate_decision_v1.json / .md
 │   │   └── README.md
 │   └── reports/
 │       ├── v2_answer_pre_hardening.json
@@ -256,9 +266,17 @@ DocuMind/
 | `evaluation/regression_runner.py` | 报告兼容性校验和自动回归门禁 CLI |
 | `evaluation/retrieve_quality.py` | 单文档 Chunk 级数据集校验、生产 RetrievalService 评测和隔离指标 |
 | `evaluation/retrieve_quality_runner.py` | 原子生成纯检索 JSON/Markdown 报告并强制契约不变量 |
+| `evaluation/retrieval_candidate_gate.py` | P2 四模式证据兼容、holdout 收益/回归、P95 预算和确定性 Go/No-Go 决策 |
+| `evaluation/retrieval_candidate_gate_runner.py` | 原子生成 P2 候选决策工件并提供稳定的 GO/NO_GO/输入错误退出码 |
+| `evaluation/data_source_downloader.py` | DS-02 固定 revision 数据下载、Range 续传、原子发布、逐文件哈希与磁盘预算门禁 |
+| `evaluation/data_source_validation.py` | DS-02 Parquet/TSV 结构、行数、完整性和有界本地 Embedding 吞吐证据 |
+| `evaluation/data_source_normalization.py` | DS-03 三来源适配器、稳定 ID、严格 qrels 完整性、原子规范化构建与快照复验 CLI |
+| `evaluation/data_sources/contracts/*.schema.json` | DS-03 documents、queries、qrels、snapshot 的严格版本化 JSON Schema |
+| `evaluation/reports/p2_ds03_normalization_evidence_v1.*` | 三来源规范化计数、输入 revision 和可复现指纹的脱敏证据 |
 | `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
 | `evaluation/baselines/deterministic_dense_v2.*` | v2.0.1 冻结、供 v2.0.2 PR CI 实时比较的 Dense 基线与可读报告 |
 | `evaluation/baselines/retrieve_quality_v1.*` | v2.2.0 单文档纯检索 API、底层排序一致和污染清零基线 |
+| `evaluation/baselines/p2_retrieval_candidate_decision_v1.*` | P2-01 真实 Dense/BM25/Hybrid/Reranker 对照与 `NO_GO` 决策 |
 | `evaluation/reports/v2_answer_pre_hardening.*` | v2.0.6 固化的旧 Prompt 真实 JSON/Markdown 对照与逐案人工复核记录 |
 | `evaluation/reports/v2_threshold_validation_*` | v2.0.7 无阈值 validation 原始结果、59 候选扫描与不启用复核记录 |
 

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-normalized-documents-v1.schema.json",
+  "title": "DocuMind P2 Normalized Document V1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "p2-normalized-document-v1"},
+    "id": {"type": "string", "pattern": "^p2n:document:[a-f0-9]{64}$"},
+    "source_snapshot_id": {"type": "string", "minLength": 1},
+    "source_dataset": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "source_document_id": {"type": "string", "minLength": 1},
+    "title": {"type": "string"},
+    "text": {"type": "string", "minLength": 1},
+    "local_reference": {"type": "string", "minLength": 1},
+    "language": {"type": "string", "minLength": 2},
+    "authority_state": {
+      "enum": [
+        "official_benchmark",
+        "human_verified",
+        "assisted_unverified",
+        "draft",
+        "superseded",
+        "unknown"
+      ]
+    },
+    "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "source_snapshot_id",
+    "source_dataset",
+    "source_revision",
+    "source_document_id",
+    "title",
+    "language",
+    "authority_state",
+    "content_sha256"
+  ],
+  "oneOf": [
+    {"required": ["text"], "not": {"required": ["local_reference"]}},
+    {"required": ["local_reference"], "not": {"required": ["text"]}}
+  ]
+}

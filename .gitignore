@@ -31,6 +31,7 @@ data/document_registry.sqlite3
 data/evaluation_chroma_db*/
 data/*_smoke.sqlite3
 data/*_smoke_uploads/
+data/evaluation_sources/
 
 # Milvus Standalone data is external to this repo. Keep local Milvus data out of Git
 # if a future manual installation places it under the workspace.

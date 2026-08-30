@@ -10,6 +10,7 @@ pytest
 pytest-cov
 pytest-asyncio
 jsonschema
+pyarrow
 
 # --- 代码质量 ---
 black

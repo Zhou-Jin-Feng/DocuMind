@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-normalized-snapshot-v1.schema.json",
+  "title": "DocuMind P2 Normalized Snapshot V1",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "documents": {"type": "integer", "minimum": 0},
+        "queries": {"type": "integer", "minimum": 0},
+        "qrels": {"type": "integer", "minimum": 0},
+        "source_snapshot_id": {"type": "string", "minLength": 1}
+      },
+      "required": ["documents", "queries", "qrels"]
+    },
+    "source_fingerprints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "documents": {"$ref": "#/$defs/sha256"},
+        "queries": {"$ref": "#/$defs/sha256"},
+        "qrels": {"$ref": "#/$defs/sha256"},
+        "dataset": {"$ref": "#/$defs/sha256"},
+        "source_snapshot_id": {"type": "string", "minLength": 1}
+      },
+      "required": ["documents", "queries", "qrels", "dataset"]
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "pattern": "^[^/]+/(documents|queries|qrels)\\.jsonl$"},
+        "count": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "required": ["path", "count", "sha256"]
+    }
+  },
+  "properties": {
+    "schema_version": {"const": "p2-normalized-snapshot-v1"},
+    "manifest_schema_version": {"type": "string", "minLength": 1},
+    "manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "conversion_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter_version": {"const": 1},
+        "canonical_serialization": {"type": "string", "minLength": 1},
+        "qrel_grade_policy": {"type": "string", "minLength": 1},
+        "stable_id_algorithm": {"type": "string", "minLength": 1},
+        "text_policy": {"type": "string", "minLength": 1},
+        "record_schema_versions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "documents": {"const": "p2-normalized-document-v1"},
+            "queries": {"const": "p2-normalized-query-v1"},
+            "qrels": {"const": "p2-normalized-qrel-v1"}
+          },
+          "required": ["documents", "queries", "qrels"]
+        }
+      },
+      "required": [
+        "adapter_version",
+        "canonical_serialization",
+        "qrel_grade_policy",
+        "stable_id_algorithm",
+        "text_policy",
+        "record_schema_versions"
+      ]
+    },
+    "source_manifests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_snapshot_id": {"type": "string", "minLength": 1},
+          "adapter": {"type": "string", "minLength": 1},
+          "adapter_version": {"const": 1},
+          "language": {"type": "string", "minLength": 2},
+          "authority_state": {"type": "string", "minLength": 1},
+          "input_files": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "dataset_id": {"type": "string", "minLength": 1},
+                "revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+                "path": {"type": "string", "minLength": 1},
+                "bytes": {"type": "integer", "minimum": 0},
+                "sha256": {"$ref": "#/$defs/sha256"},
+                "kind": {"enum": ["corpus", "queries", "qrels"]},
+                "split": {"type": "string", "minLength": 1}
+              },
+              "required": ["dataset_id", "revision", "path", "bytes", "sha256", "kind"]
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "documents": {"$ref": "#/$defs/output"},
+              "queries": {"$ref": "#/$defs/output"},
+              "qrels": {"$ref": "#/$defs/output"}
+            },
+            "required": ["documents", "queries", "qrels"]
+          }
+        },
+        "required": [
+          "source_snapshot_id",
+          "adapter",
+          "adapter_version",
+          "language",
+          "authority_state",
+          "input_files",
+          "outputs"
+        ]
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "documents": {"type": "integer", "minimum": 0},
+        "queries": {"type": "integer", "minimum": 0},
+        "qrels": {"type": "integer", "minimum": 0},
+        "by_source": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "allOf": [
+              {"$ref": "#/$defs/source_counts"},
+              {"required": ["source_snapshot_id"]}
+            ]
+          }
+        }
+      },
+      "required": ["documents", "queries", "qrels", "by_source"]
+    },
+    "normalized_fingerprints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "documents": {"$ref": "#/$defs/sha256"},
+        "queries": {"$ref": "#/$defs/sha256"},
+        "qrels": {"$ref": "#/$defs/sha256"},
+        "dataset_sha256": {"$ref": "#/$defs/sha256"},
+        "by_source": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "allOf": [
+              {"$ref": "#/$defs/source_fingerprints"},
+              {"required": ["source_snapshot_id"]}
+            ]
+          }
+        }
+      },
+      "required": ["documents", "queries", "qrels", "dataset_sha256", "by_source"]
+    }
+  },
+  "required": [
+    "schema_version",
+    "manifest_schema_version",
+    "manifest_sha256",
+    "conversion_configuration",
+    "source_manifests",
+    "counts",
+    "normalized_fingerprints"
+  ]
+}

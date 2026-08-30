@@ -1,0 +1,265 @@
+{
+  "schema_version": "p2-ds03-normalization-evidence-v1",
+  "snapshot": {
+    "conversion_configuration": {
+      "adapter_version": 1,
+      "canonical_serialization": "utf8-canonical-json-sort-keys-compact-lf-v1",
+      "qrel_grade_policy": "preserve-official-integer-0-3",
+      "record_schema_versions": {
+        "documents": "p2-normalized-document-v1",
+        "qrels": "p2-normalized-qrel-v1",
+        "queries": "p2-normalized-query-v1"
+      },
+      "stable_id_algorithm": "sha256-canonical-source-snapshot-entity-source-id-v1",
+      "text_policy": "preserve-source-text-normalize-bom-and-line-endings-v1"
+    },
+    "counts": {
+      "by_source": [
+        {
+          "documents": 118605,
+          "qrels": 118932,
+          "queries": 22812,
+          "source_snapshot_id": "t2ranking-mteb-dev"
+        },
+        {
+          "documents": 3633,
+          "qrels": 134294,
+          "queries": 3237,
+          "source_snapshot_id": "beir-nfcorpus"
+        },
+        {
+          "documents": 5183,
+          "qrels": 1258,
+          "queries": 1109,
+          "source_snapshot_id": "beir-scifact"
+        }
+      ],
+      "documents": 127421,
+      "qrels": 254484,
+      "queries": 27158
+    },
+    "manifest_schema_version": "p2-data-source-manifest-v1",
+    "manifest_sha256": "87fdbfa691696f1246bfc56fe9137c67cc21bd71a349ca78cb295e9ad551369e",
+    "normalized_fingerprints": {
+      "by_source": [
+        {
+          "dataset": "12eb27fd5534eec0e72bf2ebf5a35766cc58a9d49155e65ee78d0a99f0eb52f2",
+          "documents": "26212da3d3fb887d572a9ee43188c76582ce75a8c06c958474d30165f5f50a96",
+          "qrels": "6b59972d5b463810671b94317b1af806fea21b3a0cf51b130497a7f6a38841c7",
+          "queries": "7fcb298842a75f35b1b17bfa165beaf1090281384d2c3340ceaaade2b91e2a46",
+          "source_snapshot_id": "t2ranking-mteb-dev"
+        },
+        {
+          "dataset": "e1d62bc72f0dabbb99044d244786c118560c07860dab6e61f202ad996e625189",
+          "documents": "a64294df557d9f564d82706e90f845d245ffc580eca59e1739c8cfdb1a7b5f7e",
+          "qrels": "f5b1e9de384e049e3c83852867ca4489347355eb1c873a821c2733bfd5c7e4f0",
+          "queries": "23414b9e246131d82742636fb1adc47322e1267de40092a2b4a7ca50f3613954",
+          "source_snapshot_id": "beir-nfcorpus"
+        },
+        {
+          "dataset": "a661cade883e2c0dc0ded35275fdb9b27617aa37e52da8a7866de72556f02871",
+          "documents": "7de2bab179238a79fdc013705413ec0851cee159c28e277644baa482b9a76b15",
+          "qrels": "7b3e13aad519516f31bf783f2ba77f2f633e949bc70f11115102c2eac22d918e",
+          "queries": "940d3200a2533ae7568de106511e82f50a6565cacd9bc378032df11834a3df45",
+          "source_snapshot_id": "beir-scifact"
+        }
+      ],
+      "dataset_sha256": "05096037d6cdd2ae9667e66616ae1f55c8236383f0a72f559f4f1846618fbaaa",
+      "documents": "7537dcfbf138a91ab9bf77b35daeb8b7c5a1c5edc230ef1805558cfce458ddec",
+      "qrels": "90787b4f9d9a752b0d0ed53fbd27c29ed032518f9ca0691a725e0d20142758e9",
+      "queries": "5436e5ea9b87d77212f2fca95e1f1910458fffbc17b10b742338fe3787b5c147"
+    },
+    "schema_version": "p2-normalized-snapshot-v1",
+    "source_manifests": [
+      {
+        "adapter": "t2ranking-mteb-dev-v1",
+        "adapter_version": 1,
+        "authority_state": "official_benchmark",
+        "input_files": [
+          {
+            "bytes": 156879982,
+            "dataset_id": "mteb/T2Retrieval",
+            "kind": "corpus",
+            "path": "corpus/dev-00000-of-00001.parquet",
+            "revision": "cf778c0ea4168ec5174a34d888d6453e4cde9222",
+            "sha256": "8f0400530c6ba664e580e2ae7bb5ed41a908b8abc17c3b3934f42cc65992ac1e"
+          },
+          {
+            "bytes": 1149414,
+            "dataset_id": "mteb/T2Retrieval",
+            "kind": "qrels",
+            "path": "data/dev-00000-of-00001.parquet",
+            "revision": "cf778c0ea4168ec5174a34d888d6453e4cde9222",
+            "sha256": "c4c6ffd715faf151e0832a26dfcf2d7ec1edc17d9620a9aa99e721cc2436d7d2"
+          },
+          {
+            "bytes": 817540,
+            "dataset_id": "mteb/T2Retrieval",
+            "kind": "queries",
+            "path": "queries/dev-00000-of-00001.parquet",
+            "revision": "cf778c0ea4168ec5174a34d888d6453e4cde9222",
+            "sha256": "186b4d0a13cc4d8339eccfc6d465d1b2d4d1f6572defa8d39f3c8da3b66b0210"
+          }
+        ],
+        "language": "cmn-Hans",
+        "outputs": {
+          "documents": {
+            "count": 118605,
+            "path": "t2ranking-mteb-dev/documents.jsonl",
+            "sha256": "26212da3d3fb887d572a9ee43188c76582ce75a8c06c958474d30165f5f50a96"
+          },
+          "qrels": {
+            "count": 118932,
+            "path": "t2ranking-mteb-dev/qrels.jsonl",
+            "sha256": "6b59972d5b463810671b94317b1af806fea21b3a0cf51b130497a7f6a38841c7"
+          },
+          "queries": {
+            "count": 22812,
+            "path": "t2ranking-mteb-dev/queries.jsonl",
+            "sha256": "7fcb298842a75f35b1b17bfa165beaf1090281384d2c3340ceaaade2b91e2a46"
+          }
+        },
+        "source_snapshot_id": "t2ranking-mteb-dev"
+      },
+      {
+        "adapter": "beir-nfcorpus-v1",
+        "adapter_version": 1,
+        "authority_state": "official_benchmark",
+        "input_files": [
+          {
+            "bytes": 3157570,
+            "dataset_id": "BeIR/nfcorpus",
+            "kind": "corpus",
+            "path": "corpus/corpus-00000-of-00001.parquet",
+            "revision": "b5026a0e96e8a7ac4f95f482a596389289d46269",
+            "sha256": "f2a1c0b570a5efdf23cfa36f5e573d062cc113c6e7251e22c69b323a33ea895e"
+          },
+          {
+            "bytes": 258218,
+            "dataset_id": "BeIR/nfcorpus-qrels",
+            "kind": "qrels",
+            "path": "dev.tsv",
+            "revision": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65",
+            "sha256": "b1d38b5e8f78c4a5820bce2b7ec2db54911d7690dc601e76811846b211180bd8",
+            "split": "dev"
+          },
+          {
+            "bytes": 279572,
+            "dataset_id": "BeIR/nfcorpus-qrels",
+            "kind": "qrels",
+            "path": "test.tsv",
+            "revision": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65",
+            "sha256": "f8fba6ef3d4dd9c3a242a8ba4ae38276fc3622fce7dcbae764766d564542fd2a",
+            "split": "test"
+          },
+          {
+            "bytes": 2504643,
+            "dataset_id": "BeIR/nfcorpus-qrels",
+            "kind": "qrels",
+            "path": "train.tsv",
+            "revision": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65",
+            "sha256": "6336b80f9bffc4f063f3aa450047ad35c0b7c534efe4a6ba35e16dbace047f6a",
+            "split": "train"
+          },
+          {
+            "bytes": 80929,
+            "dataset_id": "BeIR/nfcorpus",
+            "kind": "queries",
+            "path": "queries/queries-00000-of-00001.parquet",
+            "revision": "b5026a0e96e8a7ac4f95f482a596389289d46269",
+            "sha256": "edd2b878b8130fb3b5e3c4b9428ddc1e67fbd6eedf8ae099fca3b87838ba6b29"
+          }
+        ],
+        "language": "en",
+        "outputs": {
+          "documents": {
+            "count": 3633,
+            "path": "beir-nfcorpus/documents.jsonl",
+            "sha256": "a64294df557d9f564d82706e90f845d245ffc580eca59e1739c8cfdb1a7b5f7e"
+          },
+          "qrels": {
+            "count": 134294,
+            "path": "beir-nfcorpus/qrels.jsonl",
+            "sha256": "f5b1e9de384e049e3c83852867ca4489347355eb1c873a821c2733bfd5c7e4f0"
+          },
+          "queries": {
+            "count": 3237,
+            "path": "beir-nfcorpus/queries.jsonl",
+            "sha256": "23414b9e246131d82742636fb1adc47322e1267de40092a2b4a7ca50f3613954"
+          }
+        },
+        "source_snapshot_id": "beir-nfcorpus"
+      },
+      {
+        "adapter": "beir-scifact-v1",
+        "adapter_version": 1,
+        "authority_state": "official_benchmark",
+        "input_files": [
+          {
+            "bytes": 4469916,
+            "dataset_id": "BeIR/scifact",
+            "kind": "corpus",
+            "path": "corpus/corpus-00000-of-00001.parquet",
+            "revision": "b3b5335604bf5ee3c4447671af975ea25143d4f5",
+            "sha256": "243324b35f03d82bd6d98a5f575966876e86cad7ce16e5333a35b1b793dc4f45"
+          },
+          {
+            "bytes": 5389,
+            "dataset_id": "BeIR/scifact-qrels",
+            "kind": "qrels",
+            "path": "test.tsv",
+            "revision": "2938d17dc3b09882fdb8c12bbbe2e2dc0e75a029",
+            "sha256": "0864bb985e0ca2367ba217977e72004d549054b2b06666ed9d4825ac7c21284c",
+            "split": "test"
+          },
+          {
+            "bytes": 14502,
+            "dataset_id": "BeIR/scifact-qrels",
+            "kind": "qrels",
+            "path": "train.tsv",
+            "revision": "2938d17dc3b09882fdb8c12bbbe2e2dc0e75a029",
+            "sha256": "a53f2114831916c096b6c37d9e54da68cef4efdcdbd5ed46533601af972acf1d",
+            "split": "train"
+          },
+          {
+            "bytes": 64982,
+            "dataset_id": "BeIR/scifact",
+            "kind": "queries",
+            "path": "queries/queries-00000-of-00001.parquet",
+            "revision": "b3b5335604bf5ee3c4447671af975ea25143d4f5",
+            "sha256": "1c37956c5dc8b810b60302323c24d1a9e79e26411ba8f5ad9d0888642e2a9034"
+          }
+        ],
+        "language": "en",
+        "outputs": {
+          "documents": {
+            "count": 5183,
+            "path": "beir-scifact/documents.jsonl",
+            "sha256": "7de2bab179238a79fdc013705413ec0851cee159c28e277644baa482b9a76b15"
+          },
+          "qrels": {
+            "count": 1258,
+            "path": "beir-scifact/qrels.jsonl",
+            "sha256": "7b3e13aad519516f31bf783f2ba77f2f633e949bc70f11115102c2eac22d918e"
+          },
+          "queries": {
+            "count": 1109,
+            "path": "beir-scifact/queries.jsonl",
+            "sha256": "940d3200a2533ae7568de106511e82f50a6565cacd9bc378032df11834a3df45"
+          }
+        },
+        "source_snapshot_id": "beir-scifact"
+      }
+    ]
+  },
+  "snapshot_file_sha256": "3dfcccd528ac9536140de28c6d7217824dd22c8163b1acab3d37ba89c0645100",
+  "validation": {
+    "counts": {
+      "documents": 127421,
+      "qrels": 254484,
+      "queries": 27158
+    },
+    "errors": [],
+    "ok": true
+  }
+}

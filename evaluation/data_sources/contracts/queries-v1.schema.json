@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://documind.local/contracts/p2-normalized-queries-v1.schema.json",
+  "title": "DocuMind P2 Normalized Query V1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "p2-normalized-query-v1"},
+    "id": {"type": "string", "pattern": "^p2n:query:[a-f0-9]{64}$"},
+    "source_snapshot_id": {"type": "string", "minLength": 1},
+    "source_dataset": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "source_query_id": {"type": "string", "minLength": 1},
+    "text": {"type": "string", "minLength": 1},
+    "split": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+    "answerable": {"type": "boolean"},
+    "primary_category": {"type": "string", "minLength": 1}
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "source_snapshot_id",
+    "source_dataset",
+    "source_revision",
+    "source_query_id",
+    "text",
+    "split",
+    "answerable",
+    "primary_category"
+  ]
+}

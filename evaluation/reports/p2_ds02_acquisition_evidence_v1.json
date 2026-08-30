@@ -1,0 +1,314 @@
+{
+  "schema_version": "p2-ds02-evidence-v1",
+  "completed_at": "2026-08-29T17:24:21.407769+00:00",
+  "manifest_schema_version": "p2-data-source-manifest-v1",
+  "authorized_source_ids": [
+    "t2ranking-mteb-dev",
+    "beir-nfcorpus",
+    "beir-scifact"
+  ],
+  "file_count": 12,
+  "total_bytes": 169682657,
+  "all_hashes_match": true,
+  "structure": {
+    "schema_version": "p2-ds02-structure-v1",
+    "ok": true,
+    "files": [
+      {
+        "source_id": "t2ranking-mteb-dev",
+        "dataset_id": "mteb/T2Retrieval",
+        "revision": "cf778c0ea4168ec5174a34d888d6453e4cde9222",
+        "path": "corpus/dev-00000-of-00001.parquet",
+        "bytes": 156879982,
+        "sha256": "8f0400530c6ba664e580e2ae7bb5ed41a908b8abc17c3b3934f42cc65992ac1e",
+        "ok": true,
+        "format": "parquet",
+        "rows": 118605,
+        "columns": [
+          "_id",
+          "text",
+          "title"
+        ],
+        "row_groups": 119,
+        "sample_rows_read": 20,
+        "scan_seconds": 0.015988899998774286
+      },
+      {
+        "source_id": "t2ranking-mteb-dev",
+        "dataset_id": "mteb/T2Retrieval",
+        "revision": "cf778c0ea4168ec5174a34d888d6453e4cde9222",
+        "path": "data/dev-00000-of-00001.parquet",
+        "bytes": 1149414,
+        "sha256": "c4c6ffd715faf151e0832a26dfcf2d7ec1edc17d9620a9aa99e721cc2436d7d2",
+        "ok": true,
+        "format": "parquet",
+        "rows": 118932,
+        "columns": [
+          "query-id",
+          "corpus-id",
+          "score"
+        ],
+        "row_groups": 119,
+        "sample_rows_read": 20,
+        "scan_seconds": 0.0020177000005787704
+      },
+      {
+        "source_id": "t2ranking-mteb-dev",
+        "dataset_id": "mteb/T2Retrieval",
+        "revision": "cf778c0ea4168ec5174a34d888d6453e4cde9222",
+        "path": "queries/dev-00000-of-00001.parquet",
+        "bytes": 817540,
+        "sha256": "186b4d0a13cc4d8339eccfc6d465d1b2d4d1f6572defa8d39f3c8da3b66b0210",
+        "ok": true,
+        "format": "parquet",
+        "rows": 22812,
+        "columns": [
+          "_id",
+          "text"
+        ],
+        "row_groups": 23,
+        "sample_rows_read": 20,
+        "scan_seconds": 0.0013756000007560942
+      },
+      {
+        "source_id": "beir-nfcorpus",
+        "dataset_id": "BeIR/nfcorpus",
+        "revision": "b5026a0e96e8a7ac4f95f482a596389289d46269",
+        "path": "corpus/corpus-00000-of-00001.parquet",
+        "bytes": 3157570,
+        "sha256": "f2a1c0b570a5efdf23cfa36f5e573d062cc113c6e7251e22c69b323a33ea895e",
+        "ok": true,
+        "format": "parquet",
+        "rows": 3633,
+        "columns": [
+          "_id",
+          "title",
+          "text"
+        ],
+        "row_groups": 1,
+        "sample_rows_read": 20,
+        "scan_seconds": 0.00383009999859496
+      },
+      {
+        "source_id": "beir-nfcorpus",
+        "dataset_id": "BeIR/nfcorpus",
+        "revision": "b5026a0e96e8a7ac4f95f482a596389289d46269",
+        "path": "queries/queries-00000-of-00001.parquet",
+        "bytes": 80929,
+        "sha256": "edd2b878b8130fb3b5e3c4b9428ddc1e67fbd6eedf8ae099fca3b87838ba6b29",
+        "ok": true,
+        "format": "parquet",
+        "rows": 3237,
+        "columns": [
+          "_id",
+          "title",
+          "text"
+        ],
+        "row_groups": 1,
+        "sample_rows_read": 20,
+        "scan_seconds": 0.0010886999989452306
+      },
+      {
+        "source_id": "beir-nfcorpus",
+        "dataset_id": "BeIR/nfcorpus-qrels",
+        "revision": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65",
+        "path": "dev.tsv",
+        "bytes": 258218,
+        "sha256": "b1d38b5e8f78c4a5820bce2b7ec2db54911d7690dc601e76811846b211180bd8",
+        "ok": true,
+        "format": "tsv",
+        "rows": 11385,
+        "columns": [
+          "query-id",
+          "corpus-id",
+          "score"
+        ],
+        "scan_seconds": 0.013601899998320732
+      },
+      {
+        "source_id": "beir-nfcorpus",
+        "dataset_id": "BeIR/nfcorpus-qrels",
+        "revision": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65",
+        "path": "test.tsv",
+        "bytes": 279572,
+        "sha256": "f8fba6ef3d4dd9c3a242a8ba4ae38276fc3622fce7dcbae764766d564542fd2a",
+        "ok": true,
+        "format": "tsv",
+        "rows": 12334,
+        "columns": [
+          "query-id",
+          "corpus-id",
+          "score"
+        ],
+        "scan_seconds": 0.0182280000008177
+      },
+      {
+        "source_id": "beir-nfcorpus",
+        "dataset_id": "BeIR/nfcorpus-qrels",
+        "revision": "a451b3b26d3ae1358f259c1a3a4dd61fcea35a65",
+        "path": "train.tsv",
+        "bytes": 2504643,
+        "sha256": "6336b80f9bffc4f063f3aa450047ad35c0b7c534efe4a6ba35e16dbace047f6a",
+        "ok": true,
+        "format": "tsv",
+        "rows": 110575,
+        "columns": [
+          "query-id",
+          "corpus-id",
+          "score"
+        ],
+        "scan_seconds": 0.16714409999985946
+      },
+      {
+        "source_id": "beir-scifact",
+        "dataset_id": "BeIR/scifact",
+        "revision": "b3b5335604bf5ee3c4447671af975ea25143d4f5",
+        "path": "corpus/corpus-00000-of-00001.parquet",
+        "bytes": 4469916,
+        "sha256": "243324b35f03d82bd6d98a5f575966876e86cad7ce16e5333a35b1b793dc4f45",
+        "ok": true,
+        "format": "parquet",
+        "rows": 5183,
+        "columns": [
+          "_id",
+          "title",
+          "text"
+        ],
+        "row_groups": 1,
+        "sample_rows_read": 20,
+        "scan_seconds": 0.0036239999972167425
+      },
+      {
+        "source_id": "beir-scifact",
+        "dataset_id": "BeIR/scifact",
+        "revision": "b3b5335604bf5ee3c4447671af975ea25143d4f5",
+        "path": "queries/queries-00000-of-00001.parquet",
+        "bytes": 64982,
+        "sha256": "1c37956c5dc8b810b60302323c24d1a9e79e26411ba8f5ad9d0888642e2a9034",
+        "ok": true,
+        "format": "parquet",
+        "rows": 1109,
+        "columns": [
+          "_id",
+          "title",
+          "text"
+        ],
+        "row_groups": 1,
+        "sample_rows_read": 20,
+        "scan_seconds": 0.001495799999247538
+      },
+      {
+        "source_id": "beir-scifact",
+        "dataset_id": "BeIR/scifact-qrels",
+        "revision": "2938d17dc3b09882fdb8c12bbbe2e2dc0e75a029",
+        "path": "test.tsv",
+        "bytes": 5389,
+        "sha256": "0864bb985e0ca2367ba217977e72004d549054b2b06666ed9d4825ac7c21284c",
+        "ok": true,
+        "format": "tsv",
+        "rows": 339,
+        "columns": [
+          "query-id",
+          "corpus-id",
+          "score"
+        ],
+        "scan_seconds": 0.0006386999993992504
+      },
+      {
+        "source_id": "beir-scifact",
+        "dataset_id": "BeIR/scifact-qrels",
+        "revision": "2938d17dc3b09882fdb8c12bbbe2e2dc0e75a029",
+        "path": "train.tsv",
+        "bytes": 14502,
+        "sha256": "a53f2114831916c096b6c37d9e54da68cef4efdcdbd5ed46533601af972acf1d",
+        "ok": true,
+        "format": "tsv",
+        "rows": 919,
+        "columns": [
+          "query-id",
+          "corpus-id",
+          "score"
+        ],
+        "scan_seconds": 0.0016175999990082346
+      }
+    ],
+    "aggregate_rows": {
+      "t2ranking-mteb-dev": {
+        "corpus": 118605,
+        "qrels": 118932,
+        "queries": 22812
+      },
+      "beir-nfcorpus": {
+        "corpus": 3633,
+        "queries": 3237,
+        "qrels": 134294
+      },
+      "beir-scifact": {
+        "corpus": 5183,
+        "queries": 1109,
+        "qrels": 1258
+      }
+    },
+    "errors": []
+  },
+  "read_pilot": {
+    "rows": 3000,
+    "characters": 4031870,
+    "seconds": 0.04165550000107032,
+    "rows_per_second": 72019.30117086378,
+    "characters_per_second": 96790819.93725684,
+    "rows_by_source": {
+      "t2ranking-mteb-dev": 1000,
+      "beir-nfcorpus": 1000,
+      "beir-scifact": 1000
+    }
+  },
+  "embedding_pilot": {
+    "provider": "ollama",
+    "model": "qwen3-embedding",
+    "dimension": 4096,
+    "sample_size": 32,
+    "batch_size": 8,
+    "measurement_batches": 4,
+    "sample_characters": 20021,
+    "warmup_seconds": 7.475933599998825,
+    "measured_seconds": 10.799656599996524,
+    "documents_per_second": 2.9630571772078658,
+    "characters_per_second": 1853.8552420274589,
+    "batch_latency_p50_seconds": 2.349198299998534,
+    "batch_latency_p95_seconds": 3.9330244999982824,
+    "miracl_passage_count": 4934368,
+    "miracl_embedding_only_projection_hours": 462.5822911285734,
+    "projection_limitations": "Directional estimate only; excludes Milvus writes/indexing, WAL, retries and MIRACL length-distribution differences.",
+    "sample_source_counts": {
+      "t2ranking-mteb-dev": 32
+    }
+  },
+  "runtime_policy": {
+    "maximum_launch_projection_hours": 18.0,
+    "maximum_end_to_end_runtime_hours": 24.0,
+    "rule": "Do not start when projected end-to-end runtime exceeds 18 hours; abort by 24 hours."
+  },
+  "miracl_assessment": {
+    "decision": "DEFER_FULL_DOWNLOAD",
+    "raw_snapshot_bytes": 1092278097,
+    "raw_float32_vector_bytes": 80844685312,
+    "disk_free_bytes": 191018549248,
+    "minimum_free_space_bytes": 128849018880,
+    "projected_free_after_raw_and_vectors_bytes": 109081585839,
+    "meets_disk_floor_before_milvus_overhead": false,
+    "maximum_launch_projection_hours": 18.0,
+    "maximum_end_to_end_runtime_hours": 24.0,
+    "embedding_only_projection_hours": 462.5822911285734,
+    "meets_launch_projection_limit": false,
+    "meets_end_to_end_runtime_limit": false,
+    "eligible_to_start": false,
+    "license_status": "UNRESOLVED_CONFLICT",
+    "reopen_conditions": [
+      "Resolve Apache-2.0 versus CC-BY-SA-4.0 provenance and redistribution terms.",
+      "Freeze a deterministic subset or hard-negative protocol that does not require full-corpus Dense indexing.",
+      "Project no more than 18 hours before launch and complete end-to-end within 24 hours.",
+      "Keep projected free disk above the 120 GiB floor including Milvus index, WAL and temporary files."
+    ]
+  }
+}
