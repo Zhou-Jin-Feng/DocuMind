@@ -4,8 +4,6 @@
 
 > 适用范围：本地单用户或可信私网，不提供公网多租户或高可用承诺。主线保持 Dense-only，增强检索状态见评测文档。
 
-> GitHub 已发布 tag 仍为 `v2.0`。当前代码版本为 v2.2.0；v2.0.1 至 v2.2.0 的后续版本 tag 均尚未创建。
-
 ## 核心能力
 
 - PDF、DOCX、TXT 上传、稳定分块、内容寻址保存和幂等索引。
@@ -256,7 +254,7 @@ P2 DS-03～06 已完成确定性规范化、代表性数据集人工复核、spl
 | 版本 | 主要内容 | 状态 |
 |---|---|---|
 | v2.0 | FastAPI/React/Milvus 统一 Compose、基础 CI、演示与发布收口 | 已发布并推送 tag |
-| P2 evidence checkpoint | DS-03～DS-06 数据、隔离、四模式评测和 `NO_GO` 决策 | 第二次项目冻结已完成，本地提交，待独立 push/tag |
+| v2.2.0 | 纯检索可靠性、独立 readiness/观测、质量基线和 ScholarTrace 接入 | `main`、annotated tag 和 GitHub Release 已发布 |
 
 完整历史和真实提交边界见[版本历史](docs/VERSION_HISTORY.md)。
 
