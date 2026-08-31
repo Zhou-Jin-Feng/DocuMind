@@ -9,8 +9,8 @@ jobs:
     name: Python tests and retrieval quality gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -39,7 +39,7 @@ jobs:
             --current "${{ runner.temp }}/rag-evaluation/current-evaluation.json"
       - name: Upload retrieval evaluation reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deterministic-retrieval-evaluation
           path: |
@@ -55,8 +55,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -78,7 +78,7 @@ jobs:
     name: Compose validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate full stack compose
         run: docker compose -f compose.yaml config
       - name: Validate Milvus-only compose
