@@ -192,7 +192,9 @@ class UniversalEmbeddingClient:
 
         base_url = settings.ollama_base_url
         model_name = self.config["model"]
+        keep_alive_seconds = settings.ollama_embedding_keep_alive_seconds
         self.base_url = base_url
+        self.ollama_keep_alive_seconds = keep_alive_seconds
 
         try:
             parsed_host = urlparse(base_url).hostname
@@ -208,6 +210,7 @@ class UniversalEmbeddingClient:
                 model=model_name,
                 base_url=base_url,
                 client_kwargs=client_kwargs,
+                keep_alive=keep_alive_seconds,
             )
 
             # 尝试获取实际维度
@@ -324,7 +327,17 @@ class UniversalEmbeddingClient:
         embed_request = Request(
             f"{base_url}/api/embed",
             data=json.dumps(
-                {"model": configured_model, "input": "readiness"},
+                {
+                    "model": configured_model,
+                    "input": "readiness",
+                    "keep_alive": int(
+                        getattr(
+                            self,
+                            "ollama_keep_alive_seconds",
+                            settings.ollama_embedding_keep_alive_seconds,
+                        )
+                    ),
+                },
                 ensure_ascii=False,
             ).encode("utf-8"),
             headers={

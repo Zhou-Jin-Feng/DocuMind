@@ -66,7 +66,13 @@ docker compose up --build
 - Metrics：`http://127.0.0.1:8000/metrics`
 - Milvus：`http://127.0.0.1:19530`
 
-Compose 内的 API 默认通过 `http://host.docker.internal:11434` 访问宿主机 Ollama。端口冲突或跨主机配置见 `.env.example` 中的 `*_HOST_PORT`、`DOCKER_OLLAMA_BASE_URL` 和 `VITE_API_BASE_URL`。
+Compose 内的 API 默认通过 `http://host.docker.internal:11434` 访问宿主机 Ollama。默认请求会让
+`qwen3-embedding` 在每次 Embedding 后保留 600 秒（`OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS`，
+范围 `0-3600`）；Embedding readiness 另有 60 秒有界冷加载窗口
+（`OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS`，范围 `>0-60`）。这能减少连续检索的冷启动
+503，但不会永久占用单 GPU。需要让生成模型及时接管显存时可将驻留设为 `0`，代价是下一次
+检索可能重新加载 Embedding。端口冲突或跨主机配置见 `.env.example` 中的 `*_HOST_PORT`、
+`DOCKER_OLLAMA_BASE_URL` 和 `VITE_API_BASE_URL`。
 
 停止服务但保留数据：
 

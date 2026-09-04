@@ -70,7 +70,10 @@ DS-06 报告 SHA-256：
 
 1. 部署已验证的 DocuMind `2.2.0 纯检索交付基线`，不要使用含未审查实验改动的脏工作树。
 2. 检查 `/api/v1/health/ready`，确认 `components.retrieval=ready`。
-3. 先预热 `qwen3-embedding`，完成全部论文的检索，再启动本地 `qwen3:8b` 生成。
+3. 先预热 `qwen3-embedding`，完成全部论文的检索，再启动本地 `qwen3:8b` 生成；默认
+   `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS=600` 只提供 10 分钟有界驻留，
+   `OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS=60` 只提供有界冷加载等待；不要设为永久驻留，
+   以免单 GPU 模型切换时显存不足。
 4. 每次请求绑定唯一 `document_key` 和 `expected_index_id`，保存 Chunk、index 和
    source hash。
 

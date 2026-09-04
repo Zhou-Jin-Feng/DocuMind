@@ -209,6 +209,9 @@ class RAGApplication:
     def _readiness_timeout(self) -> float:
         return float(self.settings.readiness_probe_timeout_seconds)
 
+    def _embedding_readiness_timeout(self) -> float:
+        return float(self.settings.ollama_embedding_readiness_timeout_seconds)
+
     def _check_milvus(self) -> bool:
         """通过真实 RPC 检查 Milvus，而不是只判断客户端对象是否存在。"""
         client = getattr(self.vector_store, "client", None)
@@ -223,7 +226,7 @@ class RAGApplication:
         health_check = getattr(self.embedding_client, "health_check", None)
         if not callable(health_check):
             return False
-        return bool(health_check(timeout_seconds=self._readiness_timeout()))
+        return bool(health_check(timeout_seconds=self._embedding_readiness_timeout()))
 
     def _check_llm_configuration(self) -> bool:
         """只验证 LLM 客户端和配置，不主动调用远程生成 API。"""

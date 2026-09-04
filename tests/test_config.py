@@ -31,6 +31,25 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(Settings.model_fields["server_host"].default, "127.0.0.1")
         self.assertEqual(Settings.model_fields["metrics_host"].default, "127.0.0.1")
 
+    def test_ollama_embedding_keep_alive_is_bounded(self):
+        config = Settings(_env_file=None)
+        self.assertEqual(config.ollama_embedding_keep_alive_seconds, 600)
+        self.assertEqual(config.ollama_embedding_readiness_timeout_seconds, 60.0)
+
+        for value in (-1, 3601):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                Settings(
+                    _env_file=None,
+                    ollama_embedding_keep_alive_seconds=value,
+                )
+
+        for value in (0, 61):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                Settings(
+                    _env_file=None,
+                    ollama_embedding_readiness_timeout_seconds=value,
+                )
+
     def test_readiness_probe_timeout_is_bounded(self):
         self.assertEqual(
             Settings.model_fields["readiness_probe_timeout_seconds"].default,

@@ -127,7 +127,7 @@ React 工作台
 
 每个响应带 `X-Request-ID`；SSE 事件的数据是公开 API schema，不包含 Prompt、凭据或内部堆栈。API 默认仅允许 `.env` 中列出的本地 CORS 来源。
 
-`/health/live` 只确认 API 进程存活；`/health/ready` 执行有超时上限的 Milvus RPC 和 Ollama Embedding 探测，检查 SQLite 注册表已初始化，并验证 LLM 客户端配置。LLM readiness 不发送真实生成请求，避免健康检查消耗外部 API 配额。依赖未就绪时返回 HTTP 503 和分组件状态，React 以轮询方式自动恢复。
+`/health/live` 只确认 API 进程存活；`/health/ready` 执行有超时上限的 Milvus RPC 和 Ollama Embedding 探测，检查 SQLite 注册表已初始化，并验证 LLM 客户端配置。Embedding 探针与真实 Embedding 请求使用同一个 `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS`（默认 600 秒），冷加载使用独立的 `OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS`（默认/最大 60 秒）。这两项只提供有界驻留和有界等待，不能消除模型切换或显存不足。LLM readiness 不发送真实生成请求，避免健康检查消耗外部 API 配额。依赖未就绪时返回 HTTP 503 和分组件状态，React 以轮询方式自动恢复。
 
 纯检索流程：
 

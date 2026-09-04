@@ -1,5 +1,5 @@
-﻿import unittest
-
+﻿import json
+import unittest
 from io import BytesIO
 from unittest.mock import Mock, patch
 
@@ -42,6 +42,24 @@ class EmbeddingClientTests(unittest.TestCase):
             config = UniversalEmbeddingClient.configuration_for("ollama")
 
         self.assertEqual(config["dimensions"], 768)
+
+    def test_ollama_client_passes_bounded_keep_alive(self):
+        fake_ollama = Mock()
+        with (
+            patch.object(settings, "ollama_embedding_keep_alive_seconds", 300),
+            patch(
+                "app.core.embedding_client.OllamaEmbeddings", return_value=fake_ollama
+            ) as factory,
+            patch.object(
+                UniversalEmbeddingClient,
+                "_embed_ollama_query",
+                return_value=[1.0, 2.0],
+            ),
+        ):
+            client = UniversalEmbeddingClient("ollama")
+
+        self.assertEqual(client.ollama_keep_alive_seconds, 300)
+        self.assertEqual(factory.call_args.kwargs["keep_alive"], 300)
 
     def test_ollama_embedding_retries_transient_failures(self):
         self.client.type = "local"
@@ -126,7 +144,30 @@ class EmbeddingClientTests(unittest.TestCase):
         self.assertEqual(tags_request.full_url, "http://127.0.0.1:11434/api/tags")
         self.assertEqual(embed_request.full_url, "http://127.0.0.1:11434/api/embed")
         self.assertEqual(embed_request.method, "POST")
+        self.assertEqual(json.loads(embed_request.data)["keep_alive"], 600)
         self.assertEqual(opener.open.call_args.kwargs["timeout"], 1.5)
+
+    def test_ollama_health_check_uses_client_keep_alive_override(self):
+        self.client.type = "local"
+        self.client.base_url = "http://127.0.0.1:11434"
+        self.client.ollama_keep_alive_seconds = 120
+        self.client.config = {"model": "qwen3-embedding", "dimensions": 3}
+        tags_response = BytesIO(b'{"models":[{"name":"qwen3-embedding:latest"}]}')
+        tags_response.status = 200
+        tags_response.__enter__ = Mock(return_value=tags_response)
+        tags_response.__exit__ = Mock(return_value=False)
+        embed_response = BytesIO(b'{"embeddings":[[0.1,0.2,0.3]]}')
+        embed_response.status = 200
+        embed_response.__enter__ = Mock(return_value=embed_response)
+        embed_response.__exit__ = Mock(return_value=False)
+        opener = Mock()
+        opener.open.side_effect = [tags_response, embed_response]
+
+        with patch("app.core.embedding_client.build_opener", return_value=opener):
+            self.assertTrue(self.client.health_check(timeout_seconds=1))
+
+        embed_request = opener.open.call_args_list[1].args[0]
+        self.assertEqual(json.loads(embed_request.data)["keep_alive"], 120)
 
     def test_ollama_health_check_rejects_missing_model(self):
         self.client.type = "local"

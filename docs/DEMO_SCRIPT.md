@@ -35,6 +35,14 @@ Copy-Item .env.example .env
 ollama pull qwen3-embedding
 ```
 
+连续检索演示默认将 Embedding 模型保留 10 分钟，减少空闲后首次请求的冷启动；该设置仍是
+有界的，避免与同一 GPU 上的生成模型形成永久驻留竞争。如需调整，在 `.env` 中设置：
+
+```dotenv
+OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS=600
+OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS=60
+```
+
 在 `.env` 中填写 Provider，例如：
 
 ```dotenv
@@ -214,9 +222,21 @@ Invoke-RestMethod http://127.0.0.1:8001/api/v1/health/ready
 
 1. 宿主机 `ollama serve` 是否运行；
 2. `ollama list` 是否包含 `qwen3-embedding`；
-3. `.env` 中的 LLM Provider 与 API Key 是否匹配；
-4. Milvus、etcd、MinIO 是否健康；
-5. Docker 是否支持 `host.docker.internal`。
+3. `.env` 中 `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS` 是否在 `0-3600` 范围内；
+4. `.env` 中 `OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS` 是否在 `>0-60` 范围内；
+5. `.env` 中的 LLM Provider 与 API Key 是否匹配；
+6. Milvus、etcd、MinIO 是否健康；
+7. Docker 是否支持 `host.docker.internal`。
+
+如果 readiness 曾经成功、空闲后又显示 `embedding=unavailable`，先调用一次受控预热并等待
+就绪，而不是重新下载模型：
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11434/api/embed" `
+  -ContentType "application/json" `
+  -Body '{"model":"qwen3-embedding","input":"readiness","keep_alive":600}'
+Invoke-RestMethod "http://127.0.0.1:8001/api/v1/health/ready"
+```
 
 若 Ollama 地址不可用，在 `.env` 设置：
 

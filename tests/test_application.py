@@ -12,6 +12,7 @@ class ApplicationTests(unittest.TestCase):
                 _env_file=None,
                 metrics_enabled=False,
                 readiness_probe_timeout_seconds=0.5,
+                ollama_embedding_readiness_timeout_seconds=0.75,
             )
         )
         application.initialized = True
@@ -39,7 +40,7 @@ class ApplicationTests(unittest.TestCase):
             timeout=0.5
         )
         application.embedding_client.health_check.assert_called_once_with(
-            timeout_seconds=0.5
+            timeout_seconds=0.75
         )
 
     def test_readiness_marks_unreachable_embedding_as_degraded(self):

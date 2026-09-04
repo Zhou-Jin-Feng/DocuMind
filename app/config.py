@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     ollama_embedding_model: str = "qwen3-embedding"
     # 可选的显式维度；留空时使用模型默认值并优先运行时探测。
     ollama_embedding_dimensions: Optional[int] = Field(default=None, gt=0)
+    # Ollama 请求完成后保留 Embedding 模型的秒数；0 表示请求后立即卸载。
+    # 设置上限避免把单 GPU 的模型驻留误配置为永久占用。
+    ollama_embedding_keep_alive_seconds: int = Field(default=600, ge=0, le=3600)
+    # Embedding readiness 允许一次有界冷加载；不能复用过短的通用探针超时。
+    ollama_embedding_readiness_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        le=60,
+    )
 
     # 默认提供商
     default_embedding_provider: str = "ollama"

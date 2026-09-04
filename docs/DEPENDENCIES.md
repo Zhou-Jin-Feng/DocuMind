@@ -36,7 +36,10 @@
 ## 外部运行服务
 
 - Milvus Standalone 是必需向量数据库；etcd 和 MinIO 由 Compose 一同编排。
-- 默认 Embedding 使用宿主机 Ollama `qwen3-embedding`，Compose 不会自动安装或启动 Ollama。
+- 默认 Embedding 使用宿主机 Ollama `qwen3-embedding`，Compose 不会自动安装或启动 Ollama；
+  `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS` 默认设为 600 秒（范围 `0-3600`），用于降低连续
+  检索的冷启动概率；`OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS` 默认允许 60 秒的有界
+  冷加载。两项都不能视为永久驻留或 GPU 容量保证。
 - 回答生成需要已配置的 OpenAI、Anthropic、DeepSeek 或 GLM Provider。
 - Prometheus、Grafana、Jaeger 和 OpenTelemetry Collector 不在当前 Compose 内；应用仅暴露 Metrics 并可选向外部 OTLP/HTTP endpoint 导出 Trace。
 

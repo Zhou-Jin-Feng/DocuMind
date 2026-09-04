@@ -19,7 +19,10 @@ Consumers must reject unsupported Schema versions and must never parse
 
 ## Request Sequence
 
-1. Read `GET /api/v1/health/ready` and inspect `components.retrieval`.
+1. Read `GET /api/v1/health/ready` and inspect `components.retrieval`. If the
+   Embedding model was unloaded after idle time, issue one bounded warm-up with
+   the configured `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS` and recheck readiness;
+   do not treat this as model deletion.
 2. Obtain a `document_key` and its current `active_index_id` from the upload or
    document-detail response.
 3. Send one document and the captured index identity to `/retrieve`.
@@ -112,6 +115,15 @@ Chunk content, complete identities or authorization data.
 DocuMind already performs at most the configured safe dependency attempts.
 ScholarTrace retries must have their own small total budget and must preserve the
 same document scope unless a stale-index response explicitly requires refresh.
+
+For local Ollama deployments, `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS` defaults to
+600 seconds and is sent on both readiness and retrieval Embedding requests. The
+setting is bounded to `0-3600`; the separate
+`OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS` defaults to 60 seconds so a cold
+load can complete within a bounded health-check window. `0` favors prompt model
+turnover but makes the next retrieval susceptible to cold-load latency, while a
+longer value consumes more GPU residency and still does not guarantee that Ollama
+can keep the model loaded under memory pressure.
 
 ## Operational Smoke Test
 

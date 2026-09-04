@@ -146,3 +146,12 @@ The synchronous dependency call keeps its concurrency permit until it actually
 returns, including when the HTTP client disconnects. Provider-native timeouts
 bound the remaining work, preventing a cancelled request from releasing a
 permit while a shared Milvus or Embedding client is still in use.
+
+When the local Ollama Embedding model has been unloaded after idle time, the
+first readiness or retrieval request may pay a cold-load cost. DocuMind sends
+the bounded `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS` value (default `600`, range
+`0-3600`) on both probe and retrieval calls, and gives the readiness probe a
+separate `OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS` window (default/max `60`).
+Consumers should still warm and recheck `components.retrieval` before a
+batch; they must not bypass readiness or treat an unload as deletion of the
+installed model.
