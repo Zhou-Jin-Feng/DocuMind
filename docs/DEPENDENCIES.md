@@ -1,4 +1,4 @@
-# 依赖说明（v2.2.0）
+# 依赖与开发环境
 
 ## Python 运行依赖
 
@@ -14,7 +14,6 @@
 | LLM | `anthropic` | Claude 客户端 |
 | Documents | `pypdf`、`python-docx`、`docx2txt` | PDF 和 DOCX 文本处理 |
 | Web API | `fastapi`、`uvicorn[standard]`、`python-multipart` | 主 API 入口、ASGI 服务和文件上传 |
-| 兼容界面 | `gradio` | 保留的 `web_app.py` 兼容入口，不是主交付界面 |
 | Config | `pydantic`、`pydantic-settings`、`python-dotenv` | 模型、`.env` 加载和配置验证 |
 | Retrieval | `numpy`、`rank-bm25`、`jieba` | 向量计算、BM25 和中文/标识符分词 |
 | HTTP | `httpx`、`requests` | Provider 请求和 API 测试支持 |
@@ -54,6 +53,7 @@
 ## 安装
 
 ```powershell
+python --version  # 本地开发基线为 Python 3.11
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -74,15 +74,15 @@ Set-Location frontend
 npm ci
 ```
 
-统一 Compose 交付使用 `python:3.11-slim` 和 `node:22-alpine` 作为默认基础镜像，完整启动步骤见根目录 `README.md`。
+当前 Compose 配置使用 `python:3.11-slim` 和 `node:22-alpine` 作为默认基础镜像，完整启动步骤见根目录 [README](../README.md) 和 [运行说明](DEMO_SCRIPT.md)。
 
 ## 验证
 
 ```powershell
 $env:PYTHONPYCACHEPREFIX = Join-Path $env:TEMP documind_pycache
 .\venv\Scripts\python.exe -m pip check
-.\venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
-.\venv\Scripts\python.exe -m compileall -q app web_app.py tests
+.\venv\Scripts\python.exe -m pytest -q
+.\venv\Scripts\python.exe -m compileall -q app tests
 .\venv\Scripts\python.exe -m compileall -q evaluation
 Set-Location frontend
 npm test
@@ -93,3 +93,7 @@ npm run build
 ## 可复现性说明
 
 前端已有 npm 锁文件，Python 依赖仍未锁定具体版本。Dockerfile 固定基础镜像主版本，但不等同于 Python 依赖锁定或镜像 digest 锁定。Rewrite artifact 记录 LLM、模型、最大改写数和数据集 SHA-256；Rerank 报告记录 sentence-transformers 模型和本地缓存模式。若需要严格可复现部署，后续应生成并验证 Python 锁文件，同时记录底层模型和容器镜像版本。
+
+## 验证范围
+
+源码可运行、已有测试通过和全新生产镜像可重复安装是不同检查。依赖未完整锁定时，不能仅引用历史构建结果保证任意时间的新安装；对应环境应重新验证。真实模型下载、网络和算力需求按启用的能力准备，普通确定性回归不应触发模型下载。

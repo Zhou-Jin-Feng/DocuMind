@@ -21,6 +21,8 @@ from evaluation.production import (
 from evaluation.reports import write_json_report, write_markdown_report
 from evaluation.runner import EvaluationRunner, load_golden_dataset
 
+DEFAULT_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "evaluation"
+
 
 def _select_cases_by_split(cases: Sequence[GoldenCase], split: str) -> list[GoldenCase]:
     if split not in {"all", "validation", "holdout"}:
@@ -145,12 +147,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--dataset",
-        default="evaluation/datasets/golden_dataset.jsonl",
+        default=str(
+            Path(__file__).resolve().parent / "datasets" / "golden_dataset.jsonl"
+        ),
         help="JSONL golden dataset path",
     )
     parser.add_argument(
         "--documents-dir",
-        default="evaluation/datasets/documents",
+        default=str(Path(__file__).resolve().parent / "datasets" / "documents"),
         help="TXT fixture directory; filename stem becomes document_id",
     )
     parser.add_argument(
@@ -242,14 +246,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--output-json",
         default=None,
-        help="JSON report path; defaults to evaluation/reports/{provider}_retrieval_baseline.json",
+        help="JSON report path; defaults to project artifacts/evaluation/{provider}_retrieval_baseline.json",
     )
     parser.add_argument(
         "--output-markdown",
         default=None,
         help=(
             "Markdown report path; defaults to "
-            "evaluation/reports/{provider}_retrieval_baseline.md"
+            "project artifacts/evaluation/{provider}_retrieval_baseline.md"
         ),
     )
     args = parser.parse_args(argv)
@@ -459,7 +463,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if adapter is not None:
             adapter.close()
 
-    output_dir = Path("evaluation/reports")
+    output_dir = DEFAULT_OUTPUT_ROOT
     report_stem = _default_report_stem(
         provider,
         args.score_threshold,

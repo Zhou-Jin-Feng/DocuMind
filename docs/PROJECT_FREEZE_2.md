@@ -1,81 +1,58 @@
-# DocuMind 2.2.0 交付范围与验证
+# 历史交付证据：2.2.0 纯检索基线
 
-状态：`FROZEN / PASS WITH NOTES`
+本页记录 2026 年 8 月的交付与实验快照，不代表任意当前工作树已经完成新的真实部署或发布验收。当前运行方式见 [README](../README.md)，接口语义见 [RETRIEVE_API](RETRIEVE_API.md)。
 
-本文记录已验证的交付范围，不是公网多租户生产认证。系统为
-可运行、可复现、工程可信的本地单用户或可信私网 RAG 服务，并作为 ScholarTrace
-的独立证据检索工具。
+## 范围
 
-## 1. 冻结结论
+- 单文档 Dense 纯检索，Schema `1.0`、`dense-v1`；要求匹配的 active index。
+- 数据来源规范化、合成代表性语料、人工 Gold 审核和 validation/holdout 隔离。
+- 检索执行资源控制、独立 readiness 与观测。
+- ScholarTrace 对应基线的上传/状态/纯检索联调及 Evidence 校验。
 
-本次收口将第二次冻结固定在一个干净 Git 提交上。DS-06 阶段结论为
-`PASS WITH NOTES`，增强检索候选结论为 `NO_GO`；这表示当前 BM25、Hybrid、
-Reranker 配置不应上线，不表示 Dense `/retrieve` 基线不可用。
+不包含公网认证、多租户授权、跨文档批量、线上 Reranker、完整高可用或大规模吞吐保证。
 
-## 2. 固定范围
+## DS-06 检索证据
 
-- DocuMind v2.2.0 的单文档纯检索基线；公共 Schema `1.0`、`dense-v1` 和现有
-  阈值行为保持不变。
-- DS-03 三来源确定性规范化及结构/哈希验证。
-- DS-04 75 份合成代表性文档、235 个生产 Chunk、400 题探索池、100 题人工确认
-  gold（94 approve、6 modify、0 delete）。
-- DS-05 validation/holdout 各 50 题的泄漏审计和冻结指纹。
-- DS-06 Dense、BM25、Hybrid、Reranker Top-5/Top-8 对照、一次性 holdout 和严格
-  `NO_GO` 决策。
-- ScholarTrace 兼容边界：DocuMind `2.2.0 纯检索交付基线`、`/api/v1/retrieve`
-  Schema `1.0`、一个 `document_key`、一个 `expected_index_id`、Dense-only。
-
-## 3. ScholarTrace M2 跨项目验收
-
-ScholarTrace 已在已验证的 DocuMind `2.2.0 纯检索交付基线` 上完成真实在线
-`upload -> status -> retrieve` 验收，不是仅有接口兼容测试。验收使用 3 篇版本化
-公开 arXiv PDF，DocuMind readiness 返回 HTTP 200 且 `retrieval=ready`；3 次检索
-全部一次成功，返回 15 个 Chunk，并生成 11 条全文 Evidence。
-
-ScholarTrace Consumer 对每个返回 Chunk 执行论文身份、`document_key`、active
-`index_id`、源文件 SHA-256、Chunk hash、连续 rank、页码、Chunk 定位和引用位置的
-fail-closed 校验，最终 Evidence 可回链到确定的论文全文位置。正式报告
-`docs/M2_EVIDENCE_BASELINE.md` 与机器报告 `evaluation/reports/m2_live_documind_smoke.json`
-的阶段结论均为 `PASS`。
-
-该证据只证明当前本地/可信私网 M2 集成和契约可靠性，不外推为大规模吞吐、语义
-蕴含质量或公网生产能力。
-
-## 5. 已完成验证
-
-| 检查 | 结果 |
+| 项目 | 历史记录 |
 |---|---|
-| DS-06 专项与 DS-05 定向测试 | `9 passed` |
-| 全量 Python 测试 | `316 passed, 1 skipped, 178 subtests passed` |
-| Black | 通过 |
-| compileall | 通过 |
-| `git diff --check` | 通过 |
-| DS-05 freeze validate | 通过 |
-| Holdout 执行次数 | 1 次 |
-| 公共 API 变更 | 0 |
+| 语料 | 75 份合成代表性文档，235 个按生产分块器生成的 Chunk |
+| 探索与审核 | 400 题探索池；100 题正式 Gold（94 approve、6 modify） |
+| 数据划分 | validation / holdout 各 50 题 |
+| 候选 | Dense、BM25、Hybrid、CPU Reranker；Reranker深度仅在validation选择 |
+| 决策 | 增强候选 `NO_GO`，保留 Dense 基线 |
+| 解释边界 | Reranker有质量提升但延迟超门禁；结果只适用于对应数据和配置 |
 
-DS-06 报告 SHA-256：
+原始证据：
 
-- validation：`363272c21d1fa33430122bb4a35dec1d9d6d9b2bb1a49e377efece14a8a1bbf3`
-- holdout：`8a80ab258e6752ed4c0ab6962eeb9f3dd29a3ecfa675cead190a1e0031a28d7a`
-- decision：`60d97ea874cc4dcd58b37f705b6727ba1311a4e18fcf23d24a933170e8b3f462`
+- [Validation 报告](../evaluation/reports/p2_ds06_validation_v1.json)
+- [Holdout 报告](../evaluation/reports/p2_ds06_holdout_v1.json)
+- [候选决策 JSON](../evaluation/reports/p2_ds06_final_decision_v1.json)
+- [候选决策说明](../evaluation/reports/p2_ds06_final_decision_v1.md)
 
-报告是在最终提交前的工作树上生成的。提交时不得修改评测输入、代码路径或报告
-字节；提交后应复核文件哈希和 `git show` 内容。由于 holdout 只允许执行一次，不能
-为了得到“干净提交报告”而重复运行同一 holdout。
+输入指纹、配置、指标分母和错误记录以这些文件及对应评测协议为准。历史 holdout 只执行一次；不能为了更新版本标识而重复运行同一 holdout 或改写原始结果。
 
-## 6. ScholarTrace 使用条件
+## ScholarTrace 对应基线联调
 
-第二次冻结后可以继续用于 ScholarTrace 的本地/可信私网 M2/MVP：
+历史联调使用三篇版本化公开 arXiv 论文：上传、状态检查与纯检索成功，返回15个Chunk，形成11条全文Evidence。Consumer核对论文身份、document_key、active index、源文件/Chunk哈希、排序与定位。
 
-1. 部署已验证的 DocuMind `2.2.0 纯检索交付基线`，不要使用含未审查实验改动的脏工作树。
-2. 检查 `/api/v1/health/ready`，确认 `components.retrieval=ready`。
-3. 先预热 `qwen3-embedding`，完成全部论文的检索，再启动本地 `qwen3:8b` 生成；默认
-   `OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS=600` 只提供 10 分钟有界驻留，
-   `OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS=60` 只提供有界冷加载等待；不要设为永久驻留，
-   以免单 GPU 模型切换时显存不足。
-4. 每次请求绑定唯一 `document_key` 和 `expected_index_id`，保存 Chunk、index 和
-   source hash。
+证据位于 ScholarTrace 仓库的 `docs/M2_EVIDENCE_BASELINE.md` 和 `evaluation/reports/m2_live_documind_smoke.json`。该记录证明限定的本地/可信私网契约兼容，不外推为通用语义蕴含质量、并发能力或当前版本的新验收。
 
-该冻结不承诺公网认证、多租户、跨文档批量检索、异步摄取、高可用、全量数据吞吐或
-线上 Reranker。
+## 当时的自动检查快照
+
+| 检查 | 历史结果 |
+|---|---|
+| DS-06专项及DS-05定向测试 | 9 passed |
+| 后端全量 | 316 passed、1 skipped、178 subtests passed |
+| 格式、编译、Git差异及split校验 | 通过 |
+| 公共检索Schema变化 | 无 |
+
+这些数量属于当时的测试集合，不是当前测试数量。原始报告曾在提交前的工作树生成；保留其代码/输入身份，不将后续文件整理包装成新的实验结果。
+
+## 当前接入应重新确认的条件
+
+- 目标服务和所需模型可用，`components.retrieval=ready`。
+- 请求中保持单文档和预期索引约束，不绕过失效索引检查。
+- 部署版本与Consumer契约一致，先在独立测试数据上验证调用链。
+- 有界Embedding驻留和冷加载窗口只是资源配置，不能作为GPU容量或永久可用保证。
+
+接口迁移与回退的版本差异见 [ScholarTrace接入](SCHOLARTRACE_INTEGRATION.md)，数据方法与结果解释见 [评测说明](EVALUATION.md)。

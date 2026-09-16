@@ -7,3 +7,16 @@ test-results
 .env
 .env.*
 *.log
+
+# Local private tool state
+_private
+agent
+.git
+.agents
+.codex
+.claude
+.kilo
+.serena
+.playwright-mcp
+.ohmyagent
+.monkeycode

@@ -10,7 +10,7 @@ from app.config import Settings
 
 class SettingsTests(unittest.TestCase):
     def test_application_version_matches_current_release(self):
-        self.assertEqual(__version__, "2.2.0")
+        self.assertEqual(__version__, "3.0.0")
 
     def test_chunk_overlap_must_be_smaller_than_chunk_size(self):
         with self.assertRaises(ValidationError):
@@ -28,7 +28,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(config.allowed_extensions, [".pdf", ".txt"])
 
     def test_default_host_is_localhost(self):
-        self.assertEqual(Settings.model_fields["server_host"].default, "127.0.0.1")
+        self.assertEqual(Settings.model_fields["api_host"].default, "127.0.0.1")
         self.assertEqual(Settings.model_fields["metrics_host"].default, "127.0.0.1")
 
     def test_ollama_embedding_keep_alive_is_bounded(self):

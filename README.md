@@ -1,280 +1,159 @@
-# DocuMind - RAG 知识库问答系统（v2.2.0）
+# DocuMind 3.0.0 · RAG 知识库
 
-一个本地单用户 RAG 知识库问答系统。当前主链路采用 FastAPI、React/TypeScript、Milvus Standalone 和 SSE 流式响应，包含文档生命周期管理、单文档纯检索、真实依赖探活、引用来源、结构化可观测性、离线评测和自动质量回归门禁。
+基于 **FastAPI、React 和 Milvus** 的本地知识库问答系统，提供文档摄取、流式回答、引用溯源和独立纯检索接口，并通过文档生命周期与离线评测约束数据一致性和能力变更。
 
-> 适用范围：本地单用户或可信私网，不提供公网多租户或高可用承诺。主线保持 Dense-only，增强检索状态见评测文档。
+> 适用于本地单用户或可信私网。当前主线保持 **Dense-only**，不提供公网认证、多租户隔离或高可用承诺。
 
 ## 核心能力
 
-- PDF、DOCX、TXT 上传、稳定分块、内容寻址保存和幂等索引。
-- SQLite Registry 管理文档、内容版本、索引版本、active 切换和失败恢复。
-- Milvus Standalone 保存向量，etcd 和 MinIO 由 Docker Compose 编排。
-- FastAPI 提供健康检查、配置、文档管理、单文档纯检索和 SSE 问答 API。
-- React 工作台提供上传进度、文档详情、引用来源和本地对话历史。
-- 默认 Web 检索保持 Dense-only；BM25、Hybrid/RRF、Query Rewrite 和 Reranker 保留为离线评测能力。
-- JSONL 日志、Prometheus Metrics、OpenTelemetry Tracing 和 Request/Trace ID 关联。
-- 纯检索独立 readiness、依赖超时、有限重试、进程内并发上限和 W3C Trace Context。
-- 确定性黄金集、JSON/Markdown 报告、输入兼容检查和 PR CI 质量门禁。
-- 独立的答案质量数据契约、28 条 holdout 黄金集、真实/Fake Generator/Judge、严格 Judge JSON、逐案例失败隔离和原子 JSON/Markdown 报告。
-- 人工逐案复核的旧 Prompt 真实对照，明确记录当前拒答和统一引用格式的失败边界。
-- 基于独立 validation/holdout 协议的 Dense L2 阈值校准；当前证据明确支持“不启用全局默认阈值”。
-- 加固后的不可信上下文 Prompt、XML 边界、统一 `[文档N]` 引用解析，以及低基数线上引用观测。
-- DS-04 已确认的代表性检索数据：75 份多 Chunk 合成文档、400 题探索池、100 题正式 gold（94 approve / 6 modify）。
-- DS-05 已完成 validation/holdout 隔离和指纹冻结；DS-06 在 50/50 代表集上完成四模式对照，增强候选结论为 `NO_GO`，生产默认仍为 Dense。
-- ScholarTrace M2 已在 DocuMind `2.2.0 纯检索交付基线` 上完成 3 篇公开论文的真实 `upload/status/retrieve` 联调；Evidence provenance 校验通过，结论为 `PASS`。
+- **文档管理**：支持 PDF、DOCX、TXT，内容哈希持久化、幂等摄取、索引版本及 active 原子切换。
+- **交互式问答**：React 工作台通过 SSE 展示生成过程、引用来源和中断状态，支持本地对话记录。
+- **机器检索接口**：`POST /api/v1/retrieve` 返回指定文档的原始 Chunk，不调用生成模型；固定 Schema `1.0`、`dense-v1`。
+- **可靠性**：依赖探活；纯检索执行具备有界超时、重试、进程内并发限制及失效索引校验。
+- **可观测性**：结构化 JSONL 日志、Prometheus Metrics、可选 OpenTelemetry Tracing 与凭据脱敏。
+- **质量验证**：确定性 CI 回归门禁，以及独立的检索、答案质量和增强方案对照评测。
 
-## 文档导航
+## 架构概览
 
-| 文档 | 职责 |
-|---|---|
-| [架构说明](docs/ARCHITECTURE.md) | 分层、调用链、数据不变量和系统边界 |
-| [项目结构](docs/PROJECT_STRUCTURE.md) | 目录、模块职责和依赖方向 |
-| [评测指南](docs/EVALUATION.md) | 数据集、指标、基线、Runner 和 CI 回归门禁 |
-| [可观测性指南](docs/OBSERVABILITY.md) | 日志、Metrics、Tracing 和隐私边界 |
-| [纯检索 API](docs/RETRIEVE_API.md) | 单文档 Dense 请求、证据响应、错误码和兼容规则 |
-| [ScholarTrace 接入](docs/SCHOLARTRACE_INTEGRATION.md) | Consumer 调用、错误处理、冒烟、升级回滚和服务边界 |
-| [依赖说明](docs/DEPENDENCIES.md) | 直接依赖、安装边界和可复现性 |
-| [运行示例](docs/DEMO_SCRIPT.md) | 启动、端到端流程和故障处理 |
-| [版本历史](docs/VERSION_HISTORY.md) | 主要版本与架构变化 |
-| [交付验证](docs/PROJECT_FREEZE_2.md) | 交付范围、验证证据和使用限制 |
+```mermaid
+flowchart LR
+    UI[React 工作台] --> API[FastAPI]
+    API --> DOC[文档生命周期]
+    DOC --> REG[SQLite Registry]
+    DOC --> EMB[Embedding]
+    EMB --> VEC[Milvus]
+    API --> QUERY[纯检索服务]
+    QUERY --> REG
+    QUERY --> RET[Retriever]
+    RET --> VEC
+    API --> CHAT[SSE 问答服务]
+    CHAT --> RET
+    CHAT --> LLM[配置的 LLM Provider]
+```
+
+Milvus Standalone 的 etcd、MinIO 由 Compose 编排；Ollama 和生成模型服务不包含在这组容器内。详细模块职责见[架构说明](docs/ARCHITECTURE.md)。
+
+## 版本与迁移
+
+当前源码使用 `3.0.0` 版本标识。新版统一采用 React/FastAPI/Milvus，不再提供 Gradio 启动入口；应用相对路径和默认环境文件以项目根为基准。旧版用户先阅读[3.0.0 迁移说明](docs/MIGRATION_3_0.md)。纯检索 Schema 仍为 `1.0`，`dense-v1` 不变。
+
+旧架构入口为 `v1.7.1`（Chroma/Gradio），需要时检出对应标签并使用该快照的说明。源码版本标识不等于 GitHub Release 已发布；实际发布以对应标签与发布页为准。
 
 ## 环境要求
 
-- Python 3.11
-- Node.js 22
-- Docker Desktop / Docker Engine + Compose
-- 本地 Ollama `qwen3-embedding`，或另行配置兼容的 Embedding Provider
-- OpenAI、Anthropic Claude、DeepSeek 或 GLM 中至少一个 LLM Provider
+| 场景 | 需要准备 |
+|---|---|
+| Compose 运行 | Docker Engine / Docker Desktop + Compose；可访问的 Embedding 与 LLM Provider |
+| 默认 Embedding | 本机 Ollama 已运行，并安装 `qwen3-embedding` |
+| 本地开发 | Python 3.11、Node.js 22，以及运行中的 Milvus |
+| 离线回归测试 | 安装开发依赖；确定性测试不需要真实模型或数据库 |
+
+Python 直接依赖见 `requirements.txt`，前端使用 `package-lock.json`；Python 依赖目前不是完整锁定快照。安装与可复现性边界见[依赖说明](docs/DEPENDENCIES.md)。
 
 ## 快速开始
 
-### 统一 Docker Compose
+以下命令使用 PowerShell，默认从仓库根目录执行。
+
+### 准备配置与模型
 
 ```powershell
-Copy-Item .env.example .env
-ollama serve
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ollama pull qwen3-embedding
-# 在 .env 中配置 DEFAULT_LLM_PROVIDER 和对应 API Key
-docker compose up --build
 ```
 
-默认地址：
+先确认 Ollama 服务可用；需要手动启动时，在**单独终端**运行 `ollama serve`。随后编辑本地 `.env`，设置 `DEFAULT_LLM_PROVIDER` 和对应凭据，不要将真实配置提交到 Git。
 
-- React 工作台：`http://127.0.0.1:5173`
-- FastAPI：`http://127.0.0.1:8001`
-- Swagger：`http://127.0.0.1:8001/docs`
-- Metrics：`http://127.0.0.1:8000/metrics`
-- Milvus：`http://127.0.0.1:19530`
+默认生成 Provider 为 OpenAI，因此 Web 问答并非默认完全离线。纯检索不调用生成模型，但仍依赖 Embedding、Milvus 和有效文档索引。
 
-Compose 内的 API 默认通过 `http://host.docker.internal:11434` 访问宿主机 Ollama。默认请求会让
-`qwen3-embedding` 在每次 Embedding 后保留 600 秒（`OLLAMA_EMBEDDING_KEEP_ALIVE_SECONDS`，
-范围 `0-3600`）；Embedding readiness 另有 60 秒有界冷加载窗口
-（`OLLAMA_EMBEDDING_READINESS_TIMEOUT_SECONDS`，范围 `>0-60`）。这能减少连续检索的冷启动
-503，但不会永久占用单 GPU。需要让生成模型及时接管显存时可将驻留设为 `0`，代价是下一次
-检索可能重新加载 Embedding。端口冲突或跨主机配置见 `.env.example` 中的 `*_HOST_PORT`、
-`DOCKER_OLLAMA_BASE_URL` 和 `VITE_API_BASE_URL`。
+### 启动与检查
 
-停止服务但保留数据：
+```powershell
+docker compose up -d --build
+docker compose ps
+Invoke-RestMethod http://127.0.0.1:8001/api/v1/health/live
+Invoke-RestMethod http://127.0.0.1:8001/api/v1/health/ready
+```
+
+| 入口 | 默认地址 |
+|---|---|
+| React 工作台 | `http://127.0.0.1:5173` |
+| API / Swagger | `http://127.0.0.1:8001/docs` |
+| Metrics | `http://127.0.0.1:8000/metrics` |
+| Milvus | `127.0.0.1:19530` |
+
+打开工作台，上传文档，等待索引进入 active 状态，再进行问答或调用检索接口。`live` 只表示进程存活；`ready` 才反映依赖状态。若生成服务不可用但 `components.retrieval=ready`，可使用纯检索，不能据此认为问答可用。
+
+容器默认通过 `host.docker.internal:11434` 访问宿主机 Ollama。Embedding 默认有 600 秒有界驻留和独立的 60 秒 readiness 冷加载窗口；遇到首次探活失败、端口冲突或资源不足，参见[运行与故障处理](docs/DEMO_SCRIPT.md)。
+
+### 安全停止
 
 ```powershell
 docker compose stop
 ```
 
-移除容器但保留命名卷：
+`docker compose down` 可移除容器和网络并保留命名卷。**不要在需要保留知识库时使用 `down -v`**。本地开发的 API 与前端启动步骤见[运行说明](docs/DEMO_SCRIPT.md)。
 
-```powershell
-docker compose down
-```
+## 目录与配置
 
-只有确定要删除全部本地 Milvus 和应用数据时才使用 `docker compose down -v`。
-
-### 本地开发
-
-创建环境并安装依赖：
-
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
-Copy-Item .env.example .env
-```
-
-只启动 Milvus 基础设施：
-
-```powershell
-docker compose -f infra/milvus/compose.yaml up -d
-```
-
-启动 API：
-
-```powershell
-python -m app.api
-```
-
-另开终端启动前端：
-
-```powershell
-cd frontend
-npm ci
-npm run dev
-```
-
-Gradio 兼容入口仍可通过 `python web_app.py` 启动，但不再是主要交付界面。
-
-## API 概览
-
-| 方法与路径 | 用途 |
+| 位置 | 职责 |
 |---|---|
-| `GET /api/v1/health/live` | API 进程存活检查 |
-| `GET /api/v1/health/ready` | Milvus、Embedding、LLM、Registry 和纯检索能力就绪检查 |
-| `GET /api/v1/system/config` | 返回前端需要的非敏感配置 |
-| `GET /api/v1/documents` | 文档列表 |
-| `POST /api/v1/documents` | 上传并同步建立索引 |
-| `GET /api/v1/documents/{document_key}` | 文档详情和索引历史 |
-| `POST /api/v1/documents/{document_key}/reindex` | 基于持久化源文件重建索引 |
-| `DELETE /api/v1/documents/{document_key}` | 可恢复地删除注册表、向量和无引用源文件 |
-| `POST /api/v1/retrieve` | 对指定文档 active index 返回原始 Chunk，不调用 LLM |
-| `POST /api/v1/chat/stream` | 返回 `status/sources/token/done/error` SSE 事件 |
+| `app/` / `frontend/` | 后端与前端源码 |
+| `tests/` / `frontend/e2e/` | 后端测试与浏览器流程测试 |
+| `data/` | 注册表及上传文件；内容不提交 |
+| `logs/` / `artifacts/` | 日志与新生成的验证报告；内容不提交 |
+| `evaluation/` | 固定数据集、基线、评测工具和历史证据 |
+| `_private/` | 可选的本地私人资料目录，Git/Docker 均排除 |
 
-`/retrieve` 使用独立 Schema `1.0`，要求调用方提供 `document_key` 和当前
-`expected_index_id`。接口仅承诺 Dense L2 检索，正文不截断，单次 `top_k`
-范围为 1-20，请求体上限为 16 KiB。完整契约和错误语义见[纯检索 API](docs/RETRIEVE_API.md)，跨仓调用和运维流程见[ScholarTrace 接入](docs/SCHOLARTRACE_INTEGRATION.md)。
+默认 `.env` 和相对应用数据/日志路径以项目根解析；绝对路径覆盖继续有效。配置加载不创建文件，启动时准备必要目录。Docker 使用现有 `/app/data`、`/app/logs` 持久化位置，不会因更换终端目录自动迁移数据。
 
-## 生命周期运维
+`data`、`logs`、`artifacts` 仅跟踪目录占位规则。明确传给评测 CLI 的相对输入/输出仍按调用者工作目录解释，绝对路径保持原位置。完整职责见[项目结构](docs/PROJECT_STRUCTURE.md)。
 
-```powershell
-python -m app.lifecycle list
-python -m app.lifecycle audit
-python -m app.lifecycle cleanup --dry-run
-python -m app.lifecycle cleanup --include-orphans
-python -m app.lifecycle rebuild --document-key <document_key> --dry-run
-python -m app.lifecycle rebuild --document-key <document_key>
-python -m app.lifecycle rebuild --document-key <document_key> --retry
-```
+## 评测与验证
 
-`rebuild --dry-run` 不连接 Embedding Provider，也不写 Registry 或 Milvus。真实重建会校验内容寻址源文件、Embedding 空间和 Chunk 数量，成功后才切换 active 索引。
+### 先运行确定性回归
 
-## 确定性质量门禁
-
-生成与 CI 相同的实时 Dense 报告：
-
-```powershell
-.\venv\Scripts\python.exe -m evaluation.runner `
-  --dataset evaluation/datasets/golden_dataset.jsonl `
-  --retrieval-mode dense `
-  --output-json evaluation/reports/current-deterministic.json `
-  --output-markdown evaluation/reports/current-deterministic.md
-
-.\venv\Scripts\python.exe -m evaluation.regression_runner `
-  --baseline evaluation/baselines/deterministic_dense_v2.json `
-  --current evaluation/reports/current-deterministic.json
-```
-
-普通 PR CI 只使用仓库内数据、确定性哈希 Embedding 和内存向量存储，不连接 Ollama、Milvus、Hugging Face 或付费 LLM。JSON/Markdown 报告无论门禁成功或失败都会作为 Artifact 保留 14 天。详细指标语义和基线边界见[评测指南](docs/EVALUATION.md)。
-
-单文档 `/retrieve` 另有 Chunk 级契约基线：
-
-```powershell
-.\venv\Scripts\python.exe -m evaluation.retrieve_quality_runner `
-  --json-output evaluation/reports/retrieve_quality_current.json `
-  --markdown-output evaluation/reports/retrieve_quality_current.md
-
-.\venv\Scripts\python.exe -m evaluation.regression_runner `
-  --baseline evaluation/baselines/retrieve_quality_v1.json `
-  --current evaluation/reports/retrieve_quality_current.json `
-  --allowed-drop ndcg_at_k=0 `
-  --minimum api_bottom_parity_rate=1 `
-  --minimum contamination_free_rate=1 `
-  --minimum no_answer_empty_accuracy=1
-```
-
-该基线通过生产 `RetrievalService` 运行 5 个仓库内确定性案例，只验证 Chunk
-排序、空结果、公共/底层一致和跨文档污染，不代表真实 Embedding/Milvus 质量。
-
-## 答案质量 Runner
-
-答案质量 CLI 使用当前生产 `RAGGenerator` Prompt 生成候选答案，并使用独立 Judge Prompt 评估 Faithfulness、引用质量和回答相关性。生成模型与 Judge 必须分别指定并记录：
-
-```powershell
-.\venv\Scripts\python.exe -m evaluation.answer_runner `
-  --dataset evaluation/datasets/v2_answer_quality/dataset.jsonl `
-  --documents-dir evaluation/datasets/v2_answer_quality/documents `
-  --retrieval-mode dense `
-  --embedding-provider ollama `
-  --generator-provider openai `
-  --generator-model gpt-4-turbo `
-  --judge-provider openai `
-  --judge-model gpt-4-turbo `
-  --output-json evaluation/reports/answer-quality-current.json `
-  --output-markdown evaluation/reports/answer-quality-current.md
-```
-
-退出码 `0` 表示所有案例执行成功并写出报告，`1` 表示报告已写出但存在案例错误，`2` 表示数据集、配置、Provider 初始化或输出路径错误。真实答案评测不进入普通 PR CI；运行前必须冻结模型名、参数、数据集和语料，且不得把 API Key 写入命令或报告。
-
-v2.0.5 的专用数据集包含 28 条人工编写的答案质量 `holdout`：8 条直接事实、5 条多片段综合、6 条无答案、3 条信息不足或冲突、3 条 Prompt Injection、3 条引用边界。独立阈值集另含 validation 5 正/15 负和 holdout 5 正/10 负，共 35 条；它只冻结后续校准输入，尚未执行阈值扫描。11 份 TXT 语料均为仓库内合成材料，不含私人文档或真实凭据；规范化指纹为答案集 `f5eb00ddc448772e6369f8e2b8ae798cecf4736e2f7dc6619df49a728108055d`、阈值集 `8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210`、语料 `7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878103`。
-
-v2.0.6 使用 Ollama `qwen3-embedding`（4096 维）、DeepSeek `deepseek-chat` Generator/Judge、Dense 检索、空距离阈值和未加固生产 Prompt 生成并人工复核了 [pre-hardening JSON 报告](evaluation/reports/v2_answer_pre_hardening.json)及[可读报告](evaluation/reports/v2_answer_pre_hardening.md)。28 条均成功执行，19 条可回答案例的标注文档全部进入 Top-K；Faithfulness 和回答相关性均为 `1.0000`，但拒答准确率仅为 `0.6786`，引用正确性与完整性均为 `0.0526`。三条 Prompt Injection 未输出哨兵或服从恶意指令。这是旧行为对照，不代表当前答案质量已经通过验收；完整人工结论见[复核记录](evaluation/reports/v2_answer_pre_hardening_review.md)。
-
-v2.0.7 使用相同的 Ollama Embedding、Dense、Milvus L2、Top-K=3 和 11 份专用语料，只在 validation 的 5 条正样本与 15 条困难负样本上运行无阈值检索并扫描 59 个相邻 distance 中点。没有候选同时满足 Recall@3 下降不超过 `0.02`、无答案检索准确率不低于 `0.90` 和执行成功率 `1.00`：约 `0.7175` 的候选可达到 `0.9333` 无答案准确率，但 Recall@3 仅 `0.4000`；保持 Recall@3=`1.0000` 的约 `0.9006` 候选，无答案准确率仅 `0.4667`。因此按预设协议不运行 holdout、不启用参考阈值，代码与 `.env.example` 继续保持空值。机器可读结论见[扫描报告](evaluation/reports/v2_threshold_validation_scan.json)，完整依据见[复核记录](evaluation/reports/v2_threshold_validation_review.md)。
-
-v2.0.8 在同一固定配置下将生产 Prompt 加固为不可信数据边界，并新增生产引用解析/观测。最新干净提交上的加固报告使用 DeepSeek `deepseek-chat` Generator/Judge、Ollama `qwen3-embedding` 4096 维、Dense、Milvus L2、空阈值和 28 条 holdout：`temperature=0.7` 时成功率 `1.0000`、拒答准确率 `0.7500`、Faithfulness/引用正确性/完整性/相关性均为 `0.9474`；预先选定的 `temperature=0.1` 对照成功率为 `0.9643`、拒答准确率为 `0.7037`，其已评估质量指标为 `1.0000`，但有 1 条案例在 Judge 阶段发生 `ValueError`，因此保留生产温度 `0.7`。三条 Injection 在两种温度下均未输出哨兵、system prompt、真实凭据或越界引用。报告与人工复核见 [hardened JSON](evaluation/reports/v2_answer_prompt_hardened.json)、[hardened Markdown](evaluation/reports/v2_answer_prompt_hardened.md)、[低温对照](evaluation/reports/v2_answer_prompt_hardened_low_temp.json) 和 [复核记录](evaluation/reports/v2_answer_prompt_hardened_review.md)。真实 Provider 指标只适用于本次固定数据集、语料和运行配置，不能外推为普遍质量承诺。
-
-## 测试与检查
+在安装开发依赖的 Python 环境中执行：
 
 ```powershell
 python -m pytest -q
-python -m black --check app evaluation tests web_app.py
-python -m compileall -q app evaluation web_app.py tests
-python -m pip check
-
-cd frontend
-npm test
-npm run typecheck
-npm run build
-npm run test:e2e
-
-cd ..
-docker compose -f compose.yaml config --quiet
-docker compose -f infra/milvus/compose.yaml config --quiet
+python -m evaluation.runner --output-json artifacts/evaluation/current.json --output-markdown artifacts/evaluation/current.md
+python -m evaluation.regression_runner --baseline evaluation/baselines/deterministic_dense_v2.json --current artifacts/evaluation/current.json
 ```
 
-v2.0.1 完整本地回归结果为 Python `181 passed, 1 skipped, 11 subtests passed`、Vitest `5 passed`、Playwright `6 passed`，并通过格式、编译、依赖、TypeScript、构建和两份 Compose 校验。v2.0.2 进一步验证了正常确定性报告返回 `PASS`，仅降低兼容报告的 Recall 会返回质量失败码 `1`。v2.0.3 全量 Python 回归为 `189 passed, 1 skipped, 20 subtests passed`。v2.0.4 全量 Python 回归为 `197 passed, 1 skipped, 23 subtests passed`。v2.0.5 全量 Python 回归为 `205 passed, 1 skipped, 124 subtests passed`，数据集专项为 `8 passed, 101 subtests passed`。v2.0.6 全量 Python 仍为 `205 passed, 1 skipped, 124 subtests passed`，答案专项为 `23 passed, 113 subtests passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、32 份 Markdown 检查和既有确定性检索门禁均通过。
+确定性检索使用固定数据、哈希 Embedding 和内存向量存储，不需要真实 Provider。真实 Milvus 集成有单独的显式开关；不要把默认测试通过解释为真实依赖或最终生产部署已通过。前端与完整检查命令见[运行说明](docs/DEMO_SCRIPT.md)。
 
-v2.0.7 全量 Python 为 `215 passed, 1 skipped, 124 subtests passed`，阈值专项为 `10 passed`，Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、35 份 Markdown UTF-8/本地链接检查、正式工件密钥扫描和既有确定性检索门禁均通过。
+### 历史证据摘要
 
-v2.0.8 当前代码复审为 Python `220 passed, 1 skipped`，专项测试 `35 passed`，Vitest `5 passed`，Playwright `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、44 份 Markdown UTF-8/本地链接检查、5 份正式评测工件密钥模式扫描和 `deterministic_dense_v2` 回归门禁均通过。两份真实报告均在 `对应阶段源码快照` 干净提交上生成并记录 `dirty=false`；当前源码 API/前端镜像已重建，真实 Compose 冒烟通过 `2.0.8` 健康检查、TXT 上传、可回答/无答案 SSE、详情和删除闭环。
+| 证据 | 结论与边界 |
+|---|---|
+| DS-06 检索对照 | 75 份合成代表性文档、235 Chunk，validation/holdout 各 50 题。Reranker 的 MRR@3 从 **0.3018 提升至 0.4459**，但 P95 从 **170.25 ms 增至 1102.93 ms**，超出预设延迟门禁，因此不替换 Dense 主线。 |
+| 答案质量对照 | 历史报告暴露拒答和统一引用等限制；检索命中不等于回答正确，不能宣称任意模型或用户文档都达到相同质量。 |
+| ScholarTrace 联调 | 已有对应基线的真实上传/检索与 Evidence 校验记录；证明限定条件下的接口集成，不代表当前版本的独立部署验收或大规模吞吐。 |
 
-v2.1.0 P0 本地复审为 Python `241 passed, 1 skipped, 149 subtests passed`、Vitest `5 passed`、Playwright `6 passed`；Black 检查 99 个 Python 文件，compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、40 份已跟踪 Markdown、全部已跟踪 JSON、版本对齐和 `deterministic_dense_v2` 回归门禁均通过。跳过项仍是需要显式启用的真实 Milvus 集成测试；本次没有生成新的真实 Provider 质量结论。
+详见[DS-06 决策](evaluation/reports/p2_ds06_final_decision_v1.md)、[评测文档](docs/EVALUATION.md)和[历史交付证据](docs/PROJECT_FREEZE_2.md)。数据集、指标、报告日期与依赖配置是证据的一部分，不将旧报告伪装成当前版本的新测试结果。
 
-v2.2.0 P1 本地复审为 Python `266 passed, 1 skipped, 168 subtests passed`、Vitest `5 passed`、Playwright `6 passed`；Black 检查 102 个 Python 文件，compileall、`pip check`、TypeScript、前端生产构建、两份 Compose 配置解析、34 份 JSON、42 份 Markdown、本地链接、版本对齐、`deterministic_dense_v2` 和 `retrieve_quality_v1` 回归门禁均通过。当前源码还通过真实 Ollama/Milvus 的 `2.2.0` 独立 API 冒烟：retrieval readiness、TXT 上传、active 状态、W3C Trace Context、3 个 Chunk 纯检索、证据哈希/排序及文档删除闭环均正常。跳过项仍是需显式环境开关的独立 Milvus 集成测试；本次真实冒烟验证装配与协议，不产生通用语义质量或阈值结论。
+## 使用边界
 
-P2-01 已用 35 个冻结案例对 Dense、BM25、Hybrid 和 Hybrid + Reranker 完成真实 Provider 上线门禁，结论为 [`NO_GO`](evaluation/baselines/p2_retrieval_candidate_decision_v1.md)：在这组 11 Chunk、正样本 Dense 已达 Top-1 天花板的数据上，BM25/Hybrid 未观测到可计入门禁的质量增益，不能外推为普遍“无收益”；CPU Reranker 的 holdout MRR 下降且热路径 P95 显著增加。因此公共 `/retrieve` 仍保持 Schema `1.0`、`dense-v1` 和单文档范围。
+- 文档摄取同步执行；没有后台任务队列、租户鉴权或高可用部署保证。
+- Web 主线与公共纯检索接口保持 Dense-only；BM25、Hybrid、Rewrite、Reranker 是离线实验能力。
+- `/retrieve` 要求一个 `document_key` 和匹配的 `expected_index_id`；不提供跨文档批量、结果缓存或 MCP 接口。
+- L2 阈值与 Embedding 空间、语料相关，没有可靠通用默认阈值；保留拒答和引用质量的已知限制。
+- 不可信上下文隔离及测试不等于全面安全保证；不要直接暴露到公网。
+- Prometheus、Grafana、Jaeger、Collector 等外部可观测性后端不在当前 Compose 中。
 
-P2 数据证据刷新已完成 DS-00～02：固定来源清单、可续传且逐文件校验的下载器、Parquet/TSV 结构验证器，以及 T2Ranking dev、BEIR NFCorpus、BEIR SciFact 共 12 个文件（169,682,657 bytes）的本地校验。MIRACL 中文全量未下载；按当前单 GPU 试跑外推，其 Embedding-only 约需 462.6 小时，同时不满足许可证、18/24 小时运行和 120 GiB 磁盘门禁，因此保持延期。原始数据位于 Git 忽略目录，公共检索行为没有变化。
+## 文档导航
 
-P2 DS-03～06 已完成确定性规范化、代表性数据集人工复核、split 隔离冻结和真实四模式评测。DS-06 的 `PASS WITH NOTES / NO_GO` 只表示增强候选没有达到上线门禁；Dense 基线和 ScholarTrace 所需的单文档证据检索不受影响。第二次项目冻结已完成，完整范围和提交排除项见 [`docs/PROJECT_FREEZE_2.md`](docs/PROJECT_FREEZE_2.md)。
+| 文档 | 内容 |
+|---|---|
+| [架构说明](docs/ARCHITECTURE.md) | 模块依赖、文档/索引不变量、服务边界 |
+| [运行与故障处理](docs/DEMO_SCRIPT.md) | 本地/容器启动、检查、维护与停止 |
+| [项目结构](docs/PROJECT_STRUCTURE.md) | 源码、测试、运行产物的归属 |
+| [依赖说明](docs/DEPENDENCIES.md) | 安装方式与依赖锁定边界 |
+| [纯检索 API](docs/RETRIEVE_API.md) | 请求、响应、错误码、资源控制 |
+| [ScholarTrace 接入](docs/SCHOLARTRACE_INTEGRATION.md) | Consumer 流程及兼容边界 |
+| [评测文档](docs/EVALUATION.md) | 当前回归操作与按版本归档的实验记录 |
+| [可观测性](docs/OBSERVABILITY.md) | 日志、指标、Trace 与隐私约束 |
+| [版本演进](docs/VERSION_HISTORY.md) | 主要架构节点与历史版本差异 |
+| [3.0.0 迁移](docs/MIGRATION_3_0.md) | 入口、配置与路径兼容变化 |
 
-## 版本摘要
-
-| 版本 | 主要内容 | 状态 |
-|---|---|---|
-| v2.0 | FastAPI/React/Milvus 统一 Compose、基础 CI、演示与发布收口 | 已发布并推送 tag |
-| v2.2.0 | 纯检索可靠性、独立 readiness/观测、质量基线和 ScholarTrace 接入 | `main`、annotated tag 和 GitHub Release 已发布 |
-
-完整历史和真实提交边界见[版本历史](docs/VERSION_HISTORY.md)。
-
-## 当前边界
-
-- 本地单用户系统，没有认证、真实租户隔离、限流或生产高可用承诺。
-- 文档摄取是同步操作，没有任务队列、取消或后台重试调度器。
-- 默认 LLM Provider 是 OpenAI；Embedding 默认使用本地 Ollama，普通 Web 闭环并非默认完全离线。
-- Query Rewrite、Hybrid 和 Reranker 尚未进入 Web 默认请求路径。
-- 当前 8 条确定性数据集只用于管线回归，不能代表生产答案质量。
-- ScholarTrace 可按 `2.2.0 纯检索交付基线`、Schema `1.0`、`dense-v1`、单文档和 readiness 契约接入；公网认证、多租户、高可用和大规模吞吐不在本项目冻结承诺内。
-- 检索命中正确文档不等于最终回答忠实；Faithfulness 和引用质量必须由独立答案评测验证。
-- v2.0.6 已固化真实旧 Prompt 对照；它通过了执行成功率、Faithfulness 和 Injection 人工检查，但拒答与统一引用指标未达目标，因此不能声明当前生产答案质量已通过验收。
-- v2.0.7 已完成阈值校准，但结果是不启用全局默认值；项目只能声明“支持显式阈值并有不启用证据”，不能声明参考部署已通过检索阈值实现可靠拒答。
-- 当前 Generator 已使用不可信上下文边界和统一 `[文档N]` 约束；真实评测结果仍只适用于固定数据集、语料和 Provider，不能外推为所有模型或用户文档的质量承诺。
-- `/retrieve` 首版只服务受信任的本地上游，要求单文档和预期 active index；不支持批量检索、Hybrid/Reranker、缓存、多租户认证或 MCP。
-- Prometheus、Grafana、Jaeger 和 Collector 等外部可观测性后端不在 Compose 中。
+当前源码说明与历史标签是不同入口；需要旧架构时应检出对应标签，使用该快照自带的依赖和说明。不要将历史发布记录视为任意当前工作树已经发布的证明。

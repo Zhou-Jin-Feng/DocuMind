@@ -514,6 +514,7 @@ class APITests(unittest.TestCase):
         self.assertNotIn("input", json.dumps(payload, ensure_ascii=False))
 
     def test_upload_rejects_unsupported_extension(self):
+        before_count = len(self.application.document_service.ingested)
         response = self.client.post(
             "/api/v1/documents",
             files={
@@ -522,6 +523,7 @@ class APITests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 415)
         self.assertEqual(response.json()["error"]["code"], "unsupported_file_type")
+        self.assertEqual(len(self.application.document_service.ingested), before_count)
 
     def test_upload_returns_ingestion_contract_and_cors(self):
         response = self.client.post(

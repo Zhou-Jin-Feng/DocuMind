@@ -36,8 +36,10 @@ from evaluation.representative_split_audit import (
     validate_frozen_representative_splits,
 )
 
-DATASET_ROOT = Path("evaluation/datasets/p2_retrieval_v2")
-DEFAULT_OUTPUT_ROOT = Path("evaluation/reports")
+DATASET_ROOT = Path(__file__).resolve().parent / "datasets" / "p2_retrieval_v2"
+DEFAULT_OUTPUT_ROOT = (
+    Path(__file__).resolve().parents[1] / "artifacts" / "evaluation" / "ds06"
+)
 FREEZE_SHA256 = "49600e59d3525ac78ffadb61f667004db42752e0b80ad1bccce4e383ae4472a2"
 GOLD_SHA256 = "7f2440695b6f575be045e066544009a765a308544982adb8618bf5004bf418a3"
 SNAPSHOT_SCHEMA = "p2-ds06-evaluation-v1"

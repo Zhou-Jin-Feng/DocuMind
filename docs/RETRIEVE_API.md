@@ -2,8 +2,9 @@
 
 ## Status
 
-This document defines the released Schema `1.0` contract for the DocuMind
-v2.2.0 single-document Dense retrieval Provider.
+This document describes Schema `1.0` for the single-document Dense retrieval
+Provider. `service_version` identifies the deployed application version; it is
+independent of the retrieval Schema and does not attest to deployment validation.
 
 ## Endpoint
 
@@ -45,7 +46,7 @@ reused without evaluation.
 ```json
 {
   "schema_version": "1.0",
-  "service_version": "2.2.0",
+  "service_version": "3.0.0",
   "retrieval_version": "dense-v1",
   "retrieval_mode": "dense",
   "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -81,7 +82,7 @@ source paths are not part of the contract.
 }
 ```
 
-The P0 implementation reserves these status families:
+The interface uses these status families:
 
 | HTTP | Machine code | Meaning |
 |---|---|---|
@@ -110,7 +111,16 @@ can return HTTP 503 because generation is unavailable while retrieval remains
 `ready`; this state permits `/retrieve` but not `/chat/stream`. Consumers must
 fail closed when the retrieval component is absent or not ready.
 
-## Upgrade And Rollback
+## Application 3.0.0
+
+The application reports `service_version: 3.0.0`; the retrieval contract remains
+Schema `1.0` and `retrieval_version: dense-v1`. The Gradio launcher and legacy
+server settings are removed, and default local paths are rooted in the project.
+Review [the migration guide](MIGRATION_3_0.md) before changing deployments.
+An unchanged retrieval Schema does not prove that an older deployment layout or
+Consumer version pin is automatically compatible.
+
+## Historical Version Compatibility
 
 Upgrading from v2.1.0 to v2.2.0 requires no Registry or Milvus migration and
 does not alter existing request or response fields. Deploy the candidate, check

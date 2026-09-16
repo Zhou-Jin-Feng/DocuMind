@@ -1,17 +1,15 @@
-# DocuMind - RAG 系统架构（v2.2.0）
+# 系统架构与不变量
 
 ## 1. 分层结构
 
 ```mermaid
 flowchart TD
-    GRADIO["web_app.py / Gradio 兼容入口"] --> CFG["app.config / Settings"]
     FRONTEND["frontend / React + Vite"] --> API["FastAPI /api/v1"]
-    API --> CFG
+    API --> CFG["app.config / Settings"]
     API --> SERVICE["app.services"]
     CLI["app.lifecycle CLI"] --> REG["DocumentRegistry / SQLite"]
     CLI --> VS
-    GRADIO --> LC["DocumentLifecycleService"]
-    SERVICE --> LC
+    SERVICE --> LC["DocumentLifecycleService"]
     LC --> REG
     LC --> LOAD["Document Loader"]
     LC --> CHUNK["Document Chunker"]
@@ -20,8 +18,7 @@ flowchart TD
     VS --> MILVUS["Milvus Standalone"]
     MILVUS --> ETCD["etcd / 元数据"]
     MILVUS --> MINIO["MinIO / 对象存储"]
-    GRADIO --> RET["Retriever"]
-    SERVICE --> RET
+    SERVICE --> RET["Retriever"]
     RET --> EMB
     RET --> VS
     EVAL["evaluation runner"] --> RET
@@ -29,11 +26,9 @@ flowchart TD
     EVAL --> HYB["HybridRetriever / RRF"]
     HYB --> RET
     HYB --> LEX
-    GRADIO --> GEN["RAGGenerator"]
-    SERVICE --> GEN
+    SERVICE --> GEN["RAGGenerator"]
     GEN --> LLM["UniversalLLMClient"]
     API --> OBS["app.observability"]
-    GRADIO --> OBS
     RET --> OBS
     OBS --> LOG["JSONL Logs"]
     OBS --> MET["Prometheus Metrics"]
@@ -42,7 +37,7 @@ flowchart TD
 
 `app/core` 保持业务能力，`app/observability` 提供横切能力。业务层只调用稳定封装，不直接依赖 Prometheus 注册表、OpenTelemetry 全局 Provider 或日志文件实现。
 
-v2.1 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，Gradio 仍可直接调用同一套核心服务。`RetrievalService` 独立于 Generator，供受信任的上游按单文档和 active index 获取原始证据。
+当前 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编码和错误映射；`app/services` 负责把 API 请求编排到既有生命周期、检索和生成能力。React 只依赖 `/api/v1` 合约，HTTP 服务统一调用同一套核心能力。`RetrievalService` 独立于 Generator，供受信任的上游按单文档和 active index 获取原始证据。
 
 ## 2. 文档索引流程
 
@@ -70,7 +65,7 @@ v2.1 的 HTTP 边界位于 `app/api`：路由只负责协议、校验、SSE 编�
 - 相同 Chunk ID 使用 `upsert`，并删除同一索引内非预期 ID，重复执行后集合精确收敛；
 - 文档数、向量数和向量维度在写入前校验；
 - 非空 Collection 的 Embedding Provider、模型和实际维度必须与当前配置一致；
-- Gradio 临时绝对路径不写入向量元数据。
+- 上传临时绝对路径不写入向量元数据。
 
 文档摄取 Trace：
 
@@ -295,7 +290,11 @@ evaluation.runner / production_runner
 
 日志、指标、追踪和评测配置分别见[可观测性指南](OBSERVABILITY.md)与[评测指南](EVALUATION.md)。
 
-## 存储维护约束
+## 10. 存储维护约束
 
 - 业务检索只选择 `record_type == "chunk"` 的记录，向量空间配置记录不得作为知识返回；非空 Collection 不允许混用 Embedding 模型或维度。
 - 向量存储文本限制按 UTF-8 字节校验；过滤字段与值必须通过既有白名单和安全编码，不拼接不可信表达式。
+
+## 11. 文件系统边界
+
+默认 `.env`、相对注册表/上传/日志路径以应用项目根为基准，绝对路径不被重定向。配置解析无文件创建副作用，应用初始化阶段显式准备目录；初始化失败沿用现有错误状态，不覆盖已有数据。Docker挂载仍为 `/app/data` 与 `/app/logs`。测试使用临时目录，`artifacts/` 存放未提交的新运行结果，固定评测证据继续留在 `evaluation/`。

@@ -20,9 +20,9 @@ jobs:
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements-dev.txt
       - name: Format check
-        run: python -m black --check app evaluation tests web_app.py
+        run: python -m black --check app evaluation tests
       - name: Compile
-        run: python -m compileall -q app evaluation web_app.py tests
+        run: python -m compileall -q app evaluation tests
       - name: Unit tests
         run: python -m pytest -q
       - name: Run deterministic retrieval evaluation

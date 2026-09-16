@@ -22,7 +22,6 @@ RUN PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}" \
 
 COPY app ./app
 COPY evaluation ./evaluation
-COPY web_app.py .
 
 RUN mkdir -p /app/data/uploads /app/logs
 

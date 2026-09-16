@@ -377,7 +377,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--dataset",
-        default="evaluation/datasets/golden_dataset.jsonl",
+        default=str(
+            Path(__file__).resolve().parent / "datasets" / "golden_dataset.jsonl"
+        ),
         help="JSONL golden dataset path",
     )
     parser.add_argument("--output-json", help="Write JSON report to this path")

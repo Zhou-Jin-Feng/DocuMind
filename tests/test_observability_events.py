@@ -12,7 +12,10 @@ from app.core.retriever import RetrievalResult
 from app.lifecycle.registry import DocumentRegistry
 from app.lifecycle.service import DocumentLifecycleService
 from app.observability.logging import reset_logger, setup_logger
-from web_app import RAGWebApp
+from app.config import Settings
+from app.services.rag_service import RAGService
+from app.services.document_service import DocumentService
+from app.observability.context import request_context
 
 
 class FakeEmbeddingClient:
@@ -103,16 +106,21 @@ class ObservabilityEventTests(unittest.TestCase):
         ]
 
     def test_query_stream_emits_ordered_events_with_one_request_id(self):
-        app = RAGWebApp.__new__(RAGWebApp)
-        app.initialized = True
-        app.llm_provider = "fake-llm"
-        app.retriever = Retriever(FakeVectorStore(), FakeEmbeddingClient())
-        app.rag_generator = FakeGenerator()
+        service = RAGService(
+            retriever=Retriever(FakeVectorStore(), FakeEmbeddingClient()),
+            rag_generator=FakeGenerator(),
+            settings=Settings(
+                _env_file=None, default_llm_provider="openai", metrics_enabled=False
+            ),
+        )
         private_query = "PRIVATE_QUERY_SHOULD_NOT_BE_LOGGED"
 
-        outputs = list(app.answer_question(private_query, []))
+        outputs = list(service.stream_answer(private_query))
 
-        self.assertEqual(outputs[-1][1][-1]["content"], "first token")
+        self.assertEqual(
+            "".join(event.data["text"] for event in outputs if event.type == "token"),
+            "first token",
+        )
         records = self._records()
         events = [record["event"] for record in records]
         expected = [
@@ -146,13 +154,15 @@ class ObservabilityEventTests(unittest.TestCase):
                 self.assertIsInstance(record["duration_ms"], (int, float))
 
     def test_query_context_survives_resume_in_different_contexts(self):
-        app = RAGWebApp.__new__(RAGWebApp)
-        app.initialized = True
-        app.llm_provider = "fake-llm"
-        app.retriever = Retriever(FakeVectorStore(), FakeEmbeddingClient())
-        app.rag_generator = FakeGenerator()
+        service = RAGService(
+            retriever=Retriever(FakeVectorStore(), FakeEmbeddingClient()),
+            rag_generator=FakeGenerator(),
+            settings=Settings(
+                _env_file=None, default_llm_provider="openai", metrics_enabled=False
+            ),
+        )
 
-        stream = app.answer_question("question", [])
+        stream = service.stream_answer("question")
         outputs = []
         while True:
             try:
@@ -160,7 +170,10 @@ class ObservabilityEventTests(unittest.TestCase):
             except StopIteration:
                 break
 
-        self.assertEqual(outputs[-1][1][-1]["content"], "first token")
+        self.assertEqual(
+            "".join(event.data["text"] for event in outputs if event.type == "token"),
+            "first token",
+        )
         records = self._records()
         tracked_events = {
             "query_received",
@@ -189,13 +202,15 @@ class ObservabilityEventTests(unittest.TestCase):
                 yield "partial answer"
                 raise RuntimeError("private provider failure")
 
-        app = RAGWebApp.__new__(RAGWebApp)
-        app.initialized = True
-        app.llm_provider = "fake-llm"
-        app.retriever = Retriever(FakeVectorStore(), FakeEmbeddingClient())
-        app.rag_generator = BrokenGenerator()
+        service = RAGService(
+            retriever=Retriever(FakeVectorStore(), FakeEmbeddingClient()),
+            rag_generator=BrokenGenerator(),
+            settings=Settings(
+                _env_file=None, default_llm_provider="openai", metrics_enabled=False
+            ),
+        )
 
-        stream = app.answer_question("question", [])
+        stream = service.stream_answer("question")
         outputs = []
         while True:
             try:
@@ -203,9 +218,15 @@ class ObservabilityEventTests(unittest.TestCase):
             except StopIteration:
                 break
 
-        final_answer = outputs[-1][1][-1]["content"]
+        final_answer = "".join(
+            event.data["text"] for event in outputs if event.type == "token"
+        )
         self.assertIn("partial answer", final_answer)
-        self.assertIn("模型连接在流式生成过程中中断", final_answer)
+        self.assertEqual(outputs[-1].type, "error")
+        self.assertIn("模型连接在流式生成过程中中断", outputs[-1].data["message"])
+        self.assertTrue(outputs[-1].data["partial"])
+        self.assertEqual(sum(event.type == "error" for event in outputs), 1)
+        self.assertFalse(any(event.type == "done" for event in outputs))
         self.assertNotIn("private provider failure", final_answer)
         records = self._records()
         completion = next(
@@ -214,36 +235,38 @@ class ObservabilityEventTests(unittest.TestCase):
         response = next(
             record for record in records if record["event"] == "response_sent"
         )
+        self.assertEqual(
+            sum(record["event"] == "generation_completed" for record in records), 1
+        )
         self.assertEqual(completion["status"], "error")
         self.assertEqual(response["status"], "error")
         self.assertEqual(completion["request_id"], response["request_id"])
         self.assertIsNotNone(response["request_id"])
 
     def test_document_ingestion_emits_stage_events_without_file_name(self):
-        app = RAGWebApp.__new__(RAGWebApp)
-        app.initialized = True
-        app.embedding_provider = "fake-embedding"
-        app.doc_loader = FakeLoader()
-        app.chunker = FakeChunker()
-        app.embedding_client = FakeEmbeddingClient()
-        app.vector_store = FakeVectorStore()
-
         with tempfile.TemporaryDirectory() as directory:
-            app.registry = DocumentRegistry(str(Path(directory) / "registry.sqlite3"))
-            app.lifecycle_service = DocumentLifecycleService(
-                loader=app.doc_loader,
-                chunker=app.chunker,
-                embedding_client=app.embedding_client,
-                vector_store=app.vector_store,
-                registry=app.registry,
+            registry = DocumentRegistry(str(Path(directory) / "registry.sqlite3"))
+            lifecycle = DocumentLifecycleService(
+                loader=FakeLoader(),
+                chunker=FakeChunker(),
+                embedding_client=FakeEmbeddingClient(),
+                vector_store=FakeVectorStore(),
+                registry=registry,
                 upload_dir=str(Path(directory) / "uploads"),
             )
             file_name = "private-customer-name.txt"
             file_path = Path(directory) / file_name
             file_path.write_text("content", encoding="utf-8")
-            result = app.upload_and_index_document(str(file_path))
+            service = DocumentService(
+                lifecycle_service=lifecycle,
+                registry=registry,
+                tenant_id="default",
+                collection_id="rag_documents",
+            )
+            with request_context(request_id="ingestion-test"):
+                result = service.ingest(file_path, display_name=file_path.name)
 
-        self.assertIn("文档处理完成", result)
+        self.assertEqual(result.status, "indexed")
         records = self._records()
         events = [record["event"] for record in records]
         expected = [

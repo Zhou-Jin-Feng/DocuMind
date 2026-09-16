@@ -1,352 +1,68 @@
-# 项目结构（v2.2.0）
+# 项目结构与文件职责
+
+本页描述当前源码组织；安装与使用见根目录 [README](../README.md)，设计约束见 [ARCHITECTURE](ARCHITECTURE.md)。运行生成物与私人材料不属于源码交付内容。
+
+## 顶层布局
 
 ```text
 DocuMind/
-├── app/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── document_loader.py
-│   │   ├── document_chunker.py
-│   │   ├── embedding_client.py
-│   │   ├── vector_store.py
-│   │   ├── retriever.py
-│   │   ├── query_rewriter.py
-│   │   ├── reranker.py
-│   │   ├── citations.py
-│   │   └── generator.py
-│   ├── observability/
-│   │   ├── __init__.py
-│   │   ├── context.py
-│   │   ├── logging.py
-│   │   ├── metrics.py
-│   │   └── tracing.py
-│   ├── lifecycle/
-│   │   ├── __init__.py
-│   │   ├── __main__.py
-│   │   ├── cli.py
-│   │   ├── models.py
-│   │   ├── registry.py
-│   │   └── service.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── rag_service.py
-│   │   ├── retrieval_service.py
-│   │   └── document_service.py
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── __main__.py
-│   │   ├── main.py
-│   │   ├── dependencies.py
-│   │   ├── errors.py
-│   │   ├── schemas.py
-│   │   ├── sse.py
-│   │   └── routers/
-│   │       ├── health.py
-│   │       ├── system.py
-│   │       ├── documents.py
-│   │       ├── retrieval.py
-│   │       └── chat.py
-│   └── utils/
-│       ├── __init__.py
-│       ├── logger.py
-│       └── monitoring.py
-├── tests/
-│   ├── __init__.py
-│   ├── test_config.py
-│   ├── test_document_pipeline.py
-│   ├── test_embedding_client.py
-│   ├── test_vector_store.py
-│   ├── test_retriever.py
-│   ├── test_generator.py
-│   ├── test_web_app.py
-│   ├── test_observability_context.py
-│   ├── test_structured_logging.py
-│   ├── test_observability_events.py
-│   ├── test_monitoring.py
-│   ├── test_metrics.py
-│   ├── test_tracing.py
-│   ├── test_evaluation.py
-│   ├── test_answer_evaluation.py
-│   ├── test_answer_runner.py
-│   ├── test_citations.py
-│   ├── test_threshold_calibration.py
-│   ├── test_lifecycle.py
-│   ├── test_lifecycle_cli.py
-│   ├── test_application.py
-│   ├── test_milvus_integration.py
-│   ├── test_services.py
-│   ├── test_retrieval_service.py
-│   ├── test_retrieve_contract.py
-│   ├── test_api.py
-│   └── *.txt
-├── evaluation/
-│   ├── __init__.py
-│   ├── adapters.py
-│   ├── answer_models.py
-│   ├── answer_adapters.py
-│   ├── answer_metrics.py
-│   ├── answer_reports.py
-│   ├── answer_runner.py
-│   ├── integration.py
-│   ├── fingerprints.py
-│   ├── production.py
-│   ├── production_runner.py
-│   ├── threshold_calibration.py
-│   ├── threshold_runner.py
-│   ├── comparison.py
-│   ├── comparison_runner.py
-│   ├── rewrite_artifacts.py
-│   ├── rewrite_runner.py
-│   ├── metrics.py
-│   ├── models.py
-│   ├── regression.py
-│   ├── regression_runner.py
-│   ├── retrieve_quality.py
-│   ├── retrieve_quality_runner.py
-│   ├── retrieval_candidate_gate.py
-│   ├── retrieval_candidate_gate_runner.py
-│   ├── representative_dataset.py
-│   ├── representative_split_audit.py
-│   ├── data_source_downloader.py
-│   ├── data_source_validation.py
-│   ├── data_source_normalization.py
-│   ├── data_sources/
-│   │   ├── manifest.json
-│   │   ├── README.md
-│   │   └── contracts/
-│   ├── reports.py
-│   ├── runner.py
-│   ├── datasets/
-│   │   ├── golden_dataset.jsonl
-│   │   ├── retrieve_quality_v1.json
-│   │   ├── documents/
-│   │   ├── v1_6/
-│   │   │   ├── golden_dataset.jsonl
-│   │   │   ├── holdout_dataset.jsonl
-│   │   │   └── documents/
-│   │   ├── v1_7/                # 经数据集指纹绑定的 Rewrite artifact
-│   │   ├── v2_answer_quality/
-│   │       ├── dataset.jsonl
-│   │       ├── threshold_dataset.jsonl
-│   │       ├── documents/
-│   │       └── README.md
-│   │   └── p2_retrieval_v2/
-│   │       ├── gold_dataset.jsonl
-│   │       ├── gold_candidates.jsonl
-│   │       ├── review_decisions.jsonl
-│   │       └── documents/
-│   ├── baselines/
-│   │   ├── deterministic_dense_v2.json
-│   │   ├── deterministic_dense_v2.md
-│   │   ├── retrieve_quality_v1.json / .md
-│   │   ├── p2_retrieval_candidate_decision_v1.json / .md
-│   │   └── README.md
-│   └── reports/
-│       ├── v2_answer_pre_hardening.json
-│       ├── v2_answer_pre_hardening.md
-│       ├── v2_answer_pre_hardening_review.md
-│       ├── v2_threshold_validation_raw.json / .md
-│       ├── v2_threshold_validation_scan.json / .md
-│       ├── v2_threshold_validation_review.md
-│       ├── v2_answer_prompt_hardened.json / .md
-│       ├── v2_answer_prompt_hardened_low_temp.json / .md
-│       └── v2_answer_prompt_hardened_review.md
-├── frontend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── api.ts
-│   │   ├── api.test.ts
-│   │   ├── conversations.ts
-│   │   ├── conversations.test.ts
-│   │   ├── types.ts
-│   │   └── styles.css
-│   ├── e2e/
-│   │   ├── mock-api.mjs
-│   │   └── workbench.spec.ts
-│   ├── playwright.config.ts
-│   ├── vite.config.ts
-│   ├── package.json
-│   └── package-lock.json
-├── infra/
-│   └── milvus/
-│       └── compose.yaml
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── PROJECT_STRUCTURE.md
-│   ├── EVALUATION.md
-│   ├── OBSERVABILITY.md
-│   ├── RETRIEVE_API.md
-│   ├── SCHOLARTRACE_INTEGRATION.md
-│   ├── DEPENDENCIES.md
-│   ├── DEMO_SCRIPT.md
-│   ├── VERSION_HISTORY.md
-│   └── plans/
-├── data/                  # 本地运行数据，Git 忽略
-├── logs/                  # JSONL 日志，Git 忽略
-├── .env                   # 本地密钥，Git 忽略
-├── .env.example           # 无密钥配置模板
-├── .dockerignore
-├── .gitignore
-├── compose.yaml
+├── app/                   # Python 后端
+├── frontend/              # React/Vite 工作台
+├── tests/                 # 后端测试与安全合成样例
+├── evaluation/            # 评测工具、固定输入和历史证据
+├── docs/                  # 正式工程说明与契约
+├── infra/milvus/          # 独立 Milvus 基础栈配置
+├── data/.gitignore        # 运行数据目录入口
+├── logs/.gitignore        # 日志目录入口
+├── artifacts/.gitignore   # 新生成报告目录入口
+├── .github/workflows/     # CI 定义
+├── .env.example           # 无真实凭据的配置样例
 ├── Dockerfile
+├── compose.yaml
 ├── requirements.txt
 ├── requirements-dev.txt
-├── README.md
-└── web_app.py
+├── pyproject.toml
+└── README.md
 ```
 
-## 模块职责
+目录树列出职责边界，不逐行重复所有源码文件。未列出的模块以实际工作树为准。
 
-| 文件 | 职责 |
+## 后端分层
+
+| 位置 | 责任 |
 |---|---|
-| `app/config.py` | 环境变量加载、默认值和参数验证 |
-| `document_loader.py` | PDF/DOCX/TXT 加载、稳定文档 ID、页码元数据 |
-| `document_chunker.py` | 文档分块、稳定 Chunk ID、空块过滤 |
-| `embedding_client.py` | Ollama 和 API Embedding 统一调用 |
-| `vector_store.py` | Milvus Collection、upsert、search、delete 和 Embedding 空间校验 |
-| `retriever.py` | Dense 检索、BM25 中文/标识符分词、RRF、多查询融合、重排编排和结果分数契约 |
-| `query_rewriter.py` | 原问题保留、规范化去重、严格 JSON LLM 改写和确定性映射 |
-| `reranker.py` | 延迟加载 Cross-Encoder，扩大候选后赋予独立 `rerank_score` |
-| `generator.py` | OpenAI 兼容/Anthropic 消息适配和流式生成 |
-| `web_app.py` | 上传校验、生命周期服务调用、问答编排、根 Span、Metrics 服务和 UI |
-| `app/services/rag_service.py` | 将检索和生成编排为 `status/sources/token/done/error` 结构化事件 |
-| `app/services/retrieval_service.py` | 单文档 active index 校验、Dense 作用域过滤和证据白名单映射 |
-| `app/services/document_service.py` | 文档摄取、列表、详情、重建和可恢复删除编排 |
-| `app/api/main.py` | FastAPI 应用工厂、生命周期初始化、CORS、Request ID 和异常处理 |
-| `app/api/schemas.py` | 健康、配置、文档、纯检索和聊天请求/响应模型 |
-| `app/api/routers/*.py` | health、system、documents、retrieval、chat HTTP 路由 |
-| `app/api/sse.py` | 将结构化 ChatEvent 编码为 SSE 帧 |
-| `app/core/citations.py` | 生产与离线共用的精确 `[文档N]` 引用解析和非法标记分析 |
-| `frontend/src/App.tsx` | React 工作台状态、问答流、文档管理、上传阶段、来源抽屉和本地历史 |
-| `frontend/src/api.ts` | REST/XHR 请求、上传进度、错误映射和 SSE 流解析 |
-| `frontend/src/conversations.ts` | 对话标题、数量限制、`localStorage` 读取/校验/持久化 |
-| `frontend/e2e/mock-api.mjs` | 可控状态的本地 HTTP API，用于无真实 Provider 的浏览器回归 |
-| `frontend/e2e/workbench.spec.ts` | 服务恢复、上传、文档管理、流式问答、停止生成和历史管理 E2E |
-| `compose.yaml` | 编排 FastAPI、React、Milvus、etcd、MinIO，定义健康依赖、端口和持久卷 |
-| `Dockerfile` | Python 3.11 后端镜像入口，安装运行依赖并启动 `python -m app.api` |
-| `frontend/Dockerfile` | Node 22 前端构建与 `vite preview` 演示服务入口 |
-| `.dockerignore` / `frontend/.dockerignore` | 排除密钥、运行数据、缓存、依赖目录和测试产物 |
-| `.github/workflows/ci.yml` | Python 单测、确定性检索质量回归、报告 Artifact、前端/Playwright 和 Compose 自动门禁 |
-| `infra/milvus/compose.yaml` | Milvus Standalone、etcd、MinIO、健康检查和本地持久卷 |
-| `docs/VERSION_HISTORY.md` | 版本边界、逐提交事实与发布验收记录 |
-| `app/lifecycle/models.py` | 文档、版本、索引清单、操作结果和审计报告模型 |
-| `app/lifecycle/registry.py` | SQLite 文档、索引、操作状态和 active 指针 |
-| `app/lifecycle/service.py` | 源文件持久化、同步构建、active 切换、清理、审计和重建 |
-| `app/lifecycle/cli.py` | `list`、`audit`、`cleanup`、`rebuild` 运维命令 |
-| `observability/context.py` | `request_id` / `trace_id` 的 ContextVar 生命周期 |
-| `observability/logging.py` | 结构化日志、标准字段、JSONL 输出和敏感信息脱敏 |
-| `observability/metrics.py` | Prometheus 指标定义、低基数标签和显式 HTTP 服务启动 |
-| `observability/tracing.py` | 私有 TracerProvider、核心 Span、错误标记和 OTLP/HTTP 导出 |
-| `utils/logger.py` | 兼容旧导入路径，转发到结构化日志模块 |
-| `utils/monitoring.py` | `perf_counter()` 计时和生成器完整迭代耗时 |
-| `evaluation/models.py` | 黄金用例、问题类别、检索结果和分类评估报告数据模型 |
-| `evaluation/metrics.py` | Recall@K、Precision@K、MRR、命中率和拒答指标 |
-| `evaluation/adapters.py` | Dense、BM25、Hybrid、Rewrite、Rerank 适配器与离线 Fake Adapter |
-| `evaluation/answer_models.py` | 答案用例、生成结果、严格 Judge JSON、案例失败和独立报告契约 |
-| `evaluation/answer_adapters.py` | 真实/Fake Generator 与 Judge 共用的 Protocol 及无网络 Fake 实现 |
-| `evaluation/answer_metrics.py` | 按成功案例和 Judge 适用案例分别聚合指标及实际分母 |
-| `evaluation/answer_reports.py` | 对不可信文本转义并原子写出答案质量 JSON/Markdown 报告 |
-| `evaluation/answer_runner.py` | 真实检索、当前生产 Generator、独立 Judge、案例失败隔离和 CLI 退出码 |
-| `evaluation/reports/v2_answer_prompt_hardened.*` | v2.0.8 加固 Prompt 的 0.7 真实 Provider 对照工件 |
-| `evaluation/reports/v2_answer_prompt_hardened_low_temp.*` | v2.0.8 预选 0.1 温度对照工件 |
-| `evaluation/reports/v2_answer_prompt_hardened_review.md` | Prompt、引用和三条 Injection 的人工复核记录 |
-| `evaluation/datasets/v2_answer_quality/` | 28 条答案 holdout、35 条阈值正负样本和 11 份合成 TXT 语料 |
-| `evaluation/integration.py` | 确定性 Embedding、内存 Vector Store 和三种检索模式集成烟囱测试 |
-| `evaluation/fingerprints.py` | UTF-8 BOM/换行规范化后的黄金集和语料逻辑文本 SHA-256；保留独立原始字节哈希 |
-| `evaluation/production.py` | Dense、BM25、Hybrid 和 v1.7 实验组件评估装配 |
-| `evaluation/production_runner.py` | 真实 Provider 基线、split 隔离、Rewrite、Rerank 实验 CLI |
-| `evaluation/threshold_calibration.py` | 从无阈值 Dense 报告生成相邻中点候选、约束评估和 holdout 决策 |
-| `evaluation/threshold_runner.py` | validation-only 扫描与冻结候选 holdout 评估 CLI |
-| `evaluation/comparison.py` | 四种增强模式的同配置校验、质量/延迟矩阵和基线差值 |
-| `evaluation/comparison_runner.py` | 生成 v1.7.1 四模式 JSON/Markdown 对照报告的 CLI |
-| `evaluation/rewrite_artifacts.py` | 严格 Rewrite artifact 生成、读取和数据集指纹校验 |
-| `evaluation/rewrite_runner.py` | 通过 LLM 生成可复现 Rewrite artifact 的 CLI |
-| `evaluation/runner.py` | JSONL 黄金评估集加载、分类汇总、延迟分位数和确定性三模式执行 |
-| `evaluation/regression.py` | 报告输入兼容性、指标最低值和允许下降幅度门禁 |
-| `evaluation/regression_runner.py` | 报告兼容性校验和自动回归门禁 CLI |
-| `evaluation/retrieve_quality.py` | 单文档 Chunk 级数据集校验、生产 RetrievalService 评测和隔离指标 |
-| `evaluation/retrieve_quality_runner.py` | 原子生成纯检索 JSON/Markdown 报告并强制契约不变量 |
-| `evaluation/retrieval_candidate_gate.py` | P2 四模式证据兼容、holdout 收益/回归、P95 预算和确定性 Go/No-Go 决策 |
-| `evaluation/retrieval_candidate_gate_runner.py` | 原子生成 P2 候选决策工件并提供稳定的 GO/NO_GO/输入错误退出码 |
-| `evaluation/data_source_downloader.py` | DS-02 固定 revision 数据下载、Range 续传、原子发布、逐文件哈希与磁盘预算门禁 |
-| `evaluation/data_source_validation.py` | DS-02 Parquet/TSV 结构、行数、完整性和有界本地 Embedding 吞吐证据 |
-| `evaluation/data_source_normalization.py` | DS-03 三来源适配器、稳定 ID、严格 qrels 完整性、原子规范化构建与快照复验 CLI |
-| `evaluation/data_sources/contracts/*.schema.json` | DS-03 documents、queries、qrels、snapshot 的严格版本化 JSON Schema |
-| `evaluation/reports/p2_ds03_normalization_evidence_v1.*` | 三来源规范化计数、输入 revision 和可复现指纹的脱敏证据 |
-| `evaluation/representative_dataset.py` | DS-04 代表性文档、探索题、候选 qrels、人工审查包和 gold 的确定性生成与严格复验 CLI |
-| `evaluation/representative_split_audit.py` | DS-05 validation/holdout 隔离、近重复/事实族泄漏审计和冻结指纹 CLI |
-| `evaluation/ds06_runner.py` | DS-06 Dense、BM25、Hybrid、Reranker validation/holdout 评测和严格候选决策 CLI |
-| `evaluation/representative_data/` | DS-04 的 25 主题显式设计及 document、Chunk、question、candidate、review、gold、snapshot、DS-05 split Schema |
-| `evaluation/datasets/p2_retrieval_v2/` | 75 份合成文档、400 题探索池、100 题候选、人工决定台账、100 题正式 gold 和 DS-05 `split_freeze.json`；含两批审查包 |
-| `evaluation/reports/p2_ds04_pre_review_v1.*` | DS-04 配额、指纹、隐私扫描和人工审查待办的 pre-review 证据 |
-| `evaluation/reports/p2_ds04_final_review_v1.*` | DS-04 94/6/0 人工决定、grade 修改审计和 gold 固化证据 |
-| `evaluation/reports/p2_ds05_split_audit_v1.*` | DS-05 split 隔离、泄漏检查、指纹冻结和脱敏审计证据 |
-| `evaluation/reports/p2_ds06_{validation,holdout,final_decision}_v1.*` | DS-06 四模式真实对照、一次性 holdout 和 `NO_GO` 决策证据 |
-| `evaluation/reports.py` | JSON/Markdown 报告文件输出 |
-| `evaluation/baselines/deterministic_dense_v2.*` | v2.0.1 冻结、供 v2.0.2 PR CI 实时比较的 Dense 基线与可读报告 |
-| `evaluation/baselines/retrieve_quality_v1.*` | v2.2.0 单文档纯检索 API、底层排序一致和污染清零基线 |
-| `evaluation/baselines/p2_retrieval_candidate_decision_v1.*` | P2-01 真实 Dense/BM25/Hybrid/Reranker 对照与 `NO_GO` 决策 |
-| `evaluation/reports/v2_answer_pre_hardening.*` | v2.0.6 固化的旧 Prompt 真实 JSON/Markdown 对照与逐案人工复核记录 |
-| `evaluation/reports/v2_threshold_validation_*` | v2.0.7 无阈值 validation 原始结果、59 候选扫描与不启用复核记录 |
+| `app/config.py` | 配置验证、项目根相对路径解析和显式目录准备 |
+| `app/application.py` | 依赖生命周期、初始化失败清理和 readiness 聚合 |
+| `app/api/` | FastAPI 路由、请求校验、公开错误与 SSE 协议；入口为 `python -m app.api` |
+| `app/services/` | 文档管理、流式问答和单文档纯检索服务 |
+| `app/lifecycle/` | Registry、内容版本/索引状态机、CLI 与持久化源文件 |
+| `app/core/` | 加载、分块、Embedding、向量存储、检索、生成及离线增强组件 |
+| `app/observability/` | 请求上下文、日志、指标和追踪 |
+| `app/utils/` | 兼容工具和公共辅助函数 |
 
-## 依赖方向
+路由依赖服务层，服务层调用核心组件；React 只通过 HTTP/SSE 合约交互。新版不提供独立 Gradio 启动入口，旧架构只在对应历史快照中使用。
 
-```text
-frontend/src/api.ts
-    └── FastAPI /api/v1
-        ├── app.api.routers.*
-        ├── app.services.*
-        ├── app.config
-        ├── app.core.*
-        ├── app.lifecycle.*
-        └── app.observability.*
+## 测试与评测
 
-python -m app.api
-    └── uvicorn → app.api.main:app
+| 位置 | 责任 |
+|---|---|
+| `tests/test_api.py` | HTTP 契约、就绪状态、上传/检索及错误响应 |
+| `tests/test_services.py`、`tests/test_service_regressions.py` | 服务事件、来源字段、失败语义和幂等指标 |
+| `tests/test_runtime_paths.py` | cwd、配置覆盖、目录创建与报告输出位置 |
+| `tests/test_observability_events.py`、`tests/test_tracing.py` | 日志链、Context 与 Span 层级和脱敏 |
+| `frontend/src/` 中的测试 | 前端请求与状态逻辑 |
+| `frontend/e2e/` | 基于 Mock API 的浏览器流程 |
+| `evaluation/datasets/`、`evaluation/baselines/` | 固定语料、Gold、split、qrels 和回归参照 |
+| `evaluation/reports/` | 已提交的历史评测证据；不是默认临时输出位置 |
+| `docs/contracts/` | Provider/Consumer JSON Schema 与固定契约样例 |
 
-app.lifecycle.service
-├── app.core.document_loader
-├── app.core.document_chunker
-├── app.core.vector_store
-└── app.lifecycle.registry
+## 运行文件边界
 
-app.core.retriever
-├── app.observability.metrics
-└── app.observability.tracing
+- `data/` 保存 Registry 和上传内容；默认上传目录为 `data/uploads/`。
+- `logs/` 保存应用 JSONL 日志。
+- `artifacts/` 保存新生成的验证/评测结果；普通离线 runner 在未指定输出时只打印。
+- `_private/` 可用于个人资料，`agent/` 可用于本地工作记录；二者均被 Git 和 Docker 排除，不作为使用项目的前置条件。
+- 目录骨架由 `.gitignore` 文件保留，真实内容默认忽略。测试使用临时目录，不共享正式数据。
+- 默认应用路径以项目根解析，显式 CLI 路径仍尊重调用者选择；Docker 的持久化位置由 Compose 命名卷确定。
 
-evaluation.answer_runner
-├── app.core.generator.RAGGenerator / UniversalLLMClient
-├── evaluation.production / adapters
-├── evaluation.answer_adapters / answer_metrics / answer_reports
-└── evaluation.answer_models
-
-evaluation.answer_adapters / answer_metrics
-├── evaluation.answer_models
-└── evaluation.models.RetrievedDocument
-```
-
-React 工作台通过 `frontend/src/api.ts` 访问 FastAPI，不直接导入 Python 模块；SSE 事件由 `app/api/sse.py` 编码，由 `app/services/rag_service.py` 统一产生。浏览器对话历史通过 `frontend/src/conversations.ts` 独立保存，不进入 API。`web_app.py` 仍保留为兼容入口。
-
-答案质量评测依赖旧评测层的 `RetrievedDocument`，但使用独立报告契约；生产 `app` 不反向导入 `evaluation`。v2.0.4 的 Generator 适配器桥接当前生产 `RAGGenerator`；v2.0.5 冻结全 `holdout` 的专用答案集、独立阈值 validation/holdout 和共用语料；v2.0.6 固化旧 Prompt 真实报告，并让 Judge 只按确定性解析出的精确 `[文档N]` 评分；v2.0.7 在独立 validation 上校准 Dense L2 阈值，没有合格候选，因此封存 holdout 并保持默认阈值为空；v2.0.8 将生产 Prompt 与离线评测桥接到 XML 边界和共享 `app.core.citations`，并在 SSE 完成后做不改写文本的低基数引用观测。Judge Prompt 与生产 Prompt 分离，评测器和阈值实验不改变线上生成或 SSE。
-
-可观测性模块不得反向导入 Web UI 或具体 RAG 组件，避免循环依赖。
-
-## 运行数据边界
-
-以下目录不得提交到 Git：
-
-- Milvus 服务端数据目录（不属于本仓库）
-- `data/uploads/`
-- `data/document_registry.sqlite3`
-- `logs/`
-- `local_docs/`（本地学习资料与草稿）
-- `venv/`
-- `__pycache__/`
-- `.env`
+这些规则不自动迁移、删除或修复旧数据。备份、恢复和真实维护操作需要确认精确目标，不能用文件整理替代数据一致性检查。

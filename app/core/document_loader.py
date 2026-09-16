@@ -73,7 +73,7 @@ class UniversalDocumentLoader:
                 else None
             )
 
-            # 不将 Gradio 临时文件的绝对路径写入向量库。
+            # 不将 上传临时文件的绝对路径写入向量库。
             document.metadata["source"] = file_name
             document.metadata["source_file"] = file_name
             document.metadata["file_type"] = file_ext

@@ -18,11 +18,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.add_argument(f"--{mode}", required=True, help=f"{mode} JSON report")
     parser.add_argument(
         "--output-json",
-        default="evaluation/reports/v1_7_1_comparison.json",
+        default=str(
+            Path(__file__).resolve().parents[1]
+            / "artifacts"
+            / "evaluation"
+            / "v1_7_1_comparison.json"
+        ),
     )
     parser.add_argument(
         "--output-markdown",
-        default="evaluation/reports/v1_7_1_comparison.md",
+        default=str(
+            Path(__file__).resolve().parents[1]
+            / "artifacts"
+            / "evaluation"
+            / "v1_7_1_comparison.md"
+        ),
     )
     args = parser.parse_args(argv)
 

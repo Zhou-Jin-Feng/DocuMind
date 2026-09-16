@@ -17,7 +17,9 @@ from app.core.retriever import RetrievalResult
 from app.lifecycle.registry import DocumentRegistry
 from app.lifecycle.service import DocumentLifecycleService
 from app.observability.context import get_trace_id, request_context
-from web_app import RAGWebApp
+from app.config import Settings
+from app.services.rag_service import RAGService
+from app.services.document_service import DocumentService
 from app.observability.logging import get_logger, reset_logger, setup_logger
 from app.observability.tracing import (
     configure_tracing,
@@ -278,15 +280,20 @@ class TracingTests(unittest.TestCase):
     def test_real_query_pipeline_emits_expected_span_tree(self):
         exporter = InMemorySpanExporter()
         configure_tracing(True, span_exporter=exporter)
-        app = RAGWebApp.__new__(RAGWebApp)
-        app.initialized = True
-        app.llm_provider = "fake-llm"
-        app.retriever = Retriever(FakeVectorStore(), FakeEmbeddingClient())
-        app.rag_generator = FakeGenerator()
+        service = RAGService(
+            retriever=Retriever(FakeVectorStore(), FakeEmbeddingClient()),
+            rag_generator=FakeGenerator(),
+            settings=Settings(
+                _env_file=None, default_llm_provider="openai", metrics_enabled=False
+            ),
+        )
 
-        outputs = list(app.answer_question("private question", []))
+        outputs = list(service.stream_answer("private question"))
 
-        self.assertEqual(outputs[-1][1][-1]["content"], "safe answer")
+        self.assertEqual(
+            "".join(event.data["text"] for event in outputs if event.type == "token"),
+            "safe answer",
+        )
         spans = {span.name: span for span in exporter.get_finished_spans()}
         expected_names = {
             "rag.query",
@@ -320,30 +327,29 @@ class TracingTests(unittest.TestCase):
     def test_document_ingestion_emits_expected_span_tree(self):
         exporter = InMemorySpanExporter()
         configure_tracing(True, span_exporter=exporter)
-        app = RAGWebApp.__new__(RAGWebApp)
-        app.initialized = True
-        app.embedding_provider = "fake-embedding"
-        app.doc_loader = FakeLoader()
-        app.chunker = FakeChunker()
-        app.embedding_client = FakeEmbeddingClient()
-        app.vector_store = FakeVectorStore()
-
         with tempfile.TemporaryDirectory() as directory:
-            app.registry = DocumentRegistry(str(Path(directory) / "registry.sqlite3"))
-            app.lifecycle_service = DocumentLifecycleService(
-                loader=app.doc_loader,
-                chunker=app.chunker,
-                embedding_client=app.embedding_client,
-                vector_store=app.vector_store,
-                registry=app.registry,
+            registry = DocumentRegistry(str(Path(directory) / "registry.sqlite3"))
+            lifecycle = DocumentLifecycleService(
+                loader=FakeLoader(),
+                chunker=FakeChunker(),
+                embedding_client=FakeEmbeddingClient(),
+                vector_store=FakeVectorStore(),
+                registry=registry,
                 upload_dir=str(Path(directory) / "uploads"),
             )
             private_name = "private-customer-name.txt"
             file_path = Path(directory) / private_name
             file_path.write_text("private upload content", encoding="utf-8")
-            result = app.upload_and_index_document(str(file_path))
+            service = DocumentService(
+                lifecycle_service=lifecycle,
+                registry=registry,
+                tenant_id="default",
+                collection_id="rag_documents",
+            )
+            with request_context(request_id="ingestion-test"):
+                result = service.ingest(file_path, display_name=file_path.name)
 
-        self.assertIn("文档处理完成", result)
+        self.assertEqual(result.status, "indexed")
         spans = {span.name: span for span in exporter.get_finished_spans()}
         expected_names = {
             "rag.document.ingest",

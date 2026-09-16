@@ -1,11 +1,14 @@
 # ScholarTrace Integration
 
+Current application version: **3.0.0**. The retrieval contract stays Schema `1.0` / `dense-v1`; historical 2.x integration results below are not a new 3.0.0 live integration test. Check Consumer service-version constraints and use the [migration guide](MIGRATION_3_0.md).
+
 ## Compatibility
 
-DocuMind v2.2.0 provides `POST /api/v1/retrieve` for ScholarTrace and other
+DocuMind 3.0.0 provides `POST /api/v1/retrieve` for ScholarTrace and other
 trusted local Consumers. The public contract remains Schema `1.0` with
-retrieval version `dense-v1`; v2.2.0 adds bounded execution, retrieval-specific
-readiness and observability without changing request or response fields.
+retrieval version `dense-v1`. The bounded execution, retrieval-specific
+readiness and observability introduced in v2.2.0 remain in place; the
+application version change does not widen retrieval scope or alter fields.
 
 Use the checked-in Provider artifacts as the source of truth:
 
@@ -160,13 +163,13 @@ if (-not $wasPresent) {
 }
 ```
 
-Run this against the candidate deployment before enabling ScholarTrace. Keep
+Run this against an isolated test deployment before enabling ScholarTrace. Keep
 the fixture, response and logs out of any report that could expose real user
 content.
 
-## Upgrade And Rollback
+## Historical Version Compatibility
 
-No Registry or Milvus migration is required from v2.1.0 to v2.2.0. Deploy the
+The historical v2.1.0-to-v2.2.0 transition did not require a Registry or Milvus migration. This does not establish compatibility for arbitrary later changes. Deploy the
 candidate, inspect `components.retrieval`, run the smoke path, then enable
 Consumer traffic. Existing upload, lifecycle and chat contracts are unchanged.
 

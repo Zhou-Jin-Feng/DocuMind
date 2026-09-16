@@ -19,7 +19,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
+    restart: "no"
 
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -34,7 +34,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
+    restart: "no"
 
   milvus:
     image: milvusdb/milvus:v2.6.4
@@ -59,7 +59,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-    restart: unless-stopped
+    restart: "no"
 
   api:
     build:
@@ -128,7 +128,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 8
-    restart: unless-stopped
+    restart: "no"
 
   frontend:
     build:
@@ -153,7 +153,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 8
-    restart: unless-stopped
+    restart: "no"
 
 volumes:
   etcd_data:

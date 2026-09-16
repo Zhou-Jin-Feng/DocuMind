@@ -4,18 +4,22 @@ RAG 系统配置管理。
 使用 pydantic-settings 统一管理环境变量和默认配置。
 """
 
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
     """系统配置。"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         env_ignore_empty=True,
         case_sensitive=False,
@@ -74,11 +78,6 @@ class Settings(BaseSettings):
     default_tenant_id: str = "default"
     default_user_id: str = "local-user"
 
-    # Web 服务配置。无认证时默认仅监听本机。
-    server_host: str = "127.0.0.1"
-    server_port: int = Field(default=7860, ge=1, le=65535)
-    share_gradio: bool = False
-
     # FastAPI 与本地 React 开发服务。无认证时禁止使用通配 CORS。
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8001, ge=1, le=65535)
@@ -112,6 +111,34 @@ class Settings(BaseSettings):
     allowed_extensions: list[str] = Field(
         default_factory=lambda: [".pdf", ".docx", ".txt"]
     )
+
+    @field_validator("document_registry_path", "upload_dir", "log_file_path")
+    @classmethod
+    def resolve_runtime_path(cls, value: str, info: ValidationInfo) -> str:
+        """Relative runtime paths are anchored to the application project root.
+
+        Resolution is lexical and never creates files. Absolute overrides remain
+        absolute, and an empty log path keeps file logging disabled.
+        """
+        if not value.strip():
+            if info.field_name == "log_file_path":
+                return ""
+            raise ValueError("Runtime data paths cannot be empty")
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return os.path.normpath(str(path))
+
+    def ensure_runtime_directories(self) -> None:
+        """Create configured directories at startup without touching data files."""
+        directories = {
+            Path(self.document_registry_path).parent,
+            Path(self.upload_dir),
+        }
+        if self.log_file_path:
+            directories.add(Path(self.log_file_path).parent)
+        for directory in sorted(directories):
+            directory.mkdir(parents=True, exist_ok=True)
 
     @field_validator("default_embedding_provider", "default_llm_provider")
     @classmethod
@@ -206,5 +233,5 @@ if __name__ == "__main__":
     print(
         f"Retrieval: top_k={settings.retrieval_top_k}, threshold={settings.retrieval_score_threshold}"
     )
-    print(f"Server: {settings.server_host}:{settings.server_port}")
+    print(f"Server: {settings.api_host}:{settings.api_port}")
     print(f"Log Level: {settings.log_level}")

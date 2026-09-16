@@ -1,6 +1,6 @@
-# 可观测性指南（v2.2.0）
+# 日志、指标与追踪
 
-Logs + Metrics + Traces 能力最初在 v1.3 引入，当前由 FastAPI 主入口和保留的 Gradio 兼容入口共用。应用实现内部埋点、Metrics HTTP 端口和可选 OTLP/HTTP Trace 导出；Prometheus、Grafana、Jaeger 和 OpenTelemetry Collector 等外部后端不在当前 Compose 内。
+Logs + Metrics + Traces 由 FastAPI 入口和统一服务层实现。应用实现内部埋点、Metrics HTTP 端口和可选 OTLP/HTTP Trace 导出；Prometheus、Grafana、Jaeger 和 OpenTelemetry Collector 等外部后端不在当前 Compose 内。
 
 ## 1. 设计目标
 
@@ -16,8 +16,8 @@ Logs + Metrics + Traces 能力最初在 v1.3 引入，当前由 FastAPI 主入�
 ### 2.1 默认输出
 
 - 控制台：开发友好的文本格式。
-- 文件：`./logs/rag_{time:YYYY-MM-DD}.jsonl`，每行一个扁平 JSON 对象。
-- 日志目录只在 `setup_logger()` 被应用入口显式调用后创建。
+- 默认文件：项目根下 `logs/rag_{time:YYYY-MM-DD}.jsonl`，每行一个扁平 JSON 对象；绝对路径覆盖保持有效。
+- 配置加载不创建目录；启动阶段创建已启用日志的父目录，`setup_logger()` 负责实际日志sink。代码显式传入空日志路径关闭文件日志；空环境变量仍按现有规则忽略，不改变默认日志设置。
 
 ### 2.2 标准字段
 
@@ -50,7 +50,7 @@ query_received
 
 异常时会出现 `query_embedding_failed`、`vector_search_failed`、`retrieval_failed`、`llm_stream_failed`、`generation_completed(status=error)` 或 `response_sent(status=error)`。
 
-FastAPI 中间件会验证或生成 `X-Request-ID`，把它写入请求上下文并在响应头中返回。SSE 问答由服务层产生结构化事件，已发送部分 Token 后如果 Provider 中断，前端保留已收到文本并显示错误状态。Gradio 兼容入口另外使用固定 `contextvars.Context` 保持整个流生命周期内的 `request_id` / `trace_id`。
+FastAPI 中间件会验证或生成 `X-Request-ID`，把它写入请求上下文并在响应头中返回。SSE 问答由服务层产生结构化事件，已发送部分 Token 后如果 Provider 中断，前端保留已收到文本并显示错误状态。`RAGService.stream_answer` 使用固定 `contextvars.Context` 保持整个流生命周期内的 `request_id` / `trace_id`。
 
 ### 2.4 文档摄取事件顺序
 
@@ -197,7 +197,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=
 ```powershell
 $env:PYTHONPYCACHEPREFIX = Join-Path $env:TEMP documind_pycache
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
-.\venv\Scripts\python.exe -m compileall -q app web_app.py tests
+.\venv\Scripts\python.exe -m compileall -q app tests
 .\venv\Scripts\python.exe -m pip check
 git diff --check
 ```
@@ -205,3 +205,7 @@ git diff --check
 ## 8. 当前范围边界
 
 当前仓库已包含 Docker Compose、文档生命周期、黄金评测集以及 Query Rewrite/Reranker 离线实验能力。可观测性边界仍是单实例应用端埋点：不部署 Prometheus/Grafana/Jaeger/Collector，不提供告警规则、长期指标存储或分布式 Trace 运维保证。认证、多租户、Celery/Redis 和生产高可用同样不在当前范围内。
+
+## 故障定位边界
+
+先按request_id/trace_id确认同一请求；提供外部问题报告前移除凭据、原始问题/文档和个人路径。具体启动、停止与端口检查见 [运行说明](DEMO_SCRIPT.md)。历史评测结果不等同于当前部署的就绪状态。

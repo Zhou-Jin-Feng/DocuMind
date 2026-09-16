@@ -40,7 +40,8 @@ volumes/milvus/
 
 # 忽略日志文件
 *.log
-logs/
+/logs/*
+!/logs/.gitignore
 
 # 忽略临时文件
 .DS_Store
@@ -68,3 +69,28 @@ local_docs/
 
 # Agent工作文件
 agent/
+
+# Private local materials and tool state
+/_private/
+/.serena/
+/.playwright-mcp/
+/graphify-out/
+/.claude/
+/pelican-bike-animation.html
+/docs/rag-pipeline-animation.html
+
+# Local environment variants; keep the credential-free example trackable
+.env.*
+!.env.example
+
+# Runtime directory skeletons are versioned; generated content remains local
+/data/*
+!/data/.gitignore
+/artifacts/*
+!/artifacts/.gitignore
+
+# Local agent tool state
+/.ohmyagent/
+
+# Local MonkeyCode tool state
+/.monkeycode/

@@ -12,7 +12,7 @@
     },
     "response": {
       "schema_version": "1.0",
-      "service_version": "2.2.0",
+      "service_version": "3.0.0",
       "retrieval_version": "dense-v1",
       "retrieval_mode": "dense",
       "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -69,7 +69,7 @@
         "name": "missing_content_hash",
         "payload": {
           "schema_version": "1.0",
-          "service_version": "2.2.0",
+          "service_version": "3.0.0",
           "retrieval_version": "dense-v1",
           "retrieval_mode": "dense",
           "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from app.application import RAGApplication
@@ -6,6 +8,14 @@ from app.config import Settings
 
 
 class ApplicationTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.runtime_root = Path(directory.name)
+        root_patch = patch("app.config.PROJECT_ROOT", self.runtime_root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+
     def _ready_application(self):
         application = RAGApplication(
             Settings(
@@ -97,6 +107,10 @@ class ApplicationTests(unittest.TestCase):
             application.initialize()
 
         self.assertFalse(application.initialized)
+        self.assertTrue((self.runtime_root / "data" / "uploads").is_dir())
+        self.assertFalse(
+            (self.runtime_root / "data" / "document_registry.sqlite3").exists()
+        )
         self.assertEqual(application.startup_error_type, "RuntimeError")
         self.assertIsNone(application.embedding_client)
         self.assertIsNone(application.vector_store)

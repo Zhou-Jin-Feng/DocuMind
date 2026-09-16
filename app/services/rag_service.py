@@ -142,6 +142,7 @@ class RAGService:
             active_operation = "rag.retrieve"
             generation_started: float | None = None
             first_token_received = False
+            generation_completed_logged = False
             answer_parts: list[str] = []
 
             logger.info(
@@ -270,6 +271,7 @@ class RAGService:
                     provider=llm_provider,
                     response_chars=len("".join(answer_parts)),
                 )
+                generation_completed_logged = True
                 citation_analysis = analyze_answer_citations(
                     "".join(answer_parts), len(retrieval_results)
                 )
@@ -314,6 +316,17 @@ class RAGService:
                     metrics.observe_llm_total(
                         llm_provider, "error", generation_duration
                     )
+                    if not generation_completed_logged:
+                        logger.info(
+                            "LLM 回答生成中断",
+                            event="generation_completed",
+                            operation="llm.generate",
+                            duration_ms=generation_duration * 1000,
+                            status="error",
+                            provider=llm_provider,
+                            error_type=error_type,
+                            response_chars=len("".join(answer_parts)),
+                        )
                 metrics.record_query(llm_provider, "error", elapsed)
                 logger.exception(
                     "问答流程执行失败",

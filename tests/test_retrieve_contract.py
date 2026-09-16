@@ -5,6 +5,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
+from app import __version__
 from app.api.schemas import (
     RETRIEVAL_VERSION,
     RETRIEVE_SCHEMA_VERSION,
@@ -35,7 +36,7 @@ def request_payload(**overrides):
 def response_payload(**overrides):
     payload = {
         "schema_version": RETRIEVE_SCHEMA_VERSION,
-        "service_version": "2.2.0",
+        "service_version": __version__,
         "retrieval_version": RETRIEVAL_VERSION,
         "retrieval_mode": "dense",
         "document_key": "a" * 64,

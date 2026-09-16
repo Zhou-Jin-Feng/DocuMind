@@ -23,3 +23,29 @@ frontend/test-results
 *.sqlite3
 *.db
 *.log
+
+# Private materials and local-only tool output
+_private
+_private/**
+agent
+local_docs
+.kilo
+.claude
+.serena
+.playwright-mcp
+graphify-out
+CLAUDE.md
+pelican-bike-animation.html
+docs/rag-pipeline-animation.html
+
+# New local validation and generated report output
+artifacts
+artifacts/**
+
+# Local MonkeyCode tool state
+.monkeycode
+.monkeycode/**
+
+# Local private tool state
+.ohmyagent
+.ohmyagent/**

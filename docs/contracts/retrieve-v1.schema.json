@@ -157,7 +157,7 @@
         "retrieval_mode": "dense",
         "retrieval_version": "dense-v1",
         "schema_version": "1.0",
-        "service_version": "2.2.0",
+        "service_version": "3.0.0",
         "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       }
     ],

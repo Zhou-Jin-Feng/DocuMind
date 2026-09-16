@@ -61,6 +61,7 @@ class RAGApplication:
                 return
             logger.info("正在初始化 RAG 应用服务")
             try:
+                self.settings.ensure_runtime_directories()
                 self.embedding_client = UniversalEmbeddingClient(
                     self.settings.default_embedding_provider,
                     connection_timeout_seconds=(

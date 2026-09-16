@@ -1,6 +1,24 @@
 # DocuMind - RAG 评估
 
-v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修改 Web 应用程序或调用真实 LLM 的情况下评估检索行为。v2.0.1 固化跨平台确定性基线，v2.0.2 将该基线接入普通 PR CI，v2.0.3 建立答案质量契约，v2.0.4 补齐真实 Provider Runner 和双格式报告入口，v2.0.5 冻结首套答案质量 holdout 与专用语料，v2.0.6 固化人工复核的旧 Prompt 真实对照，v2.0.7 完成 validation-only Dense L2 阈值校准并记录不启用决策，v2.0.8 完成生产 Prompt、引用和 Injection 加固对照。
+本页分开记录当前评测操作与历史实验。带版本号的段落、计数和Provider结果属于对应时间/配置，不自动代表当前代码的新验收。原始JSON、数据指纹和人工记录保持其历史身份。
+
+## 当前主线与证据导航
+
+| 问题 | 当前结论 | 对应证据 |
+|---|---|---|
+| 默认检索方式 | 单文档 Dense；增强候选未通过相应门禁 | [DS-06最终决策](../evaluation/reports/p2_ds06_final_decision_v1.md) |
+| CI检查什么 | 固定数据和哈希Embedding的确定性回归，不依赖真实模型 | [基线说明](../evaluation/baselines/README.md) |
+| 代表性数据如何获得 | 合成多版本语料、人工Gold、split与指纹冻结 | [代表性数据说明](../evaluation/datasets/p2_retrieval_v2/README.md) |
+| 回答是否普遍正确 | 历史结果仍暴露拒答和引用限制，不能作通用承诺 | [答案质量数据](../evaluation/datasets/v2_answer_quality/README.md)与下文版本记录 |
+| 真实服务是否已验证 | 必须核对具体部署和结果日期，不能用离线测试替代 | [历史交付快照](PROJECT_FREEZE_2.md) |
+
+以下保留数据契约、运行参数、指标语义以及按版本的历史结果，不在README重复逐阶段流水。
+
+## 重跑结果与固定证据
+
+新的手动运行结果建议显式写入 `artifacts/evaluation/`；CLI 的显式相对输出仍相对调用者当前目录，绝对输出保持指定位置，不强制改写。以下命令示例应从项目根执行。
+
+`evaluation/datasets/`、`evaluation/baselines/`、`evaluation/reports/` 中已提交的文件属于固定输入和历史证据，不应被日常重跑覆盖。真实Provider、DS-06或数据集生成等维护工具仍须按对应协议显式指定输入/输出与依赖，不能把数据生成步骤当普通启动命令。未传输出参数的普通离线runner只打印结果；comparison/production runner的默认新报告写入项目根 `artifacts/evaluation/`，DS-06默认写入其 `ds06/` 子目录。显式参数保持不变。数据集构建工具仍是维护命令，不作为普通启动步骤执行。
 
 ## 数据集
 
@@ -55,8 +73,8 @@ v1.4 引入了离线黄金数据集和回归测试运行器。它可以在不修
 .\venv\Scripts\python.exe -m evaluation.runner `
   --dataset evaluation/datasets/golden_dataset.jsonl `
   --retrieval-mode dense `
-  --output-json evaluation/reports/current-deterministic.json `
-  --output-markdown evaluation/reports/current-deterministic.md
+  --output-json artifacts/evaluation/current-deterministic.json `
+  --output-markdown artifacts/evaluation/current-deterministic.md
 ```
 
 默认演示加载示例文档，并通过确定性哈希嵌入和内存向量存储来测试生产环境的 `Retriever`。可回答性适配器保持虚拟状态。该演示是有意设计为确定性的：其目的是验证真实的检索边界、数据集解析、报告生成和评估流程，而不是声称生产检索质量。
@@ -153,8 +171,8 @@ CLI 示例：
   --generator-model gpt-4-turbo `
   --judge-provider openai `
   --judge-model gpt-4-turbo `
-  --output-json evaluation/reports/answer-quality-current.json `
-  --output-markdown evaluation/reports/answer-quality-current.md
+  --output-json artifacts/evaluation/answer-quality-current.json `
+  --output-markdown artifacts/evaluation/answer-quality-current.md
 ```
 
 退出语义固定为：`0` 表示所有案例成功且报告已写出；`1` 表示报告已写出但至少一个案例失败；`2` 表示输入、配置、Provider 初始化或报告路径错误。普通 PR CI 不调用真实 Provider。
@@ -185,7 +203,7 @@ documents_sha256 = 7655501aca56852fd4db7755b8fea6512705b837cd070d5e9e00ad373a878
 
 `threshold_dataset.jsonl` 与答案集分离，使用旧检索 `GoldenCase` 契约。它包含 validation 5 个正样本和 15 个困难负样本，以及未参与选择的 holdout 5 个正样本和 10 个困难负样本；负样本集中覆盖主题相近但缺少日期、数值、负责人、模型名、恢复时长、授权例外和最终决策的提问，不使用纯领域外问题凑数。两个 split 的问题互不重复，也不与 28 条答案集完全重复；其规范化 SHA-256 为 `8853bf2aba5bc1266bd7202b6f7feb084a0fca242d475d6c2204928fdab12210`。
 
-本阶段不调用 Ollama、Milvus 或云端 LLM，也不生成 pre-hardening 报告或扫描距离。28 条答案案例服务于下一阶段固定真实 Provider 的旧 Prompt 对照；35 条阈值案例只冻结 P0-2 的 validation/holdout 输入。阈值候选、distance 分布、一次性 holdout 结果和是否启用仍必须在后续独立任务中产生。因此“数据集已冻结”仍不等于“生产答案质量或拒答能力已经通过验收”，更不等于在线幻觉检测。
+该历史阶段未调用 Ollama、Milvus 或云端 LLM，也不生成 pre-hardening 报告或扫描距离。28 条答案案例服务于下一阶段固定真实 Provider 的旧 Prompt 对照；35 条阈值案例只冻结 P0-2 的 validation/holdout 输入。阈值候选、distance 分布、一次性 holdout 结果和是否启用仍必须在后续独立任务中产生。因此该阶段的“数据集已冻结”仍不等于“生产答案质量或拒答能力已经通过验收”，更不等于在线幻觉检测。
 
 v2.0.5 数据集专项为 `8 passed, 101 subtests passed`，答案评测相关专项为 `32 passed, 113 subtests passed`，全量 Python 为 `205 passed, 1 skipped, 124 subtests passed`。Vitest 为 `5 passed`，Playwright 为 `6 passed`；Black、compileall、`pip check`、TypeScript、前端生产构建、两份 Compose、30 份 Markdown 静态检查和 `deterministic_dense_v2` 检索回归门禁均通过。BM25 诊断确认 28 条答案集中 19 个可回答案例、阈值集中 10 个正样本的全部标注文档均进入各自 Top-K；该结果只验证语料可检索性，不是生产 Embedding 质量结论。
 
@@ -359,7 +377,7 @@ python -m evaluation.rewrite_runner `
   --provider deepseek --model deepseek-chat `
   --max-rewrites 2 `
   --max-tokens 256 `
-  --output evaluation/datasets/v1_7/holdout_rewrites_deepseek.json
+  --output artifacts/evaluation/holdout_rewrites_deepseek.json
 
 python -m evaluation.production_runner `
   --dataset evaluation/datasets/v1_6/holdout_dataset.jsonl `
@@ -486,8 +504,8 @@ validation 案例和 15 个 holdout 案例；最终决策只读取 holdout，其
   --bm25 evaluation/reports/p2_1_bm25_threshold.json `
   --hybrid evaluation/reports/p2_1_ollama_threshold_hybrid.json `
   --rerank evaluation/reports/p2_1_ollama_threshold_hybrid_rerank.json `
-  --output-json evaluation/baselines/p2_retrieval_candidate_decision_v1.json `
-  --output-markdown evaluation/baselines/p2_retrieval_candidate_decision_v1.md
+  --output-json artifacts/evaluation/p2_retrieval_candidate_decision_v1.json `
+  --output-markdown artifacts/evaluation/p2_retrieval_candidate_decision_v1.md
 ```
 
 退出码 `0` 表示至少一个候选满足 `GO`，`1` 表示证据有效但结论为 `NO_GO`，
@@ -530,8 +548,8 @@ DS-02 只获取 `evaluation/data_sources/manifest.json` 的
   --read-rows-per-source 1000 `
   --embedding-sample-size 32 `
   --embedding-batch-size 8 `
-  --output-json evaluation/reports/p2_ds02_acquisition_evidence_v1.json `
-  --output-markdown evaluation/reports/p2_ds02_acquisition_evidence_v1.md
+  --output-json artifacts/evaluation/p2_ds02_acquisition_evidence_v1.json `
+  --output-markdown artifacts/evaluation/p2_ds02_acquisition_evidence_v1.md
 ```
 
 本次 12 个文件共 169,682,657 bytes，T2Ranking dev、BEIR NFCorpus 与 BEIR
@@ -695,7 +713,7 @@ result.assert_passed()
 ```powershell
 .\venv\Scripts\python.exe -m evaluation.regression_runner `
   --baseline evaluation/baselines/deterministic_dense_v2.json `
-  --current evaluation/reports/current-deterministic.json
+  --current artifacts/evaluation/current-deterministic.json
 ```
 
 默认策略允许 Recall、Precision、MRR 和 Top-K 命中率的绝对下降为 `0.02`，不允许无答案检索准确率下降，并要求 `successful_case_rate=1.0`。使用重复的 `--allowed-drop METRIC=VALUE` 和 `--minimum METRIC=VALUE` 参数来覆盖或添加规则。`--no-default-policy` 禁用内置规则。
