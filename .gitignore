@@ -60,6 +60,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
+/test-results/
 
 # 本地工作与学习文档（不提交到仓库）
 CLAUDE.md

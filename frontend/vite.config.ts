@@ -5,11 +5,14 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    "import.meta.env.VITE_FE01_PROFILE": JSON.stringify("0"),
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,
   },
   test: {
-    exclude: ["e2e/**", "node_modules/**", "dist/**"],
+    exclude: ["benchmarks/**", "e2e/**", "node_modules/**", "dist/**"],
   },
 });

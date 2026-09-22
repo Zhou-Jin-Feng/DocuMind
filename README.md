@@ -1,4 +1,4 @@
-# DocuMind 3.0.0 · RAG 知识库
+# DocuMind 3.1.0 · RAG 知识库
 
 基于 **FastAPI、React 和 Milvus** 的本地知识库问答系统，提供文档摄取、流式回答、引用溯源和独立纯检索接口，并通过文档生命周期与离线评测约束数据一致性和能力变更。
 
@@ -35,7 +35,7 @@ Milvus Standalone 的 etcd、MinIO 由 Compose 编排；Ollama 和生成模型�
 
 ## 版本与迁移
 
-当前源码使用 `3.0.0` 版本标识。新版统一采用 React/FastAPI/Milvus，不再提供 Gradio 启动入口；应用相对路径和默认环境文件以项目根为基准。旧版用户先阅读[3.0.0 迁移说明](docs/MIGRATION_3_0.md)。纯检索 Schema 仍为 `1.0`，`dense-v1` 不变。
+当前源码使用 `3.1.0` 版本标识；这是本轮源码候选，尚不代表已发布 Release。新版统一采用 React/FastAPI/Milvus，不再提供 Gradio 启动入口；应用相对路径和默认环境文件以项目根为基准。旧版用户先阅读[3.0.0 迁移说明](docs/MIGRATION_3_0.md)。纯检索 Schema 仍为 `1.0`，`dense-v1` 不变。
 
 旧架构入口为 `v1.7.1`（Chroma/Gradio），需要时检出对应标签并使用该快照的说明。源码版本标识不等于 GitHub Release 已发布；实际发布以对应标签与发布页为准。
 

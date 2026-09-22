@@ -99,10 +99,10 @@ docker compose -f infra/milvus/compose.yaml config --quiet
 
 ```powershell
 npm ci
+npx playwright install chromium
 npm test
 npm run typecheck
 npm run build
-npx playwright install chromium
 npm run test:e2e
 ```
 

@@ -16,7 +16,7 @@ from app.api.schemas import (
 from tests.test_api import FakeApplication
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.0.0"
+EXPECTED_VERSION = "3.1.0"
 
 
 class VersionConsistencyTests(unittest.TestCase):

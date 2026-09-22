@@ -1,10 +1,10 @@
 # ScholarTrace Integration
 
-Current application version: **3.0.0**. The retrieval contract stays Schema `1.0` / `dense-v1`; historical 2.x integration results below are not a new 3.0.0 live integration test. Check Consumer service-version constraints and use the [migration guide](MIGRATION_3_0.md).
+Current application source candidate version: **3.1.0**. The retrieval contract stays Schema `1.0` / `dense-v1`; historical 2.x integration results below are not a new 3.1.0 live integration test. Check Consumer service-version constraints and use the [migration guide](MIGRATION_3_0.md).
 
 ## Compatibility
 
-DocuMind 3.0.0 provides `POST /api/v1/retrieve` for ScholarTrace and other
+DocuMind 3.1.0 source candidate provides `POST /api/v1/retrieve` for ScholarTrace and other
 trusted local Consumers. The public contract remains Schema `1.0` with
 retrieval version `dense-v1`. The bounded execution, retrieval-specific
 readiness and observability introduced in v2.2.0 remain in place; the

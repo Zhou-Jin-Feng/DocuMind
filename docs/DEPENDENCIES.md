@@ -72,6 +72,7 @@ pip install -r requirements-dev.txt
 ```powershell
 Set-Location frontend
 npm ci
+npx playwright install chromium
 ```
 
 当前 Compose 配置使用 `python:3.11-slim` 和 `node:22-alpine` 作为默认基础镜像，完整启动步骤见根目录 [README](../README.md) 和 [运行说明](DEMO_SCRIPT.md)。
@@ -85,6 +86,7 @@ $env:PYTHONPYCACHEPREFIX = Join-Path $env:TEMP documind_pycache
 .\venv\Scripts\python.exe -m compileall -q app tests
 .\venv\Scripts\python.exe -m compileall -q evaluation
 Set-Location frontend
+npx playwright install chromium
 npm test
 npm run typecheck
 npm run build

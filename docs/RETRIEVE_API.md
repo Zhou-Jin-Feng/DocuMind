@@ -46,7 +46,7 @@ reused without evaluation.
 ```json
 {
   "schema_version": "1.0",
-  "service_version": "3.0.0",
+  "service_version": "3.1.0",
   "retrieval_version": "dense-v1",
   "retrieval_mode": "dense",
   "document_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -111,9 +111,9 @@ can return HTTP 503 because generation is unavailable while retrieval remains
 `ready`; this state permits `/retrieve` but not `/chat/stream`. Consumers must
 fail closed when the retrieval component is absent or not ready.
 
-## Application 3.0.0
+## Application 3.1.0 candidate
 
-The application reports `service_version: 3.0.0`; the retrieval contract remains
+The current source candidate reports `service_version: 3.1.0`; the retrieval contract remains
 Schema `1.0` and `retrieval_version: dense-v1`. The Gradio launcher and legacy
 server settings are removed, and default local paths are rooted in the project.
 Review [the migration guide](MIGRATION_3_0.md) before changing deployments.
