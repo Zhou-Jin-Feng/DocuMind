@@ -2,13 +2,13 @@
 
 日期：2026-09-21
 
-状态：FE-06 PASS WITH NOTES；形成待复审的 3.1.0 源码候选，未执行发布动作。
+状态：FE-06 PASS WITH NOTES；3.1.0 源码候选已完成最终复审，未执行发布动作。
 
 ## 1. 范围与版本边界
 
 FE-06 汇总 FE-01 至 FE-05 的实现、性能、视觉、键盘、依赖和契约证据，并把当前运行时与当前契约示例同步到 3.1.0。没有全仓替换 3.0.0；历史报告、3.0 迁移说明、旧发布记录、第三方依赖版本和会话 localStorage key 均保留。Schema 1.0 与 dense-v1 未改变。
 
-当前代码是 3.1.0 源码候选，不代表 Git tag、GitHub Release、正式部署或真实服务验收。用户已授权连续完成 FE-05/FE-06；仍未授权 commit、push、tag、Release 或部署。
+当前代码是 3.1.0 源码候选，不代表 Git tag、GitHub Release 或正式部署。commit c351b2d 是此前候选提交；G2 测试、Mock 与文档收尾纳入本次后续提交，版本保持 3.1.0。未执行 tag、Release 或部署。
 
 ## 2. 版本同步清单
 
@@ -31,7 +31,8 @@ FE-06 汇总 FE-01 至 FE-05 的实现、性能、视觉、键盘、依赖和契
 | FE-03 固定高频夹具 | 1/1；修补后性能证据单独写入 review-r3-r7 路径，历史 Markdown 0、无 Long Task |
 | FE-04 + FE-05 定向 E2E | 22/22 |
 | R3-R7 reviewer 边界 | 6/6；含窄屏引用焦点 |
-| 全量 Playwright | 52/52（包含正式新增矩阵 11/11） |
+| G2 滚动保持与高亮清理矩阵 | 6/6 |
+| 全量 Playwright | 58/58（包含正式新增矩阵 11/11 与 G2 6/6） |
 | Python 版本/检索契约专项 | 9 passed，13 subtests |
 | Python 全量 | 334 passed，1 skipped，186 subtests |
 | Black | 117 files unchanged |
@@ -58,7 +59,7 @@ FE-03 normal 构建基线为 JS 426,039 B / gzip9 131,805 B、CSS 24,143 B / gzi
 - FE-01～FE-05 报告、过程记录、项目记忆和 FE-06 交付入口已保留在仓库/本地忽略证据目录。
 - 3.0.0 rag-workbench-conversations-v1 数据结构、12 会话/60 消息上限和 generating/retrieving 兼容行为未清空或迁移；FE-06 没有以清空 localStorage 作为升级步骤。
 - 当前服务协议、SSE 事件、纯检索 Schema 1.0、dense-v1、来源 rank 约定未改变。
-- 真实模型、真实 Milvus、真实屏幕阅读器、CI Node 22/Python 3.11 环境尚未在本机复刻；本机为 Node 24.18.0、Python 3.14.6/venv，报告按边界陈述。
+- 后续 N04 已通过 GitHub Actions run 35685612483 独立确认 Linux/Node 22/Python 3.11 三个 job 成功；N05 已在隔离 Docker 环境完成 Milvus 上传/检索，并由用户完成人工 Windows Narrator 冒烟。真实 `/api/v1/chat/stream`、流式回答、停止、引用对应和错误链路仍未验证，也未调用收费生成模型。
 
 ## 6. 未关闭但不阻断的事项
 
@@ -69,18 +70,23 @@ FE-03 normal 构建基线为 JS 426,039 B / gzip9 131,805 B、CSS 24,143 B / gzi
 
 ## 7. 最终结论
 
-FE-06 结论：PASS WITH NOTES。当前工作树具备可复审的 3.1.0 源码候选和完整本机证据；没有未关闭的功能必验项。候选尚未提交、推送、打 tag、发布或部署；下一步必须由人工复审决定是否允许这些外部动作。
+FE-06 结论：PASS WITH NOTES。3.1.0 源码候选的 G1～G3 收尾已通过独立复审，完整浏览器回归 58/58；本次提交包含 G2 测试及报告收尾。此前 commit c351b2d 的 CI 结果不覆盖本次新增内容，新提交推送后需核对对应 ref 的 CI。真实生成链路仍按上述范围保留为未验证，未执行 tag、发布或部署。
 
 ## FE-04～FE-06 独立复审补充
 
-本轮新增 FE-05 边界复审发现 R3～R7 并已修复：规范编号校验、reference-style link 边界、普通锚点冒充防护、重复点击重新定位和跨会话高亮清理。新增边界与窄屏焦点矩阵通过，FE-05 公开报告已同步。修补后 npm test 38/38、typecheck/build、reviewer 边界 6/6、FE-05 合计 9/9、正式新增矩阵 11/11、全量 Playwright 52/52、最终高亮性能夹具 1/1 均通过；FE-06 结论维持 PASS WITH NOTES。
+本轮新增 FE-05 边界复审发现 R3～R7 并已修复：规范编号校验、reference-style link 边界、普通锚点冒充防护、重复点击重新定位和跨会话高亮清理。新增边界与窄屏焦点矩阵通过，FE-05 公开报告已同步。修补后 npm test 38/38、typecheck/build、reviewer 边界 6/6、FE-05 合计 9/9、正式新增矩阵 11/11、G2 滚动保持与高亮清理 6/6、全量 Playwright 58/58、最终高亮性能夹具 1/1 均通过；FE-06 结论维持 PASS WITH NOTES。
 
 ## 最终 notes 收尾
 
 - N01：已关闭；可信 HEAD 配对 baseline/after、源码/依赖/夹具指纹、create-only archive 与哈希保护已形成。
 - N02：已关闭；复审矩阵已迁入正式 frontend/e2e 与标准 Mock，默认全量 Playwright 执行。
 - N03：已关闭；公开报告、执行状态、项目记忆和 notes 收尾结果已统一到最终计数与证据路径。
-- N04：未验证；无提交/远端 CI 授权，不能把本机结果冒充 Linux Node 22/Python 3.11。
-- N05：未验证；未启动真实服务、真实知识库或真实屏幕阅读器；保留明确后续条件。
-- N06～N10：按维护备注保留，不擅自升级依赖、重发邮件或绕过清理策略。
-- N11～N13：按设计边界保留，不作为未修 bug。
+- N04：PASS；commit c351b2d 已推送，GitHub Actions run 35685612483 的 Python、Frontend、Compose 三个 job 全部 success，Linux/Node 22/Python 3.11 结果已取得。
+- N05：PASS WITH NOTES；隔离 Docker 服务、合成文档上传/检索和用户人工 Windows Narrator 冒烟均完成，合成数据已清理；真实 `/api/v1/chat/stream` 与生成链路未验证。
+- N06：PASS WITH NOTES；生产依赖审计为 0，开发依赖保留 2 个 moderate；可用修复是 Vitest 5 主版本迁移，本轮不强制升级。
+- N07：PASS WITH NOTES；版本/检索契约专项 9 passed、13 subtests，保留 Starlette/httpx 与 langchain-community 已知 warning；Windows runtime-path 超时单独记录。
+- N08：PASS WITH NOTES；测试产物路径已被 ignore；FE04 profile 保留，根临时 node_modules 已加入 ignore，未绕过系统策略删除。
+- N09：已核对；历史 SMTP DNS 失败不重发。
+- N10：PASS WITH NOTES；生产构建通过，JS 650,266 B / gzip9 201,545 B，CSS 26,146 B / gzip9 5,744 B；Vite >500kB 仅为提示。
+- N11：PASS WITH NOTES；本机合成流 visible latency 仅作为 DOM mutation 代理口径。
+- N12～N13：按设计边界保留，不作为未修 bug；SSE 运行时 Schema 和后台冻结/恢复未扩大为新路线。

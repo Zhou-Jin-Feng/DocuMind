@@ -256,7 +256,12 @@ function streamChat(request, response, question) {
     return;
   }
 
-  writeEvent(response, "token", { text: "RAG 是检索增强生成技术。" });
+  writeEvent(response, "token", {
+    text:
+      streamMode === "g2-citation"
+        ? "Fresh answer [文档1]."
+        : "RAG 是检索增强生成技术。",
+  });
   writeEvent(response, "done", { status: "success" });
   finished = true;
   response.end();
