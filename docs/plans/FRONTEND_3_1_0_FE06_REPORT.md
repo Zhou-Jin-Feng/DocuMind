@@ -64,8 +64,6 @@ FE-03 normal 构建基线为 JS 426,039 B / gzip9 131,805 B、CSS 24,143 B / gzi
 ## 6. 未关闭但不阻断的事项
 
 - 完整 npm audit 的 2 个 moderate 属开发依赖 Vitest 链路；升级 Vitest 5 是潜在主版本变更，未擅自处理。
-- FE-04 阶段 SMTP 完成通知因 DNS 解析失败未送达；未无限重试。
-- FE-04 实验浏览器 profile 位于 agent/fe04-browser-*，Windows 终端策略拒绝递归删除；不影响源码、服务和证据。
 - 860→861 反向动态断点已纳入正式 fe05-focus-boundaries.spec.ts 并通过；历史 FE-04 报告中的“未单列”只描述当时阶段状态，不代表当前缺口。
 
 ## 7. 最终结论
@@ -85,8 +83,7 @@ FE-06 结论：PASS WITH NOTES。3.1.0 源码候选的 G1～G3 收尾已通过�
 - N05：PASS WITH NOTES；隔离 Docker 服务、合成文档上传/检索和用户人工 Windows Narrator 冒烟均完成，合成数据已清理；真实 `/api/v1/chat/stream` 与生成链路未验证。
 - N06：PASS WITH NOTES；生产依赖审计为 0，开发依赖保留 2 个 moderate；可用修复是 Vitest 5 主版本迁移，本轮不强制升级。
 - N07：PASS WITH NOTES；版本/检索契约专项 9 passed、13 subtests，保留 Starlette/httpx 与 langchain-community 已知 warning；Windows runtime-path 超时单独记录。
-- N08：PASS WITH NOTES；测试产物路径已被 ignore；FE04 profile 保留，根临时 node_modules 已加入 ignore，未绕过系统策略删除。
-- N09：已核对；历史 SMTP DNS 失败不重发。
+- N08：PASS WITH NOTES；测试产物与依赖缓存路径已加入忽略规则，不纳入版本交付。
 - N10：PASS WITH NOTES；生产构建通过，JS 650,266 B / gzip9 201,545 B，CSS 26,146 B / gzip9 5,744 B；Vite >500kB 仅为提示。
 - N11：PASS WITH NOTES；本机合成流 visible latency 仅作为 DOM mutation 代理口径。
 - N12～N13：按设计边界保留，不作为未修 bug；SSE 运行时 Schema 和后台冻结/恢复未扩大为新路线。

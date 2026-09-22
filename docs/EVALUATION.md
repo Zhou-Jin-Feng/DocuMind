@@ -683,7 +683,7 @@ DS-06 在 75 份代表性文档、235 个生产 Chunk 和 50/50 validation/holdo
 均未配置冻结的拒答策略，no-answer 空结果率为 0 不代表具备拒答能力。增强方案保留为
 离线/受控实验，不改变线上公共契约。
 
-第二次项目冻结是“个人项目级冻结”，不是公网生产认证：它固定 v2.2.0 Dense
+第二次项目冻结是版本交付基线冻结，不等同于公网生产环境验收：它固定 v2.2.0 Dense
 基线、P2 数据证据、评测报告、测试和边界文档；不包含 raw 数据、模型缓存、Milvus
 数据、`agent/` 工作资料或临时产物。ScholarTrace M2 已在 DocuMind `2.2.0 纯检索交付基线`
 上完成 3 篇公开论文的真实 `upload/status/retrieve` 在线验收，Evidence provenance

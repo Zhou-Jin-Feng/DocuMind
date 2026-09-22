@@ -376,7 +376,6 @@ Node/npm、mode/env 下记录所有 JS/CSS chunk 的原始字节、固定 gzip l
 - 视觉结构化数据：`artifacts/frontend-3.1.0/fe01/visual-agent/baseline-probe.json`
 - 测量设施：`frontend/src/fe01Metrics.ts`、`frontend/benchmarks/`、
   `frontend/vite.fe01.config.ts`、`frontend/playwright.fe01.config.ts`
-- 私有阶段记录：`agent/过程记录/FE-01-前端3.1.0基线与实施设计.md`
 
 ## 11. 最终自检与阶段结论
 
