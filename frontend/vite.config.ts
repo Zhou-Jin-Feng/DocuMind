@@ -13,6 +13,6 @@ export default defineConfig({
     port: 5173,
   },
   test: {
-    exclude: ["benchmarks/**", "e2e/**", "node_modules/**", "dist/**"],
+    exclude: ["benchmarks/**", "e2e/**", "e2e-real/**", "node_modules/**", "dist/**"],
   },
 });

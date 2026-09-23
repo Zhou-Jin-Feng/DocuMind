@@ -274,12 +274,8 @@ class ObservabilityEventTests(unittest.TestCase):
         ]
         self.assertEqual(len(terminal_records), 1)
         self.assertEqual(terminal_records[0]["status"], "client_disconnected")
-        self.assertEqual(
-            terminal_records[0]["fields"]["terminal_event"], "none"
-        )
-        self.assertEqual(
-            terminal_records[0]["request_id"], "disconnect-test-request"
-        )
+        self.assertEqual(terminal_records[0]["fields"]["terminal_event"], "none")
+        self.assertEqual(terminal_records[0]["request_id"], "disconnect-test-request")
         self.assertNotIn("PRIVATE_QUERY_SHOULD_NOT_BE_LOGGED", self.console.getvalue())
 
     def test_document_ingestion_emits_stage_events_without_file_name(self):

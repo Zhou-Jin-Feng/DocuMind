@@ -4,7 +4,7 @@
   "base_git_head": "b83194454771a0524f603cff566ae684fea366af",
   "working_tree_dirty": true,
   "scope": "当前 Git 差异中的全部项目源代码、测试、依赖、构建配置及相关公开文档；另列影响构建/测试复核的未修改基线输入。不是完整发布提交，也不证明任何服务已部署。",
-  "changed_candidate_file_count": 19,
+  "changed_candidate_file_count": 20,
   "changed_candidate_files": [
     {
       "path": "app/core/document_loader.py",
@@ -105,6 +105,13 @@
       "sha256": "e94b436c1ba8a619a748481fbb36fd620ef7fc90a1e46511340e911a3610591a"
     },
     {
+      "path": "frontend/vite.config.ts",
+      "status": "modified_from_base",
+      "byte_size": 414,
+      "sha256": "4faed4c4e5761c3092baa48d73aa927c7060c79b66a3a659456f57cb3999acc0",
+      "category": "test_and_build_configuration"
+    },
+    {
       "path": "README.md",
       "status": "modified_from_base",
       "category": "project_documentation",
@@ -129,8 +136,8 @@
       "path": "tests/test_observability_events.py",
       "status": "modified_from_base",
       "category": "automated_tests",
-      "byte_size": 11498,
-      "sha256": "aafd60c0af0a1973970c06b25542483695dc4d3a43639a42a7ee2e3a7317b5ef"
+      "byte_size": 11454,
+      "sha256": "f37d054941b72e5f6c53843a5f9b3497488134bb2bb92edd71759a7335bf3985"
     },
     {
       "path": "tests/test_vector_store.txt",
@@ -140,7 +147,7 @@
       "sha256": "ab75854496964161108730a96b31cdcda5b254d4fc791ad24d5d6722c8e6da55"
     }
   ],
-  "supporting_baseline_input_count": 10,
+  "supporting_baseline_input_count": 9,
   "supporting_baseline_inputs": [
     {
       "path": ".dockerignore",
@@ -195,12 +202,6 @@
       "status": "unchanged_at_base",
       "byte_size": 413,
       "sha256": "2fba2f25e1859f193b54edef5d2d2cd08cae2a37fab64c08699f6f8672bea2cc"
-    },
-    {
-      "path": "frontend/vite.config.ts",
-      "status": "unchanged_at_base",
-      "byte_size": 399,
-      "sha256": "672fe7892e6142611b8309287f2938cef138ff5833ff585ad0c7d5bacedcdb97"
     }
   ],
   "exclusions": [

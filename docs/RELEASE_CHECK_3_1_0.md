@@ -16,7 +16,7 @@
 | 检索版本 | `dense-v1` |
 | 数据库迁移 | 本轮未新增迁移脚本；Registry schema 和 Milvus 数据结构未改变 |
 
-检查基线为 HEAD `b83194454771a0524f603cff566ae684fea366af`，生成清单时工作树为 dirty。当前候选差异含 19 个代码、测试、依赖、构建配置及相关文档文件；另记录 10 个未修改的依赖/构建基线输入。逐文件字节数和 SHA-256 见 [`RELEASE_CHECK_3_1_0_CANDIDATE_MANIFEST.json`](RELEASE_CHECK_3_1_0_CANDIDATE_MANIFEST.json)，清单 SHA-256：`c0b18a120da0134c3350584766906fa768529682a8dda7a314b9536637858547`。
+检查基线为 HEAD `b83194454771a0524f603cff566ae684fea366af`，生成清单时工作树为 dirty。当前候选差异含 20 个代码、测试、依赖、构建配置及相关文档文件；另记录 9 个未修改的依赖/构建基线输入。逐文件字节数和 SHA-256 见 [`RELEASE_CHECK_3_1_0_CANDIDATE_MANIFEST.json`](RELEASE_CHECK_3_1_0_CANDIDATE_MANIFEST.json)，清单 SHA-256：`4855ee36785ee0d671f285664ff2dee40077cc999d179b5b661a5d5ce017898c`。
 
 清单不含凭据或本地环境值；排除运行数据、生成产物、缓存、用户浏览器配置/个人状态，以及与发布无关的本地文件。仓库自有 `frontend/playwright.real.config.ts` 是真实服务验收测试的可复核输入，已纳入清单，不属于用户浏览器配置。发布检查记录自身及清单文件不相互纳入哈希：检查记录引用清单指纹以避免循环依赖；记录自身最终 SHA-256 保存在私有过程记录中。该清单描述 HEAD 加指定工作树候选差异，不等于最终发布提交身份；正式发布前应根据最终提交重新生成并复核候选身份。
 
@@ -88,7 +88,7 @@ python -m evaluation.regression_runner `
 
 ### 本地 SSE 客户端断连终态观测
 
-- 源码身份按上述候选清单逐文件绑定：`app/services/rag_service.py` SHA-256 `e55dc4ba56b31f3062cb9ba2511f941342dc5c6c8239f178b89b6aab29f1e1af`；对应单元测试 `tests/test_observability_events.py` SHA-256 `aafd60c0af0a1973970c06b25542483695dc4d3a43639a42a7ee2e3a7317b5ef`；真实断连测试 `frontend/e2e-real/real-sse-disconnect.spec.ts` SHA-256 `2494f1b66d6f355e6257c03703434cd13bd6b58b6ca01f3dcf7ecb7a751a90c1`；字段说明 `docs/OBSERVABILITY.md` SHA-256 `49e418037dbc7af8d22767480d3ba95837a5ec92d76190b612d00ba909d7f73a`。
+- 源码身份按上述候选清单逐文件绑定：`app/services/rag_service.py` SHA-256 `e55dc4ba56b31f3062cb9ba2511f941342dc5c6c8239f178b89b6aab29f1e1af`；对应单元测试 `tests/test_observability_events.py` SHA-256 `f37d054941b72e5f6c53843a5f9b3497488134bb2bb92edd71759a7335bf3985`；真实断连测试 `frontend/e2e-real/real-sse-disconnect.spec.ts` SHA-256 `2494f1b66d6f355e6257c03703434cd13bd6b58b6ca01f3dcf7ecb7a751a90c1`；字段说明 `docs/OBSERVABILITY.md` SHA-256 `49e418037dbc7af8d22767480d3ba95837a5ec92d76190b612d00ba909d7f73a`。
 - 留存的本地隔离链路证据：真实客户端收到首个 token 后发出 abort；HTTP 200；服务端按同一 request ID `7aa2da8cba8840bf8d69ac345b3624f9` 观察到唯一 `response_stream_terminated` 事件，`status=client_disconnected`、`terminal_event=none`，未观察到该请求的其他终态事件。样例文档清理后列表为 0、详情请求返回 404。单元测试 5/5 通过，真实 Playwright 用例 1/1 通过；本记录引用已保存证据，没有重新启动 Compose 或发送在线请求。
 - 身份限制：保存的断连证据包含 Compose 项目名、日志事件和 request ID，但没有 API 容器镜像 ID或构建上下文摘要，因此无法事后以密码学证据将该日志精确绑定到某个镜像字节。上述 SHA-256 识别的是本次候选工作树中的实现、测试和字段文档；不将历史 R6 镜像摘要倒推为该次断连运行的镜像身份。历史镜像及报告继续保持各自原始时间和适用范围。
 - 该验证只证明本地服务观察到客户端关闭响应流并记录事件；不证明上游 Provider 已停止计算或已停止计费，也不等同 Provider 飞行中任务取消。
