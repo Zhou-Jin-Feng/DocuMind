@@ -24,7 +24,7 @@
 | Tracing | `opentelemetry-exporter-otlp-proto-http` | 可选 OTLP/HTTP Trace 导出 |
 | Utilities | `tiktoken`, `rich` | 分块分析和终端展示 |
 
-`requirements.txt` 只声明 Python 直接依赖，不等同于完整锁文件。`sentence-transformers` 会带入 PyTorch、Transformers 和 SciPy 等运行依赖；普通 Dense/BM25/Hybrid 链路不会加载重排模型。
+`requirements.txt` 只声明 Python 直接依赖；`requirements.lock` 是从已验证 Python 3.11 API 镜像生成的完整依赖快照，包含 123 个解析包。安装 `torch==2.14.0+cpu` 时需要 PyTorch CPU 索引。`sentence-transformers` 会带入 PyTorch、Transformers 和 SciPy 等运行依赖；普通 Dense/BM25/Hybrid 链路不会加载重排模型。容器基础镜像和外部服务镜像已在 `compose.yaml` 与 Dockerfile 中以 digest 固定，具体身份和依赖锁验证见[3.1.0 发布前检查记录](RELEASE_CHECK_3_1_0.md)。
 
 ## 前端依赖
 
@@ -57,6 +57,12 @@ python --version  # 本地开发基线为 Python 3.11
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+```
+
+如需按已验证的完整依赖快照安装：
+
+```powershell
+pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.lock
 ```
 
 开发依赖：

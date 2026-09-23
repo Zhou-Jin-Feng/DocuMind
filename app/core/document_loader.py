@@ -217,7 +217,7 @@ def demo_load_single_file():
     loader = UniversalDocumentLoader()
 
     logger.info("\n请输入文档路径（支持 .pdf / .docx / .txt）:")
-    logger.info("示例: C:\\Users\\test\\Desktop\\sample.pdf")
+    logger.info("示例: ./documents/sample.pdf")
 
     file_path = input("\n文件路径: ").strip()
 

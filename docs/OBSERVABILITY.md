@@ -30,7 +30,7 @@ Logs + Metrics + Traces 由 FastAPI 入口和统一服务层实现。应用实�
 | `request_id` | 一次业务请求内保持一致 |
 | `trace_id` | Tracing 开启时与 Span Trace ID 一致 |
 | `duration_ms` | 数字毫秒，不使用带单位字符串 |
-| `status` | `started`、`success`、`no_context`、`rejected` 或 `error` |
+| `status` | `started`、`success`、`no_context`、`rejected`、`error` 或 `client_disconnected` |
 | `error_type` | 只记录异常类型，不把异常消息作为结构化字段 |
 
 ### 2.3 问答事件顺序
@@ -51,6 +51,8 @@ query_received
 异常时会出现 `query_embedding_failed`、`vector_search_failed`、`retrieval_failed`、`llm_stream_failed`、`generation_completed(status=error)` 或 `response_sent(status=error)`。
 
 FastAPI 中间件会验证或生成 `X-Request-ID`，把它写入请求上下文并在响应头中返回。SSE 问答由服务层产生结构化事件，已发送部分 Token 后如果 Provider 中断，前端保留已收到文本并显示错误状态。`RAGService.stream_answer` 使用固定 `contextvars.Context` 保持整个流生命周期内的 `request_id` / `trace_id`。
+
+客户端关闭 SSE 响应流时，服务层记录 `response_stream_terminated`，包含 `request_id`、持续时间、`status=client_disconnected` 和服务端已发出的终态事件（`done`、`error` 或 `none`）。该日志用于识别服务端生成器被关闭，不表示客户端已收到任何终态事件。
 
 ### 2.4 文档摄取事件顺序
 

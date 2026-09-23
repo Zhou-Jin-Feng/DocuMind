@@ -37,6 +37,8 @@ Milvus Standalone 的 etcd、MinIO 由 Compose 编排；Ollama 和生成模型�
 
 当前源码使用 `3.1.0` 版本标识；这是本轮源码候选，尚不代表已发布 Release。新版统一采用 React/FastAPI/Milvus，不再提供 Gradio 启动入口；应用相对路径和默认环境文件以项目根为基准。旧版用户先阅读[3.0.0 迁移说明](docs/MIGRATION_3_0.md)。纯检索 Schema 仍为 `1.0`，`dense-v1` 不变。
 
+3.1.0 的源码、依赖、镜像和当前版本确定性回归身份见[发布前检查记录](docs/RELEASE_CHECK_3_1_0.md)；该记录不代表已发布 Release。
+
 旧架构入口为 `v1.7.1`（Chroma/Gradio），需要时检出对应标签并使用该快照的说明。源码版本标识不等于 GitHub Release 已发布；实际发布以对应标签与发布页为准。
 
 ## 环境要求
@@ -127,6 +129,7 @@ python -m evaluation.regression_runner --baseline evaluation/baselines/determini
 | 证据 | 结论与边界 |
 |---|---|
 | DS-06 检索对照 | 75 份合成代表性文档、235 Chunk，validation/holdout 各 50 题。Reranker 的 MRR@3 从 **0.3018 提升至 0.4459**，但 P95 从 **170.25 ms 增至 1102.93 ms**，超出预设延迟门禁，因此不替换 Dense 主线。 |
+| 结构化上下文候选 | 固定工程文档题集、真实 `qwen3-embedding`、跨文档候选池；完整证据单元 Recall@3 未提升，开发集 MRR@3 从 0.7609 降至 0.7029；候选未采用，Dense-only 主线不变。final 为已曝露集合复核，不是未接触 holdout。 |
 | 答案质量对照 | 历史报告暴露拒答和统一引用等限制；检索命中不等于回答正确，不能宣称任意模型或用户文档都达到相同质量。 |
 | ScholarTrace 联调 | 已有对应基线的真实上传/检索与 Evidence 校验记录；证明限定条件下的接口集成，不代表当前版本的独立部署验收或大规模吞吐。 |
 

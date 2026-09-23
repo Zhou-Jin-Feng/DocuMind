@@ -1,0 +1,237 @@
+{
+  "schema_version": "documind-3.1.0-candidate-source-manifest-v1",
+  "generated_date": "2026-09-24",
+  "base_git_head": "b83194454771a0524f603cff566ae684fea366af",
+  "working_tree_dirty": true,
+  "scope": "当前 Git 差异中的全部项目源代码、测试、依赖、构建配置及相关公开文档；另列影响构建/测试复核的未修改基线输入。不是完整发布提交，也不证明任何服务已部署。",
+  "changed_candidate_file_count": 19,
+  "changed_candidate_files": [
+    {
+      "path": "app/core/document_loader.py",
+      "status": "modified_from_base",
+      "category": "application_source",
+      "byte_size": 10025,
+      "sha256": "cdbc7f3409679ffb9380e979e02dffeb583023ca49348d1b5edf4c48944d37c0"
+    },
+    {
+      "path": "app/services/rag_service.py",
+      "status": "modified_from_base",
+      "category": "application_source",
+      "byte_size": 15768,
+      "sha256": "e55dc4ba56b31f3062cb9ba2511f941342dc5c6c8239f178b89b6aab29f1e1af"
+    },
+    {
+      "path": "compose.yaml",
+      "status": "modified_from_base",
+      "category": "deployment_build_configuration",
+      "byte_size": 5632,
+      "sha256": "4c441eef69977f38cfc9c2487c7ac32c5da9d2349f3f27aae562ac6aa05be466"
+    },
+    {
+      "path": "Dockerfile",
+      "status": "modified_from_base",
+      "category": "build_configuration",
+      "byte_size": 937,
+      "sha256": "1d9c130b9bb8335eb5fe4ea042280f4546651b96be4af834c0dd15a18ce51703"
+    },
+    {
+      "path": "docs/DEPENDENCIES.md",
+      "status": "modified_from_base",
+      "category": "dependency_documentation",
+      "byte_size": 5849,
+      "sha256": "c135bab81b0465442822f75b91a16cc78b84639c67fe994403f2c78b67dbd850"
+    },
+    {
+      "path": "docs/EVALUATION.md",
+      "status": "modified_from_base",
+      "category": "evaluation_documentation",
+      "byte_size": 57033,
+      "sha256": "a68dd7b93d21227e40d224123cf2fb2dac59a4700673bb93b4bd8e5d03f56c8a"
+    },
+    {
+      "path": "docs/OBSERVABILITY.md",
+      "status": "modified_from_base",
+      "category": "observability_documentation",
+      "byte_size": 9625,
+      "sha256": "49e418037dbc7af8d22767480d3ba95837a5ec92d76190b612d00ba909d7f73a"
+    },
+    {
+      "path": "docs/VERSION_HISTORY.md",
+      "status": "modified_from_base",
+      "category": "release_documentation",
+      "byte_size": 3721,
+      "sha256": "fd7bab978f4971654a0931d62827256d39b8dd8e261d4f9f57dfb3c165e4a0d5"
+    },
+    {
+      "path": "evaluation/da02_diagnostic.py",
+      "status": "untracked_candidate",
+      "category": "evaluation_source",
+      "byte_size": 22553,
+      "sha256": "af2b2aacf4f4a126ef1f7c25b03a432e6ce37ec2c3eaac78a23e1d57a508be0c"
+    },
+    {
+      "path": "frontend/Dockerfile",
+      "status": "modified_from_base",
+      "category": "build_configuration",
+      "byte_size": 418,
+      "sha256": "0c4c88e465a1286a86bf40a7142f4aa57c35ceb02512cd2c1be2a14c4d6a85bc"
+    },
+    {
+      "path": "frontend/e2e-real/real-sse-disconnect.spec.ts",
+      "status": "untracked_candidate",
+      "category": "real_service_acceptance_test",
+      "byte_size": 4493,
+      "sha256": "2494f1b66d6f355e6257c03703434cd13bd6b58b6ca01f3dcf7ecb7a751a90c1"
+    },
+    {
+      "path": "frontend/e2e-real/real-sse-isolation.spec.ts",
+      "status": "untracked_candidate",
+      "category": "real_service_acceptance_test",
+      "byte_size": 7426,
+      "sha256": "b9f5b1ccb10956cc08ed88d20ff81f030e1fe053a45d3b769d4b43a3a377ad2a"
+    },
+    {
+      "path": "frontend/package.json",
+      "status": "modified_from_base",
+      "category": "dependency_and_test_configuration",
+      "byte_size": 1328,
+      "sha256": "07e55ea893dd0b948984133e13d7127c2a63e8b6ab417a4ea37aa74073c0b342"
+    },
+    {
+      "path": "frontend/playwright.real.config.ts",
+      "status": "untracked_candidate",
+      "category": "repository_owned_test_configuration",
+      "byte_size": 1129,
+      "sha256": "e94b436c1ba8a619a748481fbb36fd620ef7fc90a1e46511340e911a3610591a"
+    },
+    {
+      "path": "README.md",
+      "status": "modified_from_base",
+      "category": "project_documentation",
+      "byte_size": 9897,
+      "sha256": "6b594d4c0008d2cdaaf043e3fe6b763c38aad3adff87a92b0e4a9d161c71295a"
+    },
+    {
+      "path": "requirements.lock",
+      "status": "untracked_candidate",
+      "category": "python_dependency_lock",
+      "byte_size": 2963,
+      "sha256": "cb75c974054aaa3bfee5c9306fc126b28635a7e37540ae2a23b365809478d37a"
+    },
+    {
+      "path": "tests/test_da02_diagnostic.py",
+      "status": "untracked_candidate",
+      "category": "automated_tests",
+      "byte_size": 3678,
+      "sha256": "6391a163daab5d0f313d7c1e0a5ad4453b510bb2f3af47a5c04b531e1e5a71f9"
+    },
+    {
+      "path": "tests/test_observability_events.py",
+      "status": "modified_from_base",
+      "category": "automated_tests",
+      "byte_size": 11498,
+      "sha256": "aafd60c0af0a1973970c06b25542483695dc4d3a43639a42a7ee2e3a7317b5ef"
+    },
+    {
+      "path": "tests/test_vector_store.txt",
+      "status": "modified_from_base",
+      "category": "test_fixture",
+      "byte_size": 539,
+      "sha256": "ab75854496964161108730a96b31cdcda5b254d4fc791ad24d5d6722c8e6da55"
+    }
+  ],
+  "supporting_baseline_input_count": 10,
+  "supporting_baseline_inputs": [
+    {
+      "path": ".dockerignore",
+      "status": "unchanged_at_base",
+      "byte_size": 713,
+      "sha256": "a069432c0bb40918a940b6728f52ad57fe27d8510c745fc6f3523aecea060258"
+    },
+    {
+      "path": "requirements.txt",
+      "status": "unchanged_at_base",
+      "byte_size": 939,
+      "sha256": "82e497d1a718519c2c5095597e9530abd8567721a42e28ea31b28cb86beae7e3"
+    },
+    {
+      "path": "requirements-dev.txt",
+      "status": "unchanged_at_base",
+      "byte_size": 365,
+      "sha256": "6e4d961e746bd93b790165af28e86932b4d03afca1ea565fb0b09c7ff8b6b0d1"
+    },
+    {
+      "path": "pyproject.toml",
+      "status": "unchanged_at_base",
+      "byte_size": 128,
+      "sha256": "72bf9be550d8c75452c6969c73be2c14bb7d0bb5a7053beef9918d9c113bbecb"
+    },
+    {
+      "path": "frontend/.dockerignore",
+      "status": "unchanged_at_base",
+      "byte_size": 206,
+      "sha256": "1a68c74d7a99526935f97e0000ed412f6d6c1e2657971b2f95987c09586254db"
+    },
+    {
+      "path": "frontend/package-lock.json",
+      "status": "unchanged_at_base",
+      "byte_size": 162351,
+      "sha256": "4488388077ff25ab80e508ca5beaa015fad5845a54e18f9696b27e6ea4b28b99"
+    },
+    {
+      "path": "frontend/tsconfig.json",
+      "status": "unchanged_at_base",
+      "byte_size": 119,
+      "sha256": "770b4140bbb581e2dfd9ea9946ffc9c75a1d86ba7d2db5f77c83e37cbdf9d808"
+    },
+    {
+      "path": "frontend/tsconfig.app.json",
+      "status": "unchanged_at_base",
+      "byte_size": 638,
+      "sha256": "fcfd96666194e5e0c5c71e2e3a700bc463d85d13deff776dc0a1e1477f3f922e"
+    },
+    {
+      "path": "frontend/tsconfig.node.json",
+      "status": "unchanged_at_base",
+      "byte_size": 413,
+      "sha256": "2fba2f25e1859f193b54edef5d2d2cd08cae2a37fab64c08699f6f8672bea2cc"
+    },
+    {
+      "path": "frontend/vite.config.ts",
+      "status": "unchanged_at_base",
+      "byte_size": 399,
+      "sha256": "672fe7892e6142611b8309287f2938cef138ff5833ff585ad0c7d5bacedcdb97"
+    }
+  ],
+  "exclusions": [
+    {
+      "path": "docs/RELEASE_CHECK_3_1_0.md",
+      "reason": "本发布检查记录引用本清单指纹；排除此文件以避免循环哈希。其最终独立文件哈希写入私有过程记录。"
+    },
+    {
+      "path": "docs/RELEASE_CHECK_3_1_0_CANDIDATE_MANIFEST.json",
+      "reason": "清单自身；自哈希由发布检查记录和私有过程记录绑定。"
+    },
+    {
+      "category": "unrelated_local_files",
+      "count": 1,
+      "reason": "与发布无关的本地文件不纳入候选；具体排除清单保存在私有检查记录。"
+    },
+    {
+      "path": ".env、.env.* 中的本地配置与凭据值",
+      "reason": "不读取、不复制凭据或本机秘密。"
+    },
+    {
+      "path": "data/、artifacts/、logs/、test-results/、前端构建输出及依赖缓存",
+      "reason": "运行数据、生成产物和缓存，不属于源码候选。"
+    },
+    {
+      "path": "用户浏览器配置、个人配置文件、认证状态及浏览器缓存",
+      "reason": "本地用户状态不属于仓库源码；仓库自有 Playwright 测试配置仍作为可复核测试输入纳入清单。"
+    },
+    {
+      "path": "agent/",
+      "reason": "按项目约定仅保存私有工作记录，不纳入提交候选。"
+    }
+  ]
+}

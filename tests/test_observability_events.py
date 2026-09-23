@@ -243,6 +243,45 @@ class ObservabilityEventTests(unittest.TestCase):
         self.assertEqual(completion["request_id"], response["request_id"])
         self.assertIsNotNone(response["request_id"])
 
+    def test_client_disconnect_after_token_logs_stream_terminal_state(self):
+        service = RAGService(
+            retriever=Retriever(FakeVectorStore(), FakeEmbeddingClient()),
+            rag_generator=FakeGenerator(),
+            settings=Settings(
+                _env_file=None, default_llm_provider="openai", metrics_enabled=False
+            ),
+        )
+        stream = service.stream_answer(
+            "PRIVATE_QUERY_SHOULD_NOT_BE_LOGGED",
+            request_id="disconnect-test-request",
+        )
+        outputs = []
+        try:
+            while True:
+                event = next(stream)
+                outputs.append(event)
+                if event.type == "token":
+                    break
+        finally:
+            stream.close()
+
+        self.assertEqual(outputs[-1].type, "token")
+        records = self._records()
+        terminal_records = [
+            record
+            for record in records
+            if record["event"] == "response_stream_terminated"
+        ]
+        self.assertEqual(len(terminal_records), 1)
+        self.assertEqual(terminal_records[0]["status"], "client_disconnected")
+        self.assertEqual(
+            terminal_records[0]["fields"]["terminal_event"], "none"
+        )
+        self.assertEqual(
+            terminal_records[0]["request_id"], "disconnect-test-request"
+        )
+        self.assertNotIn("PRIVATE_QUERY_SHOULD_NOT_BE_LOGGED", self.console.getvalue())
+
     def test_document_ingestion_emits_stage_events_without_file_name(self):
         with tempfile.TemporaryDirectory() as directory:
             registry = DocumentRegistry(str(Path(directory) / "registry.sqlite3"))

@@ -110,12 +110,29 @@ class RAGService:
 
         stream = self._stream_answer(question, request_id=request_id)
         stream_context = copy_context()
+        stream_started = perf_counter()
+        terminal_event: str | None = None
         try:
             while True:
                 try:
-                    yield stream_context.run(next, stream)
+                    event = stream_context.run(next, stream)
                 except StopIteration:
                     return
+                if event.type in {"done", "error"}:
+                    terminal_event = event.type
+                yield event
+        except GeneratorExit:
+            stream_context.run(
+                logger.info,
+                "问答事件流因客户端关闭而终止",
+                event="response_stream_terminated",
+                operation="rag.query",
+                duration_ms=(perf_counter() - stream_started) * 1000,
+                status="client_disconnected",
+                terminal_event=terminal_event or "none",
+                request_id=request_id,
+            )
+            raise
         finally:
             stream_context.run(stream.close)
 
